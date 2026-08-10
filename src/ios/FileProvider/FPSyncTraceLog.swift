@@ -22,7 +22,7 @@ enum FPSyncTraceLog {
 
     private static var fileURL: URL? {
         guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.openminis.app"
+            forSecurityApplicationGroupIdentifier: "group.com.1agents.phone"
         ) else { return nil }
         let dir = container.appendingPathComponent("MinisConfig", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

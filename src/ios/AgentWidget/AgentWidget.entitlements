@@ -2,9 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+<!-- rev-2: app group aligned to com.1agents.phone -->
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.openminis.app</string>
+		<string>group.com.1agents.phone</string>
 	</array>
 </dict>
 </plist>

@@ -114,14 +114,24 @@ init_submodules() {
 
     cd "$ISH_DIR"
 
-    if [ ! -d "deps/libapps/.git" ] && [ ! -f "deps/libapps/.git" ]; then
-        git submodule update --init --recursive
-        log_success "Submodules initialized"
-    else
-        log_info "Submodules already initialized"
-    fi
-
-    cd "$SCRIPT_DIR"
+    # Always run submodule update (idempotent: it's a fast no-op when the
+    # submodules are already initialized). Retry on failure — GitHub clones
+    # from slow/CN networks are prone to transient timeouts (curl 28 / early
+    # EOF) even when the connection itself is fine.
+    local attempts=6
+    local i
+    for i in $(seq 1 "$attempts"); do
+        if git submodule update --init --recursive; then
+            log_success "Submodules initialized"
+            cd "$SCRIPT_DIR"
+            return
+        fi
+        if [ "$i" -lt "$attempts" ]; then
+            log_warning "Submodule init failed (attempt $i/$attempts), retrying in 5s..."
+            sleep 5
+        fi
+    done
+    log_error "Failed to initialize submodules after $attempts attempts"
 }
 
 # ============================================================================

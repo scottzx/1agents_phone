@@ -123,4 +123,58 @@ typedef void (^ISHShellCompletionCallback)(ISHShellExecutionResult *result);
 
 @end
 
+#pragma mark - Persistent Process
+
+/// A long-lived guest process whose stdin pipe stays open after launch, so the
+/// host can keep writing commands and stream stdout/stderr line-by-line.
+/// Used for daemon-style runtimes (e.g. `pi --mode rpc`).
+@interface ISHShellPersistentProcess : NSObject
+
+/// Guest process PID (returned by the launch method).
+@property (nonatomic, readonly) int pid;
+
+/// Write end of the guest's stdin pipe. Owned by this object; do NOT close it
+/// yourself — call -terminate or dealloc instead.
+@property (nonatomic, readonly) int stdinWriteFD;
+
+/// Write a chunk of data to the process's stdin (blocking until fully written).
+/// @return YES on success, NO if the pipe is closed or the write failed.
+- (BOOL)writeData:(NSData *)data;
+
+/// Write a line to stdin, appending "\n" (RPC mode is newline-delimited JSON).
+/// @return YES on success, NO if the pipe is closed or the write failed.
+- (BOOL)writeLine:(NSString *)line;
+
+/// Send SIGTERM then SIGKILL to the process and its whole group (children
+/// included), then close the stdin pipe. Safe to call multiple times.
+- (void)terminate;
+
+@end
+
+/// Line callback for persistent processes (called on the main queue).
+typedef void (^ISHShellPersistentLineCallback)(NSString *line, BOOL isStdErr);
+
+/// Exit callback for persistent processes (called on the main queue).
+typedef void (^ISHShellPersistentExitCallback)(int exitCode, int guestPid);
+
+@interface ISHShellExecutor (Persistent)
+
+/// Launch a long-lived executable with an open stdin pipe.
+/// @param executable Path to executable (e.g. "/usr/local/bin/pi")
+/// @param arguments Array of arguments (e.g. @[@"--mode", @"rpc"])
+/// @param environment Dictionary of environment variables (nil = default)
+/// @param fsContext Opaque per-session context (0 = default), stamped on the
+///        new task group like the one-shot methods
+/// @param lineCallback Called per stdout/stderr line (main queue), can be nil
+/// @param exitCallback Called when the process exits (main queue), can be nil
+/// @return A process handle, or nil if the process could not be launched.
++ (nullable ISHShellPersistentProcess *)launchPersistentExecutable:(NSString *)executable
+                                                         arguments:(nullable NSArray<NSString *> *)arguments
+                                                       environment:(nullable NSDictionary<NSString *, NSString *> *)environment
+                                                         fsContext:(uint64_t)fsContext
+                                                      lineCallback:(nullable ISHShellPersistentLineCallback)lineCallback
+                                                      exitCallback:(nullable ISHShellPersistentExitCallback)exitCallback;
+
+@end
+
 NS_ASSUME_NONNULL_END

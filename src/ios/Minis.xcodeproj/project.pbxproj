@@ -313,6 +313,13 @@
 		E5P000002 /* EnvironmentVariablesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5P000012 /* EnvironmentVariablesView.swift */; };
 		E5P000003 /* DeepLinkCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5P000013 /* DeepLinkCoordinator.swift */; };
 		E5P000004 /* DeepLinkRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5P000014 /* DeepLinkRouter.swift */; };
+		E5PIRT001 /* PiRuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PIRT002 /* PiRuntimeBridge.swift */; };
+		E5PIRT003 /* pi in Resources */ = {isa = PBXBuildFile; fileRef = E5PIRT004 /* pi */; };
+		E5PIRT005 /* pi-x86_64 in Resources */ = {isa = PBXBuildFile; fileRef = E5PIRT006 /* pi-x86_64 */; };
+		E5PIRT007 /* PiRPCWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PIRT008 /* PiRPCWire.swift */; };
+		E5PIRT009 /* PiRPCWire.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PIRT008 /* PiRPCWire.swift */; };
+		E5PIRT012 /* PiRuntimeSessionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PIRT013 /* PiRuntimeSessionController.swift */; };
+		E5PIRT014 /* AIChatViewModel+PiRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PIRT015 /* AIChatViewModel+PiRuntime.swift */; };
 		E5PRIV01 /* EnvVarPrivacyStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PRIV11 /* EnvVarPrivacyStore.swift */; };
 		E5PRIV02 /* EnvVarRedactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5PRIV12 /* EnvVarRedactor.swift */; };
 		E5PV00001 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E5PV00002 /* PrivacyInfo.xcprivacy */; };
@@ -934,6 +941,12 @@
 		E5P000012 /* EnvironmentVariablesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvironmentVariablesView.swift; sourceTree = "<group>"; };
 		E5P000013 /* DeepLinkCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkCoordinator.swift; sourceTree = "<group>"; };
 		E5P000014 /* DeepLinkRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeepLinkRouter.swift; sourceTree = "<group>"; };
+		E5PIRT002 /* PiRuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRuntimeBridge.swift; sourceTree = "<group>"; };
+		E5PIRT004 /* pi */ = {isa = PBXFileReference; lastKnownFileType = file; name = pi; path = ../../deps/resources/pi; sourceTree = SOURCE_ROOT; };
+		E5PIRT006 /* pi-x86_64 */ = {isa = PBXFileReference; lastKnownFileType = file; name = "pi-x86_64"; path = "../../deps/resources/pi-x86_64"; sourceTree = SOURCE_ROOT; };
+		E5PIRT008 /* PiRPCWire.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRPCWire.swift; sourceTree = "<group>"; };
+		E5PIRT013 /* PiRuntimeSessionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PiRuntimeSessionController.swift; sourceTree = "<group>"; };
+		E5PIRT015 /* AIChatViewModel+PiRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+PiRuntime.swift"; sourceTree = "<group>"; };
 		E5PRIV11 /* EnvVarPrivacyStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvVarPrivacyStore.swift; sourceTree = "<group>"; };
 		E5PRIV12 /* EnvVarRedactor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnvVarRedactor.swift; sourceTree = "<group>"; };
 		E5PV00002 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -1253,6 +1266,8 @@
 				AC0000201 /* ProviderCustomizationGenerated.swift */,
 				E54000AC2 /* DebugSkillGenerated.swift */,
 				AC0000001 /* ProviderCustomization.xcconfig */,
+				E5PIRT004 /* pi */,
+				E5PIRT006 /* pi-x86_64 */,
 			);
 			name = "Recovered References";
 			sourceTree = "<group>";
@@ -1400,6 +1415,7 @@
 				F1A00018 /* Speech */,
 				F1A00013 /* Sync */,
 				E5LD00003 /* ToolLoopDetector.swift */,
+				E5PIRT100 /* Runtime */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1729,6 +1745,16 @@
 			path = NativeOffloads;
 			sourceTree = "<group>";
 		};
+		E5PIRT100 /* Runtime */ = {
+			isa = PBXGroup;
+			children = (
+				E5PIRT002 /* PiRuntimeBridge.swift */,
+				E5PIRT008 /* PiRPCWire.swift */,
+				E5PIRT013 /* PiRuntimeSessionController.swift */,
+			);
+			path = Runtime;
+			sourceTree = "<group>";
+		};
 		E5T000030 /* Intents */ = {
 			isa = PBXGroup;
 			children = (
@@ -1854,6 +1880,7 @@
 				E5VMC0015 /* AIChatViewModel+Persistence.swift */,
 				E5VMC0016 /* AIChatViewModel+BackgroundTask.swift */,
 				E5VMC0017 /* AIChatViewModel+ConcurrentTools.swift */,
+				E5PIRT015 /* AIChatViewModel+PiRuntime.swift */,
 				E53000014 /* ChatStore.swift */,
 				BB1000110F700000000000AA /* ContextPolicy.swift */,
 				E5FMI0011 /* FileMentionIndex.swift */,
@@ -2333,6 +2360,8 @@
 			files = (
 				E51000004 /* Preview Assets.xcassets in Resources */,
 				AA26CCB72F31067900AECF2D /* alpine-rootfs.zip in Resources */,
+				E5PIRT003 /* pi in Resources */,
+				E5PIRT005 /* pi-x86_64 in Resources */,
 				E5BSH0004 /* bashism_rules.json in Resources */,
 				E5BSH0005 /* bashism_test_vectors.json in Resources */,
 				AA0838D22F3B941A00049557 /* RootfsPatch.bundle in Resources */,
@@ -2428,6 +2457,7 @@
 			files = (
 				BB1000120F700000000000AA /* ContextPolicy.swift in Sources */,
 				E5LD00002 /* ToolLoopDetector.swift in Sources */,
+				E5PIRT009 /* PiRPCWire.swift in Sources */,
 				E5GWF0004 /* GeminiWireFormat.swift in Sources */,
 				E5JB10001 /* JiebaWrapper.mm in Sources */,
 				E5JB10002 /* TextSegmenter.swift in Sources */,
@@ -2516,6 +2546,10 @@
 				E5KIMI0D1 /* KimiModelsAPI.swift in Sources */,
 				E52000009 /* AnthropicModelsAPI.swift in Sources */,
 				E53000001 /* AIChatViewModel.swift in Sources */,
+				E5PIRT001 /* PiRuntimeBridge.swift in Sources */,
+				E5PIRT007 /* PiRPCWire.swift in Sources */,
+				E5PIRT012 /* PiRuntimeSessionController.swift in Sources */,
+				E5PIRT014 /* AIChatViewModel+PiRuntime.swift in Sources */,
 				E5VMA0001 /* AIChatViewModel+Attachments.swift in Sources */,
 				E5VMA0002 /* AIChatViewModel+SlashCommands.swift in Sources */,
 				E5VMA0003 /* AIChatViewModel+MentionMenu.swift in Sources */,

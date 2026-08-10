@@ -1,0 +1,33 @@
+{
+  "defaultProvider": null,
+  "defaultModel": null,
+  "sessionStore": "sqlite",
+  "sessionDurability": "balanced",
+  "steeringMode": "one-at-a-time",
+  "followUpMode": "all",
+  "checkForUpdates": false,
+  "quietStartup": true,
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384,
+    "keepRecentTokens": 20000
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "maxDelayMs": 60000
+  },
+  "images": {
+    "autoResize": true,
+    "blockImages": false
+  },
+  "extensionPolicy": {
+    "profile": "safe",
+    "defaultPermissive": false,
+    "allowDangerous": false
+  },
+  "repairPolicy": {
+    "mode": "suggest"
+  }
+}

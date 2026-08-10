@@ -14,6 +14,20 @@ private let logger = AppLogger(category: "AIChatVM")
 @MainActor
 final class AIChatViewModel: ObservableObject, SpeechControlling {
 
+    /// [PiRuntime] Session controller for the `pi` agent runtime (P2 bridge).
+    /// Non-nil while this VM is running turns through pi.
+    var piSessionController: PiRuntimeSessionController?
+    /// [PiRuntime] Index into `messages` of the assistant message for the
+    /// current pi turn.
+    var piTurnAssistantIndex: Int?
+    /// [PiRuntime] Tool call id → pi tool name, so tool cards can be persisted
+    /// with their real names after the turn.
+    var piToolNamesByCallId: [String: String] = [:]
+    /// [PiRuntime] True once piControllerDidEndTurn(error:) attached the turn
+    /// error to the assistant bubble, so runPiTurnIfEligible doesn't also show
+    /// the global error banner for the same failure.
+    var piTurnErrorAttachedToBubble = false
+
     /// Maximum characters returned in a single tool result to the model
     static let kMaxToolResultChars = 15000
 
@@ -1698,7 +1712,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         return _cachedTimeString
     }
 
-    private var baseSystemPrompt: String {
+    /// [PiRuntime] Shared with AIChatViewModel+PiRuntime.swift so pi gets the
+    /// identical system prompt the legacy loop sends.
+    var baseSystemPrompt: String {
         // [T-soul-md] Layer 1 is rendered by SystemPromptBuilder, which
         // owns the "You are <name>, a capable AI assistant running on an
         // iOS device ..." identity sentence (parametric on SOUL.md's
@@ -1880,7 +1896,8 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// we land an authoritative override at the end of the prompt so the
     /// model knows the tools won't be registered, the memory files won't
     /// be injected, and what to tell the user if they ask about memory.
-    private var memoryStatusFragment: String {
+    /// [PiRuntime] Read by the pi prompt assembly (AIChatViewModel+PiRuntime.swift).
+    var memoryStatusFragment: String {
         if memoryEnabled {
             return "\n\nMemory status: ENABLED for this session. GLOBAL.md and recent daily logs have been injected above (if non-empty), and memory_get / memory_write are available in the tool list."
         } else {
@@ -4216,6 +4233,17 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         defer { logger.info("🔄SESSION [vm=\(self.vmInstanceId)] runAgentLoop END session=\(self.sessionId ?? "nil") history=\(self.agentHistory.count) estimated ~\(self.estimateContextTokens()) tokens") }
 
         let loopSetupStart = CFAbsoluteTimeGetCurrent()
+
+        // [PiRuntime] Fresh turns run through the pi agent runtime when the
+        // bundled binary is present. Retries/resumes keep the legacy loop so
+        // partial-turn state (existing blocks) stays intact.
+        if existingMsgIdx == nil,
+           let userMsg = messages.last(where: { $0.role == .user && !$0.content.isEmpty }) {
+            if await runPiTurnIfEligible(text: userMsg.content) {
+                logger.info("🔄SESSION [vm=\(self.vmInstanceId)] runAgentLoop routed to PiRuntime session=\(self.sessionId ?? "nil")")
+                return
+            }
+        }
 
         // [T-ios-empty-after-toolresult-reminder] Fresh turn → allow one reminder retry.
         didInjectEmptyToolReminderThisRun = false

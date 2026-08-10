@@ -8,6 +8,7 @@
 import Foundation
 import Compression
 import SQLite3
+import CryptoKit
 
 class RootfsManager {
     static let shared = RootfsManager()
@@ -238,6 +239,17 @@ class RootfsManager {
                 if relativePath.hasPrefix(Self.mcpCliLibPrefix) {
                     posixMode = 0o444
                 }
+                // Stamp the mode on the HOST copy as well. iOS can ship bundle
+                // resources read-only, and copyItem preserves those bits — so a
+                // file like root/.pi/agent/models.json would be unwritable for
+                // the app's runtime rewrites (PiRuntimeSessionController) and
+                // data.write(to:) would throw EACCES. Skip the app-managed
+                // read-only mcp-cli lib (0o444): its every-boot update uses
+                // remove+copy, which only needs directory permissions.
+                if posixMode != 0o444 {
+                    try? fm.setAttributes([.posixPermissions: NSNumber(value: posixMode)],
+                                          ofItemAtPath: destURL.path)
+                }
                 let fakefsMode: UInt32 = 0o100000 | UInt32(posixMode)
 
                 // Register in fakefs meta.db so iSH kernel can see the file
@@ -271,6 +283,70 @@ class RootfsManager {
         let avgCopyMs = fileCount > 0 ? copyTotalMs / Double(fileCount) : 0
         let avgMetaMs = fileCount > 0 ? metaDbTotalMs / Double(fileCount) : 0
         logger.info("[DefaultMount] Done. \(fileCount) file(s) overlaid in \(String(format: "%.1f", totalMs))ms — copy: \(String(format: "%.1f", copyTotalMs))ms (avg \(String(format: "%.2f", avgCopyMs))ms/file), metaDB: \(String(format: "%.1f", metaDbTotalMs))ms (avg \(String(format: "%.2f", avgMetaMs))ms/file), marker: \(String(format: "%.1f", markerMs))ms")
+
+        // [PiRuntime] The `pi` agent binary is large and would slow every boot
+        // if copied via the overlay, so it is installed once with a size+hash
+        // guard and replaced only when the bundled binary changes.
+        installPiRuntimeIfNeeded()
+    }
+
+    /// Guest path where the `pi` agent runtime is installed.
+    static let piGuestPath = "/usr/local/bin/pi"
+
+    /// Install the bundled `pi` agent runtime into the guest rootfs.
+    ///
+    /// The binary ships as the `pi` bundle resource (aarch64-unknown-linux-musl,
+    /// built by `deps/build_pi.sh`). Unlike `applyDefaultMountOverlay()` this is
+    /// a one-time copy guarded by a size + SHA-256 check, so ordinary boots do
+    /// not pay the copy cost and app upgrades replace the binary in place. Fakefs
+    /// metadata is registered so the guest sees it as executable (0o755).
+    func installPiRuntimeIfNeeded() {
+        let fm = FileManager.default
+        let guestRelative = Self.piGuestPath
+        let destURL = dataPath.appendingPathComponent(guestRelative)
+
+        guard let sourceURL = Bundle.main.url(forResource: "pi", withExtension: nil) else {
+            logger.info("[PiRuntime] No bundled 'pi' resource — skipping runtime install")
+            return
+        }
+        guard let sourceAttrs = try? fm.attributesOfItem(atPath: sourceURL.path),
+              let sourceSize = (sourceAttrs[.size] as? NSNumber)?.uint64Value else {
+            logger.error("[PiRuntime] Cannot stat bundled pi resource")
+            return
+        }
+
+        if fm.fileExists(atPath: destURL.path),
+           let destAttrs = try? fm.attributesOfItem(atPath: destURL.path),
+           (destAttrs[.size] as? NSNumber)?.uint64Value == sourceSize,
+           let sourceHash = Self.sha256Hex(of: sourceURL.path),
+           let destHash = Self.sha256Hex(of: destURL.path),
+           sourceHash == destHash {
+            logger.info("[PiRuntime] pi already installed and up to date (\(sourceSize) bytes)")
+            return
+        }
+
+        do {
+            try fm.createDirectory(at: destURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if fm.fileExists(atPath: destURL.path) {
+                try fm.removeItem(at: destURL)
+            }
+            try fm.copyItem(at: sourceURL, to: destURL)
+            try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destURL.path)
+
+            ensureParentDirsInMetaDB(for: guestRelative)
+            ensureFakefsMetadata(for: guestRelative, isDirectory: false, mode: 0o100755)
+            logger.info("[PiRuntime] Installed pi (\(sourceSize) bytes) -> \(destURL.path)")
+        } catch {
+            logger.error("[PiRuntime] Install failed: \(error)")
+        }
+    }
+
+    private static func sha256Hex(of path: String) -> String? {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: [.mappedIfSafe]) else {
+            return nil
+        }
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 
     /// Remove the PEP 668 EXTERNALLY-MANAGED marker file from all Python versions.

@@ -29,7 +29,6 @@ git submodule update --init --recursive
 |---|---|---|
 | `deps/ish` | [OpenMinis/ish-arm64](https://github.com/OpenMinis/ish-arm64) | iOS sandbox kernel |
 | `deps/proot` | [OpenMinis/proot](https://github.com/OpenMinis/proot) | Android sandbox |
-| `deps/pi_agent_rust` | [Dicklesworthstone/pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust) | `pi` agent runtime (iOS) |
 
 ### Build-time customization
 
@@ -94,7 +93,6 @@ LAME, so LAME must exist first or MP3 encoding is silently dropped:
 ./deps/build_ffmpeg.sh        # → deps/frameworks/*.framework  (LGPL config)
 ./deps/build_ish.sh           # → deps/libs/*.a, deps/include/, deps/resources/
 ./deps/prepare_alpine_rootfs.sh   # → deps/resources/alpine-rootfs.zip
-./deps/build_pi.sh            # → deps/resources/pi, deps/resources/pi-x86_64
 ```
 
 What each produces:
@@ -107,20 +105,10 @@ What each produces:
   submodule, plus headers and the VDSO.
 - **`prepare_alpine_rootfs.sh`** — downloads Alpine aarch64 minirootfs and
   converts it to iSH's fakefs format.
-- **`build_pi.sh`** — cross-compiles the `pi` agent runtime
-  (`deps/pi_agent_rust`) with `cargo-zigbuild` for
-  `aarch64-unknown-linux-musl` (device guest) and
-  `x86_64-unknown-linux-musl` (simulator guest). No TUI feature; the app
-  drives `pi --mode rpc` over stdio, so the binary is stripped and small.
-  Prerequisites: `rustup` (stable ≥ 1.95), `zig`, and
-  `cargo install cargo-zigbuild`.
 
 The Xcode project references `deps/libs/`, `deps/include/`, `deps/frameworks/`
 and `deps/resources/` relative to the project, so nothing needs to be copied
-by hand. `deps/resources/pi` is bundled as an app resource and injected into
-the guest rootfs at `usr/local/bin/pi` on first boot (see
-`RootfsManager.installPiRuntimeIfNeeded()`); when it is absent the app builds
-and runs with the legacy agent loop as fallback.
+by hand.
 
 ### 2. Build the app
 

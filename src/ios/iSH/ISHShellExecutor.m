@@ -91,86 +91,6 @@
 
 @end
 
-#pragma mark - Env Buffer Helper
-
-// Build the guest envp block (NUL-separated, double-NUL terminated) shared by
-// the one-shot and persistent exec paths. Returns malloc'd memory; the caller
-// must free() it after do_execve (which copies the strings into the task).
-// The contents are byte-identical to the historical inline builder in
-// -executeExecutable: (16384 bytes to leave room for injected credentials).
-static char *build_envp_buffer(NSDictionary<NSString *, NSString *> *environment, BOOL is_node) {
-    char *envp_buf = malloc(16384);
-    if (envp_buf == NULL) return NULL;
-    size_t envp_pos = 0;
-
-#define ENVP_APPEND(s) do { \
-    const char *_s = (s); \
-    size_t _len = strlen(_s) + 1; \
-    if (envp_pos + _len < 16384 - 256) { \
-        memcpy(envp_buf + envp_pos, _s, _len); \
-        envp_pos += _len; \
-    } \
-} while(0)
-
-    ENVP_APPEND("TERM=xterm-256color");
-    ENVP_APPEND("HOME=/root");
-    ENVP_APPEND("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin");
-    ENVP_APPEND("LANG=C.UTF-8");
-    ENVP_APPEND("CHARSET=UTF-8");
-    ENVP_APPEND("ENV=/etc/profile");
-    ENVP_APPEND("OPENSSL_armcap=0");
-    // Route browser-opening calls through the in-app WebKit preview.
-    // Python's stdlib `webbrowser` module honours $BROWSER before probing
-    // $DISPLAY, so setting it here lets `python -c "import webbrowser;
-    // webbrowser.open(...)"` and similar non-login shell invocations reach
-    // /usr/local/bin/minis-open which emits an OSC marker parsed by the host.
-    ENVP_APPEND("BROWSER=/usr/local/bin/minis-open");
-
-    // Inject device timezone so iSH userspace sees local time.
-    // Use POSIX TZ format with a fixed name to avoid abbreviations like "GMT+8"
-    // which contain +/- and confuse musl's TZ parser.
-    {
-        NSTimeZone *tz = [NSTimeZone systemTimeZone];
-        NSInteger secs = tz.secondsFromGMT;
-        NSInteger hrs  = secs / 3600;
-        NSInteger mins = labs(secs % 3600) / 60;
-        NSString *posixTZ;
-        if (mins != 0) {
-            posixTZ = [NSString stringWithFormat:@"LCL%+ld:%02ld",
-                       (long)-hrs, (long)mins];
-        } else {
-            posixTZ = [NSString stringWithFormat:@"LCL%+ld",
-                       (long)-hrs];
-        }
-        NSString *tzEnv = [NSString stringWithFormat:@"TZ=%@", posixTZ];
-        ENVP_APPEND(tzEnv.UTF8String);
-    }
-
-    // Runtime compatibility env vars (matches xX_main_Xx.h / kernel/exec.c)
-    ENVP_APPEND("GODEBUG=asyncpreemptoff=1");
-    ENVP_APPEND("GOMAXPROCS=2");
-    ENVP_APPEND("NO_COLOR=1");
-    ENVP_APPEND("PYTHONMALLOC=malloc");
-    ENVP_APPEND("PYTHONDONTWRITEBYTECODE=1");
-
-    // Node-specific: LD_PRELOAD for zero_free.so
-    if (is_node) {
-        ENVP_APPEND("LD_PRELOAD=/lib/zero_free.so");
-    }
-
-    // Custom environment
-    if (environment) {
-        for (NSString *key in environment) {
-            NSString *entry = [NSString stringWithFormat:@"%@=%@", key, environment[key]];
-            ENVP_APPEND(entry.UTF8String);
-        }
-    }
-    envp_buf[envp_pos] = '\0'; // double-NUL terminate
-
-#undef ENVP_APPEND
-    return envp_buf;
-}
-
 #pragma mark - Executor Implementation
 
 @implementation ISHShellExecutor
@@ -428,18 +348,81 @@ static dispatch_once_t _onceToken;
     }
     argv_buf[pos] = '\0'; // double-NUL terminate
 
-    // Build envp via the shared helper (see build_envp_buffer above).
-    char *envp = build_envp_buffer(environment, is_node);
-    if (envp == NULL) {
-        current = saved_current;
-        [ctx cleanup];
-        NSLog(@"ISHShellExecutor: envp allocation failed");
-        return ISHShellExecutorErrorProcessCreationFailed;
+    // Build envp as a C buffer (NUL-separated, double-NUL terminated)
+    // NSString truncates at first NUL so we must use a raw C buffer
+    char envp_buf[8192];
+    size_t envp_pos = 0;
+
+#define ENVP_APPEND(s) do { \
+    const char *_s = (s); \
+    size_t _len = strlen(_s) + 1; \
+    if (envp_pos + _len < sizeof(envp_buf) - 256) { \
+        memcpy(envp_buf + envp_pos, _s, _len); \
+        envp_pos += _len; \
+    } \
+} while(0)
+
+    ENVP_APPEND("TERM=xterm-256color");
+    ENVP_APPEND("HOME=/root");
+    ENVP_APPEND("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/bin");
+    ENVP_APPEND("LANG=C.UTF-8");
+    ENVP_APPEND("CHARSET=UTF-8");
+    ENVP_APPEND("ENV=/etc/profile");
+    ENVP_APPEND("OPENSSL_armcap=0");
+    // Route browser-opening calls through the in-app WebKit preview.
+    // Python's stdlib `webbrowser` module honours $BROWSER before probing
+    // $DISPLAY, so setting it here lets `python -c "import webbrowser;
+    // webbrowser.open(...)"` and similar non-login shell invocations reach
+    // /usr/local/bin/minis-open which emits an OSC marker parsed by the host.
+    ENVP_APPEND("BROWSER=/usr/local/bin/minis-open");
+
+    // Inject device timezone so iSH userspace sees local time.
+    // Use POSIX TZ format with a fixed name to avoid abbreviations like "GMT+8"
+    // which contain +/- and confuse musl's TZ parser.
+    {
+        NSTimeZone *tz = [NSTimeZone systemTimeZone];
+        NSInteger secs = tz.secondsFromGMT;
+        NSInteger hrs  = secs / 3600;
+        NSInteger mins = labs(secs % 3600) / 60;
+        NSString *posixTZ;
+        if (mins != 0) {
+            posixTZ = [NSString stringWithFormat:@"LCL%+ld:%02ld",
+                       (long)-hrs, (long)mins];
+        } else {
+            posixTZ = [NSString stringWithFormat:@"LCL%+ld",
+                       (long)-hrs];
+        }
+        NSString *tzEnv = [NSString stringWithFormat:@"TZ=%@", posixTZ];
+        ENVP_APPEND(tzEnv.UTF8String);
     }
+
+    // Runtime compatibility env vars (matches xX_main_Xx.h / kernel/exec.c)
+    ENVP_APPEND("GODEBUG=asyncpreemptoff=1");
+    ENVP_APPEND("GOMAXPROCS=2");
+    ENVP_APPEND("NO_COLOR=1");
+    ENVP_APPEND("PYTHONMALLOC=malloc");
+    ENVP_APPEND("PYTHONDONTWRITEBYTECODE=1");
+
+    // Node-specific: LD_PRELOAD for zero_free.so
+    if (is_node) {
+        ENVP_APPEND("LD_PRELOAD=/lib/zero_free.so");
+    }
+
+    // Custom environment
+    if (environment) {
+        for (NSString *key in environment) {
+            NSString *entry = [NSString stringWithFormat:@"%@=%@", key, environment[key]];
+            ENVP_APPEND(entry.UTF8String);
+        }
+    }
+    envp_buf[envp_pos] = '\0'; // double-NUL terminate
+
+#undef ENVP_APPEND
+
+    const char *envp = envp_buf;
 
     // Execute
     err = do_execve(exec_path, exec_argc, argv_buf, envp);
-    free(envp);
     if (err < 0) {
         current = saved_current;
         [ctx cleanup];
@@ -892,248 +875,6 @@ static BOOL ISHTaskIsDescendantOf(struct task *t, pid_t_ rootPid) {
             });
         }
     }
-}
-
-@end
-
-#pragma mark - Persistent Process Implementation
-
-@interface ISHShellPersistentProcess ()
-@property (nonatomic, readwrite) int pid;
-@property (nonatomic, readwrite) int stdinWriteFD;
-@end
-
-@implementation ISHShellPersistentProcess
-
-- (instancetype)initWithPid:(int)pid stdinWriteFD:(int)fd {
-    if (self = [super init]) {
-        _pid = pid;
-        _stdinWriteFD = fd;
-    }
-    return self;
-}
-
-- (BOOL)writeData:(NSData *)data {
-    if (_stdinWriteFD < 0 || data.length == 0) return NO;
-    const uint8_t *bytes = data.bytes;
-    size_t remaining = data.length;
-    while (remaining > 0) {
-        ssize_t written = write(_stdinWriteFD, bytes, remaining);
-        if (written <= 0) {
-            NSLog(@"ISHShellPersistentProcess[%d]: stdin write failed (%zd, errno=%d)", _pid, written, errno);
-            return NO;
-        }
-        bytes += written;
-        remaining -= (size_t)written;
-    }
-    return YES;
-}
-
-- (BOOL)writeLine:(NSString *)line {
-    NSString *withNewline = [line hasSuffix:@"\n"] ? line : [line stringByAppendingString:@"\n"];
-    NSData *data = [withNewline dataUsingEncoding:NSUTF8StringEncoding];
-    return [self writeData:data];
-}
-
-- (void)terminate {
-    if (_stdinWriteFD >= 0) {
-        close(_stdinWriteFD);
-        _stdinWriteFD = -1;
-    }
-    if (_pid > 1) {
-        [ISHShellExecutor killProcessGroup:_pid];
-    }
-}
-
-- (void)dealloc {
-    if (_stdinWriteFD >= 0) {
-        close(_stdinWriteFD);
-        _stdinWriteFD = -1;
-    }
-}
-
-@end
-
-@implementation ISHShellExecutor (Persistent)
-
-+ (ISHShellPersistentProcess *)launchPersistentExecutable:(NSString *)executable
-                                                arguments:(NSArray<NSString *> *)arguments
-                                              environment:(NSDictionary<NSString *, NSString *> *)environment
-                                                fsContext:(uint64_t)fsContext
-                                             lineCallback:(ISHShellPersistentLineCallback)lineCallback
-                                             exitCallback:(ISHShellPersistentExitCallback)exitCallback {
-    // Bail out if the iSH kernel hasn't booted yet (same guard as the
-    // one-shot path — become_new_init_child() asserts on a non-booted kernel).
-    if (!ISHKernel.shared.isBooted) {
-        NSLog(@"ISHShellExecutor[persistent]: kernel not booted — refusing to launch %@", executable);
-        return nil;
-    }
-    if (executable.length == 0) {
-        return nil;
-    }
-
-    ISHShellExecutionContext *ctx = [[ISHShellExecutionContext alloc] init];
-    ctx.lineCallback = lineCallback ? ^(NSString *line, BOOL isStdErr) { lineCallback(line, isStdErr); } : nil;
-    ctx.completion = exitCallback ? ^(ISHShellExecutionResult *result) { exitCallback(result.exitCode, result.pid); } : nil;
-    ctx.startTime = [NSDate date];
-
-    // Create pipes for stdout and stderr
-    if (pipe([ctx stdoutPipe]) < 0 || pipe([ctx stderrPipe]) < 0) {
-        NSLog(@"ISHShellExecutor[persistent]: pipe() failed: %s", strerror(errno));
-        [ctx cleanup];
-        return nil;
-    }
-
-    // Set read ends to non-blocking
-    fcntl([ctx stdoutPipe][0], F_SETFL, O_NONBLOCK);
-    fcntl([ctx stderrPipe][0], F_SETFL, O_NONBLOCK);
-
-    // Create the stdin pipe; the write end stays open on the handle so the
-    // host can keep sending commands (RPC mode).
-    int stdinPipe[2] = {-1, -1};
-    if (pipe(stdinPipe) < 0) {
-        NSLog(@"ISHShellExecutor[persistent]: stdin pipe() failed: %s", strerror(errno));
-        [ctx cleanup];
-        return nil;
-    }
-
-    struct task *saved_current = current;
-
-    // Create new process
-    int err = become_new_init_child();
-    if (err < 0) {
-        current = saved_current;
-        [ctx cleanup];
-        close(stdinPipe[0]);
-        close(stdinPipe[1]);
-        NSLog(@"ISHShellExecutor[persistent]: become_new_init_child failed: %d", err);
-        return nil;
-    }
-
-    struct task *task = current;
-
-    // Stamp the new task group with the caller-provided fs_context (inherited
-    // by any process this task fork()s), mirroring the one-shot path.
-    if (fsContext != 0 && task->group != NULL) {
-        task->group->fs_context = fsContext;
-    }
-
-    // Setup stdin: dup the pipe read end into the task; the parent keeps the
-    // write end on the returned handle (unlike the one-shot path).
-    struct fd *stdin_fd = adhoc_fd_create(&realfs_fdops);
-    if (stdin_fd) {
-        int real_fd = dup(stdinPipe[0]);
-        if (real_fd < 0) {
-            NSLog(@"ISHShellExecutor[persistent]: stdin dup() failed: %s", strerror(errno));
-            current = saved_current;
-            [ctx cleanup];
-            close(stdinPipe[0]);
-            close(stdinPipe[1]);
-            return nil;
-        }
-        stdin_fd->real_fd = real_fd;
-        task->files->files[0] = stdin_fd;
-    }
-    close(stdinPipe[0]);
-    stdinPipe[0] = -1;
-
-    // Setup stdout to pipe
-    struct fd *stdout_fd = adhoc_fd_create(&realfs_fdops);
-    if (stdout_fd) {
-        int real_fd = dup([ctx stdoutPipe][1]);
-        if (real_fd < 0) {
-            NSLog(@"ISHShellExecutor[persistent]: stdout dup() failed: %s", strerror(errno));
-            current = saved_current;
-            [ctx cleanup];
-            close(stdinPipe[1]);
-            return nil;
-        }
-        stdout_fd->real_fd = real_fd;
-        task->files->files[1] = stdout_fd;
-    }
-
-    // Setup stderr to pipe
-    struct fd *stderr_fd = adhoc_fd_create(&realfs_fdops);
-    if (stderr_fd) {
-        int real_fd = dup([ctx stderrPipe][1]);
-        if (real_fd < 0) {
-            NSLog(@"ISHShellExecutor[persistent]: stderr dup() failed: %s", strerror(errno));
-            current = saved_current;
-            [ctx cleanup];
-            close(stdinPipe[1]);
-            return nil;
-        }
-        stderr_fd->real_fd = real_fd;
-        task->files->files[2] = stderr_fd;
-    }
-
-    // Close write ends in parent
-    close([ctx stdoutPipe][1]);
-    close([ctx stderrPipe][1]);
-    [ctx stdoutPipe][1] = -1;
-    [ctx stderrPipe][1] = -1;
-
-    // Build argv (NUL-separated string, double-NUL terminated)
-    char argv_buf[16384];
-    size_t pos = 0;
-    int exec_argc = 0;
-    NSMutableArray<NSString *> *fullArgs = [NSMutableArray arrayWithObject:executable];
-    if (arguments) {
-        [fullArgs addObjectsFromArray:arguments];
-    }
-    for (NSString *arg in fullArgs) {
-        const char *str = arg.UTF8String;
-        size_t len = strlen(str) + 1;
-        if (pos + len >= sizeof(argv_buf) - 1) {
-            current = saved_current;
-            [ctx cleanup];
-            close(stdinPipe[1]);
-            NSLog(@"ISHShellExecutor[persistent]: argv too long");
-            return nil;
-        }
-        memcpy(argv_buf + pos, str, len);
-        pos += len;
-        exec_argc++;
-    }
-    argv_buf[pos] = '\0'; // double-NUL terminate
-
-    // Build envp via the shared helper (see build_envp_buffer above).
-    char *envp = build_envp_buffer(environment, NO);
-    if (envp == NULL) {
-        current = saved_current;
-        [ctx cleanup];
-        close(stdinPipe[1]);
-        NSLog(@"ISHShellExecutor[persistent]: envp allocation failed");
-        return nil;
-    }
-
-    // Execute
-    err = do_execve(executable.UTF8String, exec_argc, argv_buf, envp);
-    free(envp);
-    if (err < 0) {
-        current = saved_current;
-        [ctx cleanup];
-        close(stdinPipe[1]);
-        NSLog(@"ISHShellExecutor[persistent]: do_execve failed: %d", err);
-        return nil;
-    }
-
-    // Get guest PID and start task
-    ctx.guestPid = task->pid;
-    task_start(task);
-    current = saved_current;
-
-    // Register context (processDidExit: finds it here and fires exitCallback
-    // after the reader threads drain the pipes, exactly like the one-shot path)
-    @synchronized(_activeExecutions) {
-        _activeExecutions[@(ctx.guestPid)] = ctx;
-    }
-
-    // Start reader threads
-    [self startReaderForPipe:[ctx stdoutPipe][0] context:ctx isStdErr:NO];
-    [self startReaderForPipe:[ctx stderrPipe][0] context:ctx isStdErr:YES];
-
-    return [[ISHShellPersistentProcess alloc] initWithPid:ctx.guestPid stdinWriteFD:stdinPipe[1]];
 }
 
 @end

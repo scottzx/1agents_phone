@@ -6,7 +6,3 @@
 	path = deps/proot
 	url = https://github.com/OpenMinis/proot.git
 	branch = master
-[submodule "deps/pi_agent_rust"]
-	path = deps/pi_agent_rust
-	url = https://github.com/Dicklesworthstone/pi_agent_rust
-	shallow = true

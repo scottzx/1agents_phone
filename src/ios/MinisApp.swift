@@ -109,6 +109,36 @@ struct MinisApp: App {
         _ = Self.processLaunchedAt
         #if DEBUG
         try? debugServer.start(port: 8321)
+        if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--inspect-shared=") }) {
+            let terms = argument.dropFirst("--inspect-shared=".count)
+                .split(separator: ",")
+                .map { String($0) }
+                .filter { !$0.isEmpty }
+            if !terms.isEmpty {
+                DispatchQueue.global(qos: .utility).async {
+                    SharedFolderReadOnlyInspector.run(terms: terms)
+                }
+            }
+        }
+        if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--inspect-shared-file=") }) {
+            let path = String(argument.dropFirst("--inspect-shared-file=".count))
+            if !path.isEmpty {
+                DispatchQueue.global(qos: .utility).async {
+                    SharedFolderReadOnlyInspector.preview(relativePath: path)
+                }
+            }
+        }
+        if let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--inspect-shared-preview=") }) {
+            let terms = argument.dropFirst("--inspect-shared-preview=".count)
+                .split(separator: ",")
+                .map { String($0) }
+                .filter { !$0.isEmpty }
+            if !terms.isEmpty {
+                DispatchQueue.global(qos: .utility).async {
+                    SharedFolderReadOnlyInspector.previewFirstMatch(terms: terms)
+                }
+            }
+        }
         #endif
         // Install the NSTextContainer setSize: reentrancy guard before any
         // UITextView gets created. Breaks the iOS 26 TextKit1 fillLayoutHole
@@ -292,6 +322,9 @@ struct MinisApp: App {
                     // Start watching shared/skills/memory subtrees so iSH writes
                     // and FileBrowserView mutations propagate to the Files app.
                     AppGroupChangeWatcher.shared.start()
+                    // Optional one-way mirror. This only writes a Finder-visible
+                    // iCloud Drive copy; it never imports data from iCloud.
+                    SharedFolderICloudMirror.shared.start()
                     // Activate security scopes for user-mounted external folders
                     // (e.g. Obsidian vault in iCloud Drive). Held for app lifetime.
                     MountedFoldersManager.shared.activateAll()
@@ -328,6 +361,8 @@ struct MinisApp: App {
     // MARK: - Lifecycle Logging
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {
+        SharedFolderWebDAVServer.shared.handleScenePhase(phase)
+        SharedFolderICloudMirror.shared.handleScenePhase(phase)
         switch phase {
         case .active:
             let remaining = UIApplication.shared.backgroundTimeRemaining

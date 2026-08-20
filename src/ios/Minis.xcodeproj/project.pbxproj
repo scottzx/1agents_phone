@@ -337,6 +337,8 @@
 		E5SHV0002 /* SharedFolderVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5SHV0101 /* SharedFolderVisibility.swift */; };
 		E5SHV0003 /* SharedFoldersSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5SHV0103 /* SharedFoldersSettingsView.swift */; };
 		E5SHV0004 /* MountDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5SHV0104 /* MountDetailView.swift */; };
+		E5WD0001 /* SharedFolderWebDAVServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5WD0011 /* SharedFolderWebDAVServer.swift */; };
+		E5ICM0001 /* SharedFolderICloudMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5ICM0011 /* SharedFolderICloudMirror.swift */; };
 		E5SOUL001 /* SoulStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5SOUL101 /* SoulStore.swift */; };
 		E5SOUL002 /* SoulSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5SOUL102 /* SoulSettingsView.swift */; };
 		E5SVP0021 /* ShadowVoiceProviderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5SVP0031 /* ShadowVoiceProviderDetailView.swift */; };
@@ -956,6 +958,8 @@
 		E5SD00019 /* ShortcutRunTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutRunTracker.swift; sourceTree = "<group>"; };
 		E5SHV0101 /* SharedFolderVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFolderVisibility.swift; sourceTree = "<group>"; };
 		E5SHV0103 /* SharedFoldersSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFoldersSettingsView.swift; sourceTree = "<group>"; };
+		E5WD0011 /* SharedFolderWebDAVServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFolderWebDAVServer.swift; sourceTree = "<group>"; };
+		E5ICM0011 /* SharedFolderICloudMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedFolderICloudMirror.swift; sourceTree = "<group>"; };
 		E5SHV0104 /* MountDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MountDetailView.swift; sourceTree = "<group>"; };
 		E5SOUL101 /* SoulStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulStore.swift; sourceTree = "<group>"; };
 		E5SOUL102 /* SoulSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SoulSettingsView.swift; sourceTree = "<group>"; };
@@ -1629,6 +1633,8 @@
 				E5E000019 /* ShareCoordinator.swift */,
 				E5E0000A2 /* ExternalFileImporter.swift */,
 				E5E000017 /* SharedContainerStore.swift */,
+				E5WD0011 /* SharedFolderWebDAVServer.swift */,
+				E5ICM0011 /* SharedFolderICloudMirror.swift */,
 				AADDA9E02F6ECCF400B66649 /* ThumbnailCache.swift */,
 			);
 			path = Shared;
@@ -2500,6 +2506,8 @@
 				E5SHV0001 /* SharedFolderVisibility.swift in Sources */,
 				E5SHV0003 /* SharedFoldersSettingsView.swift in Sources */,
 				E5SHV0004 /* MountDetailView.swift in Sources */,
+				E5WD0001 /* SharedFolderWebDAVServer.swift in Sources */,
+				E5ICM0001 /* SharedFolderICloudMirror.swift in Sources */,
 				E52000001 /* LLMTypes.swift in Sources */,
 				E52000002 /* LLMError.swift in Sources */,
 				E52000003 /* LLMProvider.swift in Sources */,
@@ -3161,7 +3169,7 @@
 				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
 				ENABLE_PREVIEWS = YES;
@@ -3240,7 +3248,7 @@
 				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
 				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
 				ENABLE_PREVIEWS = YES;

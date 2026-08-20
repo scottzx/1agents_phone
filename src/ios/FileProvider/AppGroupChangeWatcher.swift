@@ -258,6 +258,9 @@ final class AppGroupChangeWatcher {
         }
         // Working set covers Spotlight + recent / unified search.
         scheduleSignal(itemID: .workingSet)
+        if rootKey == "shared" {
+            NotificationCenter.default.post(name: .minisSharedFolderDidChange, object: nil)
+        }
     }
 
     private func scheduleSignalForParent(rootKey: String, relativePath: String) {

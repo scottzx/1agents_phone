@@ -42,6 +42,19 @@ struct SharedFoldersSettingsView: View {
                     }
                 }
             }
+
+            Section("Mac") {
+                NavigationLink {
+                    SharedFolderICloudMirrorSettingsView()
+                } label: {
+                    Label("Mirror to iCloud Drive", systemImage: "icloud.and.arrow.up")
+                }
+                NavigationLink {
+                    SharedFolderWebDAVSettingsView()
+                } label: {
+                    Label("Connect from Mac", systemImage: "externaldrive.connected.to.line.below")
+                }
+            }
         }
         .navigationTitle("Shared Folders")
         .navigationBarTitleDisplayMode(.inline)

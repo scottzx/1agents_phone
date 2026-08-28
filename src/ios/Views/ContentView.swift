@@ -5006,6 +5006,22 @@ private struct SettingsSheet: View {
                     }
                 }
 
+                Section("Hardware") {
+                    NavigationLink {
+                        HardwareBridgeSettingsView()
+                    } label: {
+                        Label {
+                            Text("硬件设备")
+                        } icon: {
+                            Image(systemName: "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 9))
+                                .foregroundStyle(.white)
+                                .frame(width: 21, height: 21)
+                                .background(.blue, in: Circle())
+                        }
+                    }
+                }
+
                 Section("Logs") {
                     NavigationLink {
                         LogManagementView()

@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FK1000020000000000000001 /* FlavorConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = FK1000010000000000000001 /* FlavorConfig.swift */; };
+		FK1000020000000000000002 /* RolePackManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = FK1000010000000000000002 /* RolePackManifest.swift */; };
+		FK1000020000000000000003 /* RolePackInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = FK1000010000000000000003 /* RolePackInstaller.swift */; };
+		FK1000020000000000000004 /* FlavorRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FK1000010000000000000004 /* FlavorRootView.swift */; };
+		SC1000020000000000000001 /* SalesHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC1000010000000000000001 /* SalesHomeView.swift */; };
 		21FED4B7BB6F6D9476C9992E /* VoiceProvider+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88993FC8E3F0199C6638F664 /* VoiceProvider+System.swift */; };
 		241D530017827D7F0EB604DE /* VoiceProviderFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2941B643B8A2F048A2B154E /* VoiceProviderFactory.swift */; };
 		2A4FD49F872431D703328384 /* VoiceOutputPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424510790AF3FB2452D3CCE3 /* VoiceOutputPlayer.swift */; };
@@ -44,6 +49,8 @@
 		AADDA9E12F6ECCF400B66649 /* ThumbnailCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADDA9E02F6ECCF400B66649 /* ThumbnailCache.swift */; };
 		AAF00F012F50A00000049557 /* FFmpeg.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AAF00F002F50A00000049557 /* FFmpeg.framework */; };
 		AAF00F022F50A00000049557 /* FFmpeg.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = AAF00F002F50A00000049557 /* FFmpeg.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		HB00000000000000000000A2 /* TranscribeCpp.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = HB00000000000000000000A1 /* TranscribeCpp.xcframework */; };
+		HB00000000000000000000A3 /* TranscribeCpp.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = HB00000000000000000000A1 /* TranscribeCpp.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AAF10F012F50A00000049557 /* libavcodec.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AAF10F002F50A00000049557 /* libavcodec.framework */; };
 		AAF10F022F50A00000049557 /* libavcodec.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = AAF10F002F50A00000049557 /* libavcodec.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AAF10F032F50A00000049557 /* libavformat.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AAF10F042F50A00000049557 /* libavformat.framework */; };
@@ -517,6 +524,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				HB00000000000000000000A3 /* TranscribeCpp.xcframework in Embed Frameworks */,
 				AAF00F022F50A00000049557 /* FFmpeg.framework in Embed Frameworks */,
 				AAF10F022F50A00000049557 /* libavcodec.framework in Embed Frameworks */,
 				AAF10F052F50A00000049557 /* libavformat.framework in Embed Frameworks */,
@@ -544,6 +552,14 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F1A00000000000000000001 /* MinisSales.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MinisSales.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F2A00000000000000000001 /* MinisEnglish.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MinisEnglish.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F3A00000000000000000001 /* MinisFitness.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MinisFitness.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		FK1000010000000000000001 /* FlavorConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlavorConfig.swift; sourceTree = "<group>"; };
+		FK1000010000000000000002 /* RolePackManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RolePackManifest.swift; sourceTree = "<group>"; };
+		FK1000010000000000000003 /* RolePackInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RolePackInstaller.swift; sourceTree = "<group>"; };
+		FK1000010000000000000004 /* FlavorRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlavorRootView.swift; sourceTree = "<group>"; };
+		SC1000010000000000000001 /* SalesHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SalesHomeView.swift; sourceTree = "<group>"; };
 		0ED149397BEA7E0408C92688 /* GroupVoiceModelsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupVoiceModelsView.swift; sourceTree = "<group>"; };
 		0F5379380323FA8C6477708C /* GroupSlotPicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupSlotPicker.swift; sourceTree = "<group>"; };
 		16FF3462D09402F14B610CD6 /* VoiceWaveformView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceWaveformView.swift; sourceTree = "<group>"; };
@@ -638,6 +654,7 @@
 		AA8A568B2F6FBB7A00A3E54E /* MinisUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MinisUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AADDA9E02F6ECCF400B66649 /* ThumbnailCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThumbnailCache.swift; sourceTree = "<group>"; };
 		AAF00F002F50A00000049557 /* FFmpeg.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = FFmpeg.framework; path = ../../deps/frameworks/FFmpeg.framework; sourceTree = "<group>"; };
+		HB00000000000000000000A1 /* TranscribeCpp.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TranscribeCpp.xcframework; path = ../../deps/frameworks/TranscribeCpp.xcframework; sourceTree = "<group>"; };
 		AAF10F002F50A00000049557 /* libavcodec.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libavcodec.framework; path = ../../deps/frameworks/libavcodec.framework; sourceTree = "<group>"; };
 		AAF10F042F50A00000049557 /* libavformat.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libavformat.framework; path = ../../deps/frameworks/libavformat.framework; sourceTree = "<group>"; };
 		AAF10F072F50A00000049557 /* libavutil.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = libavutil.framework; path = ../../deps/frameworks/libavutil.framework; sourceTree = "<group>"; };
@@ -1094,6 +1111,7 @@
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0838CB2F3CA8A900049557 /* Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Terminal; sourceTree = "<group>"; };
+		HB00000000000000000000A4 /* HardwareBridge */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = HardwareBridge; sourceTree = "<group>"; };
 		AA8A568C2F6FBB7A00A3E54E /* MinisUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MinisUITests; sourceTree = "<group>"; };
 		BB1000012F700000000000AA /* MinisTests */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (E5EXC0001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MinisTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -1118,6 +1136,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA9C2BF92F65996900F41633 /* SwiftMath in Frameworks */,
+				HB00000000000000000000A2 /* TranscribeCpp.xcframework in Frameworks */,
 				AAF00F012F50A00000049557 /* FFmpeg.framework in Frameworks */,
 				AAF10F012F50A00000049557 /* libavcodec.framework in Frameworks */,
 				AAF10F032F50A00000049557 /* libavformat.framework in Frameworks */,
@@ -1139,6 +1158,33 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		FK1000030000000000000001 /* FlavorKit */ = {
+			isa = PBXGroup;
+			children = (
+				FK1000010000000000000001 /* FlavorConfig.swift */,
+				FK1000010000000000000002 /* RolePackManifest.swift */,
+				FK1000010000000000000003 /* RolePackInstaller.swift */,
+				FK1000010000000000000004 /* FlavorRootView.swift */,
+			);
+			path = FlavorKit;
+			sourceTree = "<group>";
+		};
+		SC1000030000000000000001 /* Scenes */ = {
+			isa = PBXGroup;
+			children = (
+				SC1000030000000000000002 /* sales */,
+			);
+			path = Scenes;
+			sourceTree = "<group>";
+		};
+		SC1000030000000000000002 /* sales */ = {
+			isa = PBXGroup;
+			children = (
+				SC1000010000000000000001 /* SalesHomeView.swift */,
+			);
+			path = sales;
+			sourceTree = "<group>";
+		};
 		42A3821DABA8773E8A5BA57E /* Voice */ = {
 			isa = PBXGroup;
 			children = (
@@ -1177,6 +1223,7 @@
 		AA26BD0E2F2E5FA500AECF2D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				HB00000000000000000000A1 /* TranscribeCpp.xcframework */,
 				AAF00F002F50A00000049557 /* FFmpeg.framework */,
 				AAF10F002F50A00000049557 /* libavcodec.framework */,
 				AAF10F042F50A00000049557 /* libavformat.framework */,
@@ -1281,6 +1328,9 @@
 			isa = PBXGroup;
 			children = (
 				E51000011 /* MinisApp.swift */,
+				HB00000000000000000000A4 /* HardwareBridge */,
+				FK1000030000000000000001 /* FlavorKit */,
+				SC1000030000000000000001 /* Scenes */,
 				E5QA0102 /* AppDelegate.swift */,
 				E5E000018 /* Minis.entitlements */,
 				E5PV00002 /* PrivacyInfo.xcprivacy */,
@@ -1314,6 +1364,9 @@
 			isa = PBXGroup;
 			children = (
 				E51000010 /* Minis.app */,
+				F1A00000000000000000001 /* MinisSales.app */,
+				F2A00000000000000000001 /* MinisEnglish.app */,
+				F3A00000000000000000001 /* MinisFitness.app */,
 				E5E000010 /* MinisShare.appex */,
 				E5H000010 /* AgentWidgetExtension.appex */,
 				E5FP00010 /* MinisFileProvider.appex */,
@@ -2177,6 +2230,7 @@
 				E51000041 /* Sources */,
 				E51000020 /* Frameworks */,
 				E51000042 /* Resources */,
+				FK1000040000000000000001 /* Embed Role Pack */,
 				AA26BD2D2F2E659300AECF2D /* Copy Alpine Rootfs */,
 				AAF00F032F50A00000049557 /* Embed Frameworks */,
 				E5E000060 /* Embed Foundation Extensions */,
@@ -2190,6 +2244,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				AA0838CB2F3CA8A900049557 /* Terminal */,
+				HB00000000000000000000A4 /* HardwareBridge */,
 			);
 			name = Minis;
 			packageProductDependencies = (
@@ -2201,6 +2256,102 @@
 			);
 			productName = Minis;
 			productReference = E51000010 /* Minis.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F1A00000000000000000002 /* MinisSales */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F1A00000000000000000007 /* Build configuration list for PBXNativeTarget "MinisSales" */;
+			buildPhases = (
+				AC0000200 /* Generate Provider Customization */,
+				E54000AD0 /* Generate Debug Skill */,
+				E51000041 /* Sources */,
+				E51000020 /* Frameworks */,
+				E51000042 /* Resources */,
+				FK1000040000000000000001 /* Embed Role Pack */,
+				AA26BD2D2F2E659300AECF2D /* Copy Alpine Rootfs */,
+				AAF00F032F50A00000049557 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0838CB2F3CA8A900049557 /* Terminal */,
+			);
+			name = MinisSales;
+			packageProductDependencies = (
+				E52000021 /* SwiftAnthropic */,
+				E5M000021 /* cmark-gfm */,
+				E5M000022 /* cmark-gfm-extensions */,
+				E5X000021 /* SwiftMath */,
+				C42120806C66A2C804F89620 /* RealTimeCutVADLibrary */,
+			);
+			productName = MinisSales;
+			productReference = F1A00000000000000000001 /* MinisSales.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F2A00000000000000000002 /* MinisEnglish */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F2A00000000000000000007 /* Build configuration list for PBXNativeTarget "MinisEnglish" */;
+			buildPhases = (
+				AC0000200 /* Generate Provider Customization */,
+				E54000AD0 /* Generate Debug Skill */,
+				E51000041 /* Sources */,
+				E51000020 /* Frameworks */,
+				E51000042 /* Resources */,
+				FK1000040000000000000001 /* Embed Role Pack */,
+				AA26BD2D2F2E659300AECF2D /* Copy Alpine Rootfs */,
+				AAF00F032F50A00000049557 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0838CB2F3CA8A900049557 /* Terminal */,
+			);
+			name = MinisEnglish;
+			packageProductDependencies = (
+				E52000021 /* SwiftAnthropic */,
+				E5M000021 /* cmark-gfm */,
+				E5M000022 /* cmark-gfm-extensions */,
+				E5X000021 /* SwiftMath */,
+				C42120806C66A2C804F89620 /* RealTimeCutVADLibrary */,
+			);
+			productName = MinisEnglish;
+			productReference = F2A00000000000000000001 /* MinisEnglish.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F3A00000000000000000002 /* MinisFitness */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F3A00000000000000000007 /* Build configuration list for PBXNativeTarget "MinisFitness" */;
+			buildPhases = (
+				AC0000200 /* Generate Provider Customization */,
+				E54000AD0 /* Generate Debug Skill */,
+				E51000041 /* Sources */,
+				E51000020 /* Frameworks */,
+				E51000042 /* Resources */,
+				FK1000040000000000000001 /* Embed Role Pack */,
+				AA26BD2D2F2E659300AECF2D /* Copy Alpine Rootfs */,
+				AAF00F032F50A00000049557 /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0838CB2F3CA8A900049557 /* Terminal */,
+			);
+			name = MinisFitness;
+			packageProductDependencies = (
+				E52000021 /* SwiftAnthropic */,
+				E5M000021 /* cmark-gfm */,
+				E5M000022 /* cmark-gfm-extensions */,
+				E5X000021 /* SwiftMath */,
+				C42120806C66A2C804F89620 /* RealTimeCutVADLibrary */,
+			);
+			productName = MinisFitness;
+			productReference = F3A00000000000000000001 /* MinisFitness.app */;
 			productType = "com.apple.product-type.application";
 		};
 		E5E000040 /* MinisShare */ = {
@@ -2268,6 +2419,15 @@
 					E51000040 = {
 						CreatedOnToolsVersion = 15.0;
 					};
+					F1A00000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					F2A00000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					F3A00000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
 					E5E000040 = {
 						CreatedOnToolsVersion = 15.0;
 					};
@@ -2306,6 +2466,9 @@
 			projectRoot = "";
 			targets = (
 				E51000040 /* Minis */,
+				F1A00000000000000000002 /* MinisSales */,
+				F2A00000000000000000002 /* MinisEnglish */,
+				F3A00000000000000000002 /* MinisFitness */,
 				E5E000040 /* MinisShare */,
 				E5H000040 /* AgentWidgetExtension */,
 				E5FP00040 /* MinisFileProvider */,
@@ -2386,6 +2549,21 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		FK1000040000000000000001 /* Embed Role Pack */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Embed Role Pack";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"$SRCROOT/scripts/embed_role_pack.sh\"\n";
+		};
 		AC0000200 /* Generate Provider Customization */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -2461,6 +2639,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FK1000020000000000000001 /* FlavorConfig.swift in Sources */,
+				FK1000020000000000000002 /* RolePackManifest.swift in Sources */,
+				FK1000020000000000000003 /* RolePackInstaller.swift in Sources */,
+				FK1000020000000000000004 /* FlavorRootView.swift in Sources */,
+				SC1000020000000000000001 /* SalesHomeView.swift in Sources */,
 				AC0000202 /* ProviderCustomizationGenerated.swift in Sources */,
 				E54000AC1 /* DebugSkillGenerated.swift in Sources */,
 				E5FP00100 /* AppGroupChangeWatcher.swift in Sources */,
@@ -3228,6 +3411,7 @@
 					"-lfakefs",
 				);
 				OTHER_SWIFT_FLAGS = "";
+				FLAVOR_ID = openminis;
 				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -3307,6 +3491,7 @@
 					"-lfakefs",
 				);
 				OTHER_SWIFT_FLAGS = "";
+				FLAVOR_ID = openminis;
 				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -3479,9 +3664,378 @@
 			};
 			name = Release;
 		};
+		F1A00000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
+				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
+				ENABLE_PREVIEWS = YES;
+				FLAVOR_ID = sales;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/../../build/frameworks",
+					"$(SRCROOT)/../../deps/frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../deps/include",
+					"$(SRCROOT)/../../deps/include/ish",
+					"$(SRCROOT)/NativeOffloads",
+					"$(SRCROOT)/../../deps/frameworks/FFmpeg.framework/Headers",
+					"$(SRCROOT)/Vendor/cppjieba/include",
+				);
+				INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "销售助手";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
+				MARKETING_VERSION = 1.11;
+				OTHER_LDFLAGS = (
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone.sales;
+				PRODUCT_MODULE_NAME = Minis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/MinisApp-Bridging-Header.h";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Minis-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F1A00000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
+				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
+				ENABLE_PREVIEWS = YES;
+				FLAVOR_ID = sales;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/../../build/frameworks",
+					"$(SRCROOT)/../../deps/frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../deps/include",
+					"$(SRCROOT)/../../deps/include/ish",
+					"$(SRCROOT)/NativeOffloads",
+					"$(SRCROOT)/../../deps/frameworks/FFmpeg.framework/Headers",
+					"$(SRCROOT)/Vendor/cppjieba/include",
+				);
+				INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "销售助手";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
+				MARKETING_VERSION = 1.11;
+				OTHER_LDFLAGS = (
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone.sales;
+				PRODUCT_MODULE_NAME = Minis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/MinisApp-Bridging-Header.h";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Minis-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F2A00000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
+				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
+				ENABLE_PREVIEWS = YES;
+				FLAVOR_ID = english;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/../../build/frameworks",
+					"$(SRCROOT)/../../deps/frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../deps/include",
+					"$(SRCROOT)/../../deps/include/ish",
+					"$(SRCROOT)/NativeOffloads",
+					"$(SRCROOT)/../../deps/frameworks/FFmpeg.framework/Headers",
+					"$(SRCROOT)/Vendor/cppjieba/include",
+				);
+				INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "英语陪练";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
+				MARKETING_VERSION = 1.11;
+				OTHER_LDFLAGS = (
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone.english;
+				PRODUCT_MODULE_NAME = Minis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/MinisApp-Bridging-Header.h";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Minis-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F2A00000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
+				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
+				ENABLE_PREVIEWS = YES;
+				FLAVOR_ID = english;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/../../build/frameworks",
+					"$(SRCROOT)/../../deps/frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../deps/include",
+					"$(SRCROOT)/../../deps/include/ish",
+					"$(SRCROOT)/NativeOffloads",
+					"$(SRCROOT)/../../deps/frameworks/FFmpeg.framework/Headers",
+					"$(SRCROOT)/Vendor/cppjieba/include",
+				);
+				INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "英语陪练";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
+				MARKETING_VERSION = 1.11;
+				OTHER_LDFLAGS = (
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone.english;
+				PRODUCT_MODULE_NAME = Minis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/MinisApp-Bridging-Header.h";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Minis-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		F3A00000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
+				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
+				ENABLE_PREVIEWS = YES;
+				FLAVOR_ID = fitness;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/../../build/frameworks",
+					"$(SRCROOT)/../../deps/frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../deps/include",
+					"$(SRCROOT)/../../deps/include/ish",
+					"$(SRCROOT)/NativeOffloads",
+					"$(SRCROOT)/../../deps/frameworks/FFmpeg.framework/Headers",
+					"$(SRCROOT)/Vendor/cppjieba/include",
+				);
+				INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "健身陪练";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
+				MARKETING_VERSION = 1.11;
+				OTHER_LDFLAGS = (
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone.fitness;
+				PRODUCT_MODULE_NAME = Minis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/MinisApp-Bridging-Header.h";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Minis-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F3A00000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
+				CODE_SIGN_ENTITLEMENTS = Minis.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "\"Preview Content\"";
+				DEVELOPMENT_TEAM = 3HJ3R6SXAL;
+				ENABLE_PREVIEWS = YES;
+				FLAVOR_ID = fitness;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(SRCROOT)/../../build/frameworks",
+					"$(SRCROOT)/../../deps/frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(SRCROOT)/../../deps/include",
+					"$(SRCROOT)/../../deps/include/ish",
+					"$(SRCROOT)/NativeOffloads",
+					"$(SRCROOT)/../../deps/frameworks/FFmpeg.framework/Headers",
+					"$(SRCROOT)/Vendor/cppjieba/include",
+				);
+				INFOPLIST_FILE = "$(SRCROOT)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "健身陪练";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = "Launch Screen";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
+				MARKETING_VERSION = 1.11;
+				OTHER_LDFLAGS = (
+					"-lish_emu",
+					"-lish",
+					"-lfakefs",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.1agents.phone.fitness;
+				PRODUCT_MODULE_NAME = Minis;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "$(SRCROOT)/MinisApp-Bridging-Header.h";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "Minis-Swift.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		F1A00000000000000000007 /* Build configuration list for PBXNativeTarget "MinisSales" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F1A00000000000000000008 /* Debug */,
+				F1A00000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F2A00000000000000000007 /* Build configuration list for PBXNativeTarget "MinisEnglish" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F2A00000000000000000008 /* Debug */,
+				F2A00000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F3A00000000000000000007 /* Build configuration list for PBXNativeTarget "MinisFitness" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F3A00000000000000000008 /* Debug */,
+				F3A00000000000000000009 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		AA8A56952F6FBB7A00A3E54E /* Build configuration list for PBXNativeTarget "MinisUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -2111,11 +2111,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             case .ok:
                 break
             case .needsCompact:
-                if sessionSource == "shortcut" || autoCompactEnabled {
-                    // Shortcut sessions can't show UI prompts; auto-compact
-                    // opt-in [T-chat-auto-compact-opt-in] rides the same
-                    // no-prompt path — compact and send without asking.
-                    logger.info("[Context] Near capacity — auto-compacting (\(sessionSource == "shortcut" ? "shortcut session" : "autoCompactEnabled"))")
+                if sessionSource == "shortcut" || sessionSource == "hardware" || autoCompactEnabled {
+                    // Shortcut and hardware sessions can't show UI prompts;
+                    // auto-compact opt-in [T-chat-auto-compact-opt-in] rides
+                    // the same no-prompt path — compact and send without asking.
+                    logger.info("[Context] Near capacity — auto-compacting (\(sessionSource == "shortcut" || sessionSource == "hardware" ? "headless session" : "autoCompactEnabled"))")
                     pendingSendText = text
                     pendingSendAttachments = pendingAttachments
                     inputText = ""
@@ -2131,9 +2131,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 logger.info("[Context] Near capacity — prompting user to compact before send")
                 return
             case .exhausted:
-                if sessionSource == "shortcut" {
-                    // Shortcut sessions can't show UI — set inline error
-                    logger.info("[Context] Exhausted — shortcut session cannot continue")
+                if sessionSource == "shortcut" || sessionSource == "hardware" {
+                    // Shortcut and hardware sessions can't show UI — set inline error
+                    logger.info("[Context] Exhausted — headless session cannot continue")
                     let errMsg = ChatMessage(role: .assistant, content: "", blocks: [])
                     errMsg.error = String(localized: "Context full. Start a new session to continue.")
                     messages.append(errMsg)

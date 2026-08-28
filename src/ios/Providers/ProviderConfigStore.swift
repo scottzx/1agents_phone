@@ -389,6 +389,12 @@ final class ProviderConfigStore: ObservableObject {
                     || entryId.hasPrefix(SystemVoiceProvider.builtinProviderId + "/") {
                     return entryId
                 }
+                // 3.6. Built-in SenseVoice engine member (sentinel-prefixed) → PRESERVE,
+                //    same reasoning as the System branch above.
+                if entryId == SenseVoiceProvider.builtinProviderId
+                    || entryId.hasPrefix(SenseVoiceProvider.builtinProviderId + "/") {
+                    return entryId
+                }
                 // 4. Neither a known composite key nor a UUID → genuinely
                 //    unrecognisable; drop (this is the only safe drop).
                 logger.warning("[GroupLoad] group \(config.modelGroups[i].id.prefix(8)) dropping unrecognisable member token '\(entryId.prefix(12))' (not a UUID, not a known composite key)")
@@ -885,6 +891,10 @@ final class ProviderConfigStore: ObservableObject {
             || id.hasPrefix(SystemVoiceProvider.builtinProviderId + "/") {
             return SystemVoiceProvider.providerInstance
         }
+        if id == SenseVoiceProvider.builtinProviderId
+            || id.hasPrefix(SenseVoiceProvider.builtinProviderId + "/") {
+            return SenseVoiceProvider.providerInstance
+        }
         return config.instances.first { $0.id == id }
     }
 
@@ -1261,6 +1271,12 @@ final class ProviderConfigStore: ObservableObject {
         if entryId == SystemVoiceProvider.builtinProviderId
             || entryId.hasPrefix(SystemVoiceProvider.builtinProviderId + "/") {
             return SystemVoiceCatalog.entry(forCompositeId: entryId)
+        }
+        // Built-in SenseVoice engine members are virtual too. Mirrors the System
+        // branch above.
+        if entryId == SenseVoiceProvider.builtinProviderId
+            || entryId.hasPrefix(SenseVoiceProvider.builtinProviderId + "/") {
+            return SenseVoiceCatalog.entry(forCompositeId: entryId)
         }
         // [T-provider-entry-composite-key] `id` is now the compositeKey
         // ("{instanceId}/{modelId}"). Resolve by composite key first; then fall

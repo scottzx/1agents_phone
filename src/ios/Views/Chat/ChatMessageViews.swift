@@ -161,6 +161,9 @@ struct ChatMessageRow: View {
                 parts.append("Image: \(path)")
             case .memoryTool(let action):
                 parts.append("Memory: \(action)\n\(block.content)")
+            case .subagentTool(let action, let taskTitle):
+                let label = taskTitle.isEmpty ? action : "\(action): \(taskTitle)"
+                parts.append("Task: \(label)\n\(block.content)")
             case .thinking:
                 if !block.content.isEmpty { parts.append("[Thinking]\n\(block.content)") }
             case .info:
@@ -699,7 +702,7 @@ struct ChatMessageRow: View {
             case .text: return !block.content.isEmpty
             case .thinking: return true
             case .info: return true
-            case .shellTool, .fileReadTool, .fileWriteTool, .fileEditTool, .browserTool, .readImageTool, .memoryTool: return true
+            case .shellTool, .fileReadTool, .fileWriteTool, .fileEditTool, .browserTool, .readImageTool, .memoryTool, .subagentTool: return true
             }
         }
     }

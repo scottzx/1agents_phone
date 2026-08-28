@@ -308,6 +308,10 @@ struct AIChatView: View {
         nonmutating set { voiceMode.isVoiceActive = newValue }
     }
     @StateObject private var voiceVM = VoiceInputViewModel()
+    @ObservedObject private var voiceSelection = VoiceSelectionStore.shared
+    @State private var showVoiceConfigMenu = false
+    @State private var showVoiceLanguagePicker = false
+    @State private var showVoiceModelSelector = false
     /// Global read-replies state — observed so the voice-mode "Read replies" toggle
     /// reflects enabled/muted in lockstep with the global voice-output capsule.
     @ObservedObject private var voiceOutput = VoiceOutputState.shared
@@ -1246,23 +1250,18 @@ struct AIChatView: View {
             // Capsule auto-shows whenever audio is loaded — no manual activation needed.
             minisLogger.info("🔑DRAFT AIChatView.onDisappear vm=\(vm.vmInstanceId) sessionId=\(sessionId ?? "nil") draftId=\(draftId ?? "nil") vm.sessionId=\(vm.sessionId ?? "nil") vm.isProcessing=\(vm.isProcessing)")
         }
-        // [T-voice-bg-fg-gap] Structural immunity: while the voice panel is up
-        // and the transcript editor is NOT open, there is no legitimate keyboard
-        // in this subtree — so ignore the keyboard safe-area entirely in that
-        // state. Device log 2026-07-17 12:12 showed the panel shifting from
-        // y=686…778 to y=638…730 (exactly 48pt, the keyboard-accessory height)
-        // during the didEnterBackground layout pass: iOS re-asserted a keyboard
-        // inset while snapshotting, the app suspended before the matching hide
-        // was processed, and no keyboard event fires on foreground return — the
-        // zombie inset persisted and the panel floated (the reported bottom
-        // gap). Ignoring the keyboard edge in this state makes ANY such stale
-        // inset harmless; edit mode (edges: []) keeps normal avoidance so the
-        // panel still lifts above the keyboard while editing, and text mode is
-        // untouched.
-        .ignoresSafeArea(
-            .keyboard,
-            edges: (voiceInputActive && !voiceVM.isEditingTranscript) ? .bottom : []
-        )
+        // [T-voice-bg-fg-gap] REMOVED (voice-input redesign): this used to force-
+        // ignore the keyboard safe area and force-resign the responder while
+        // voice mode was active, because the old InlineVoiceInputView's editable
+        // transcript field could be torn out of the view tree mid-layout-pass,
+        // leaving a zombie keyboard inset. PastableTextView now stays mounted in
+        // both text and voice mode (never torn out), and is legitimately
+        // focusable/editable at any time — including while voiceInputActive is
+        // true — so "voice mode ⇒ no legitimate keyboard" no longer holds, and
+        // force-resigning here would fight a keyboard the user genuinely opened.
+        // Re-test lock/background-during-recording on device if a bottom-gap
+        // regression reappears; the original device-log incident is documented
+        // in git history at this call site.
         .onChange(of: scenePhase) { phase in
             if phase == .active {
                 // [T-voice-inputbar-fg-stale-debounce] iOS changes safe area
@@ -1278,41 +1277,6 @@ struct AIChatView: View {
                 // one for an already-visible view.
                 inputBarHeightDebounce?.cancel()
                 inputBarHeightDebounce = nil
-                // [T-voice-bg-fg-gap] Foreground reseal: if we return to a
-                // voice-mode-not-editing state, no responder should be armed.
-                // Releasing here is a no-op when nothing is focused and clears
-                // any responder UIKit resurrected during the background pass.
-                if voiceInputActive && !voiceVM.isEditingTranscript {
-                    let keyWindow = UIApplication.shared.connectedScenes
-                        .compactMap { $0 as? UIWindowScene }
-                        .flatMap(\.windows)
-                        .first(where: \.isKeyWindow)
-                    if let keyWindow, keyWindow.endEditing(true) {
-                        AppLogger(category: "InputBarLayout").info("[voice-bgfg] scene active — released a resurrected responder (voice mode, not editing)")
-                    }
-                }
-            }
-            if phase != .active, voiceInputActive, !voiceVM.isEditingTranscript {
-                // [T-voice-bg-fg-gap] Complete any in-flight keyboard dismissal
-                // BEFORE the snapshot/suspend layout pass — but ONLY in the
-                // voice-mode-not-editing state, where no responder is ever
-                // legitimate (text mode keeps its focused composer across app
-                // switches; edit mode keeps its editor keyboard — resigning
-                // those would be a visible regression). If the edit→send
-                // teardown's dismiss animation is still running when the app
-                // backgrounds, iOS can freeze the window mid-dismissal with a
-                // partial keyboard inset that survives into the next foreground.
-                // Synchronous resign + no-animation layout guarantees the window
-                // geometry is final before UIKit snapshots it.
-                let keyWindow = UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .flatMap(\.windows)
-                    .first(where: \.isKeyWindow)
-                if let keyWindow {
-                    let hadResponder = keyWindow.endEditing(true)
-                    UIView.performWithoutAnimation { keyWindow.layoutIfNeeded() }
-                    AppLogger(category: "InputBarLayout").info("[voice-bgfg] scene \(phase == .inactive ? "inactive" : "background") — forced keyboard-dismiss completion (hadResponder=\(hadResponder)) voice=\(voiceInputActive) editing=\(voiceVM.isEditingTranscript)")
-                }
             }
             if phase != .active, speechManager.state == .recording {
                 speechManager.stopRecording()
@@ -3010,27 +2974,45 @@ struct AIChatView: View {
         }
     }
 
-    /// Mic button plus the attached language-picker sheet.
-    private var micButtonContainer: some View {
-        MicButton(speechManager: speechManager, inputFocused: $inputFocused, onTap: {
-            if voiceInputActive {
-                // Already in voice mode — the "T" button switches back to text.
-                // [T-ios-voice-keyboard-text-carry] Keep the transcript: the
-                // composer mirrors it, so clearing here would empty the input
-                // box and lose the dictated text on the way back to keyboard.
-                voiceVM.reset(clearTranscript: false)
-                withAnimation(.easeInOut(duration: 0.2)) { voiceInputActive = false }
-            } else {
-                // Mark the composition as voice-assisted (committed to the
-                // "voice" input-mode preference only at send time). Switch the
-                // composer into inline voice mode — the single voice entry point.
-                vm.voiceUsedInComposition = true
-                // Switching text→voice opens the panel expanded this one time;
-                // afterwards it resumes the remembered expand/compact state.
-                VoiceModePreference.shared.enteredFromText = true
-                withAnimation(.easeInOut(duration: 0.2)) { voiceInputActive = true }
+    /// Mic button: single tap toggles voice mode (the .onChange(of: voiceInputActive)
+    /// below drives the actual VAD start/stop); long-press opens a quick config
+    /// menu for recognition language + input model.
+    private var micButtonContainer: AnyView {
+        AnyView(
+            MicButton(speechManager: speechManager, inputFocused: $inputFocused, onTap: {
+                if voiceInputActive {
+                    // Already in voice mode — the "T" button switches back to text.
+                    // [T-ios-voice-keyboard-text-carry] Keep the transcript: the
+                    // composer mirrors it, so clearing here would empty the input
+                    // box and lose the dictated text on the way back to keyboard.
+                    voiceVM.reset(clearTranscript: false)
+                    withAnimation(.easeInOut(duration: 0.2)) { voiceInputActive = false }
+                } else {
+                    // Mark the composition as voice-assisted (committed to the
+                    // "voice" input-mode preference only at send time). Switch the
+                    // composer into inline voice mode — the single voice entry point.
+                    vm.voiceUsedInComposition = true
+                    withAnimation(.easeInOut(duration: 0.2)) { voiceInputActive = true }
+                }
+            }, onLongPress: {
+                showVoiceConfigMenu = true
+            }, isVoiceActive: voiceInputActive)
+            .confirmationDialog(Text("Voice Input Settings", comment: "Long-press mic config menu title"),
+                                 isPresented: $showVoiceConfigMenu, titleVisibility: .visible) {
+                Button("\(String(localized: "Language", comment: "Voice config menu: recognition language")) (\(VoiceLanguages.option(for: voiceVM.language).label))") {
+                    showVoiceLanguagePicker = true
+                }
+                Button("\(String(localized: "Input Model", comment: "Voice config menu: ASR model")) (\(VoiceProviderResolver.inputModelLabel(includeInstance: false)))") {
+                    showVoiceModelSelector = true
+                }
             }
-        }, isVoiceActive: voiceInputActive)
+            .sheet(isPresented: $showVoiceLanguagePicker) {
+                VoiceLanguagePickerSheet(viewModel: voiceVM)
+            }
+            .sheet(isPresented: $showVoiceModelSelector) {
+                NavigationStack { UnifiedModelPicker(config: .voiceInput()) }
+            }
+        )
     }
 
     /// Send / Enqueue / Stop circular button.
@@ -3068,20 +3050,6 @@ struct AIChatView: View {
     /// `__swift_instantiateConcreteTypeFromMangledNameV2`).
     private var inputFieldOrWaveform: AnyView {
         let topPadding: CGFloat = (vm.attachments.isEmpty && vm.loadingVideoCount == 0) ? 16 : 11
-        if voiceInputActive {
-            return AnyView(
-                // [voice-correction §6] Recent conversation turns, straight from the
-                // already-loaded in-memory list (§12.1 forbids a DB query on this path),
-                // budgeted by CorrectionContextBuilder.
-                InlineVoiceInputView(
-                    viewModel: voiceVM,
-                    inputText: inputTextBinding,
-                    onPasteImage: { image in vm.addImageAttachment(image) },
-                    onPasteFile: { url in vm.addFileAttachment(from: url) },
-                    conversationContext: { voiceCorrectionContext(from: vm.messages) }
-                )
-            )
-        }
         if speechManager.state == .recording {
             // Transcript area grows with content up to a cap (~5 lines),
             // then scrolls internally. ScrollView is greedy in its scroll
@@ -3160,6 +3128,15 @@ struct AIChatView: View {
         .padding(.horizontal, 16)
         .padding(.top, topPadding)
         .padding(.bottom, 10)
+        if voiceInputActive {
+            return AnyView(VStack(spacing: 0) {
+                VoiceRecordingStatusBar(
+                    viewModel: voiceVM,
+                    conversationContext: { voiceCorrectionContext(from: vm.messages) }
+                )
+                field
+            })
+        }
         return AnyView(field)
     }
 
@@ -3245,6 +3222,54 @@ struct AIChatView: View {
                 }
                 lastRecognizedLength = newLength
             }
+            // [inline-voice] Single tap on the mic now starts recording directly
+            // (no separate "tap to speak" inner button) — replaces what used to
+            // be InlineVoiceInputView.onAppear/.onDisappear.
+            .onChange(of: voiceInputActive) { active in
+                if active {
+                    voiceVM.accumulate = true
+                    VoiceCorrectionEngine.warmUp()
+                    // Seamless text → voice: carry whatever was typed into the
+                    // transcript so dictation appends to it.
+                    voiceVM.setTranscript(vm.inputText)
+                    voiceVM.prepare()
+                    voiceVM.handleMainButtonTap()
+                } else {
+                    voiceVM.stopListening()
+                }
+            }
+            // Mirror the recognized text into the composer field. Never
+            // auto-send — the user reviews then taps Send (or swipes/returns).
+            .onChange(of: voiceVM.transcript) { newValue in
+                if vm.inputText != newValue {
+                    vm.inputText = newValue
+                }
+            }
+            // Reverse mirror: when inputText changes externally (share/paste
+            // injection, "add selected reply to input"), pull it back into the
+            // voice transcript so a subsequent VAD segment appends onto current
+            // text instead of a stale transcript.
+            .onChange(of: vm.inputText) { newValue in
+                if voiceInputActive, voiceVM.transcript != newValue {
+                    voiceVM.setTranscript(newValue)
+                }
+            }
+            .onChange(of: voiceSelection.inputEntryId) { _ in
+                voiceVM.refreshInputProvider()
+            }
+            #if DEBUG
+            // debug.voice.panel {action:"mic"} — on-device e2e audio tests
+            // (synthetic debug.tap cannot reach SwiftUI buttons). Relocated from
+            // the retired InlineVoiceInputView.
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("MinisDebugVoiceMicTap"))) { _ in
+                VoiceLog.log("[debug-bridge] mic tap via debug.voice.panel")
+                if voiceVM.isTranscribing, voiceVM.state != .recording {
+                    voiceVM.cancelTranscription()
+                } else {
+                    voiceVM.handleMainButtonTap()
+                }
+            }
+            #endif
             .overlay(alignment: .topTrailing) {
                 // Only offer "Move to…" when there is actually something to
                 // move. hasInjectedShareContent is flipped true after EVERY
@@ -3458,17 +3483,6 @@ struct AIChatView: View {
                 DragGesture(minimumDistance: 20, coordinateSpace: .local)
                     .onChanged { value in
                         guard !inputHasSelection, !inputIsScrollable else { return }
-                        // Priority in voice mode: component gestures > collapse/
-                        // expand > swipe-to-send. The panel's own drags (collapse/
-                        // expand, delete control) are handled inside the panel; the
-                        // swipe-to-send only engages once the finger has been
-                        // dragged ABOVE the input container (location.y < 0), i.e.
-                        // out toward the message area — making it the lowest
-                        // priority and never colliding with in-panel drags.
-                        if voiceInputActive && value.location.y >= 0 {
-                            if sendSwipeProgress != 0 { sendSwipeProgress = 0 }
-                            return
-                        }
                         let isVertical = abs(value.translation.height) > abs(value.translation.width)
                         guard isVertical, value.translation.height < 0 else {
                             if sendSwipeProgress != 0 { sendSwipeProgress = 0 }
@@ -3497,27 +3511,6 @@ struct AIChatView: View {
                     .onEnded { value in
                         guard !inputHasSelection, !inputIsScrollable else {
                             sendSwipeProgress = 0
-                            return
-                        }
-                        // Voice mode: only a release dragged OUT of the input
-                        // container (toward the message area) sends — in-panel
-                        // drags belong to collapse/expand and the delete control.
-                        //
-                        // [T-voice-scroll-gesture-priority] This location test is
-                        // also what already satisfies "scroll must win over
-                        // swipe-to-send" inside the voice panel's transcript, in
-                        // BOTH the editing and read-only modes: any drag whose
-                        // release lands inside the input container (y >= 0) —
-                        // which is every drag that stays within the transcript
-                        // ScrollView — is rejected here before it can send. So a
-                        // scroll gesture can never be reinterpreted as a send,
-                        // and no separate isScrollable/at-bottom channel needs to
-                        // be plumbed from the panel to this gesture. Send only
-                        // engages once the finger has genuinely left the panel and
-                        // moved up toward the message list, which is exactly the
-                        // required behaviour.
-                        if voiceInputActive && value.location.y >= 0 {
-                            if sendSwipeProgress != 0 { sendSwipeProgress = 0 }
                             return
                         }
                         let isVertical = abs(value.translation.height) > abs(value.translation.width)
@@ -5312,13 +5305,21 @@ private struct MicButton: View {
     /// point. The SpeechRecognitionManager path stays in place but is no longer
     /// triggered from here.
     var onTap: () -> Void = {}
+    /// Long-press (500ms, no movement) — opens the voice config menu
+    /// (language / input model).
+    var onLongPress: () -> Void = {}
     /// True while inline voice mode is active — the button flips to a "T" glyph
     /// that switches back to text input.
     var isVoiceActive: Bool = false
     /// Press feedback for the custom-gesture button.
     @State private var micPressed = false
+    /// True once the hold timer has fired for the current press — suppresses
+    /// onTap on release so a long-press never ALSO fires a tap.
+    @State private var longPressFired = false
+    @State private var longPressTask: Task<Void, Never>?
 
     private static let diameter: CGFloat = 34
+    private static let longPressDuration: Duration = .milliseconds(500)
 
     var body: some View {
         // NOT a Button: SwiftUI's Button has a generous system touch-slop / touch-
@@ -5338,16 +5339,41 @@ private struct MicButton: View {
             .scaleEffect(micPressed ? 0.9 : 1.0)
             .contentShape(Circle())
             .gesture(
+                // Long-press is timed manually inside this SAME gesture rather
+                // than adding a second LongPressGesture recognizer: both would
+                // start tracking on touch-down, a simultaneous LongPressGesture
+                // wouldn't cancel this DragGesture's onEnded (still need the
+                // same "consumed" flag), and the sequenced-gesture composition
+                // (LongPressGesture.sequenced(before:)) delays the tap path this
+                // button was specifically built to keep fast/precise.
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
                         micPressed = Self.isInside(value.location)
+                        if longPressTask == nil, Self.isInside(value.startLocation) {
+                            longPressFired = false
+                            longPressTask = Task { @MainActor in
+                                try? await Task.sleep(for: Self.longPressDuration)
+                                guard !Task.isCancelled, micPressed else { return }
+                                longPressFired = true
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                onLongPress()
+                            }
+                        }
+                        if hypot(value.translation.width, value.translation.height) >= 10 {
+                            longPressTask?.cancel()
+                            longPressTask = nil
+                        }
                     }
                     .onEnded { value in
+                        longPressTask?.cancel()
+                        longPressTask = nil
+                        let firedLongPress = longPressFired
+                        longPressFired = false
                         let started = Self.isInside(value.startLocation)
                         let ended = Self.isInside(value.location)
                         let moved = hypot(value.translation.width, value.translation.height)
                         micPressed = false
-                        guard started, ended, moved < 10 else { return }
+                        guard started, ended, moved < 10, !firedLongPress else { return }
                         inputFocused = false
                         onTap()
                     }

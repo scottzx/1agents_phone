@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "actions": [
+    {
+      "id": "free_talk",
+      "title": "Free Talk",
+      "subtitle": "5-minute conversation",
+      "icon": "bubble.left.and.bubble.right",
+      "kind": "prompt",
+      "prompt": "Start a 5-minute English free-talk session. Pick a light topic, correct only important mistakes, and end with 3 phrases I should reuse."
+    },
+    {
+      "id": "correct_me",
+      "title": "Correct Me",
+      "subtitle": "Polish what I just said",
+      "icon": "pencil.and.outline",
+      "kind": "prompt",
+      "prompt": "I will write or dictate English. Correct grammar and naturalness, show a better version, and explain briefly."
+    },
+    {
+      "id": "daily_drill",
+      "title": "Daily Drill",
+      "subtitle": "Schedule practice",
+      "icon": "calendar",
+      "kind": "prompt",
+      "prompt": "Design a short daily English drill for me and offer to create an iOS Reminder so I practice on schedule."
+    }
+  ]
+}

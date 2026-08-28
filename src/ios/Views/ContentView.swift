@@ -81,6 +81,12 @@ enum ToolSheet: String, Identifiable {
 }
 
 struct ContentView: View {
+    /// When set, this screen shows only the given agent's sessions and acts as
+    /// that agent's history list rather than the app's root. Left nil at the
+    /// root (and for the flavor packs that still use the chat list as home),
+    /// where it behaves exactly as before.
+    var agentFilter: String?
+
     /// Prefix for draft session IDs. Each new chat gets a unique suffix
     /// so SwiftUI's `.id()` correctly destroys old views and creates new ones.
     private static let newSessionPrefix = "__new__"
@@ -131,6 +137,22 @@ struct ContentView: View {
     @ObservedObject private var sidebarActivityTracker = SessionActivityTracker.shared
     @ObservedObject private var sidebarConcurrencyManager = SessionConcurrencyManager.shared
     @State private var sessions: [ChatSession] = []
+
+    /// Narrow a session list to one agent. Subagent scratch sessions are
+    /// already excluded by listSessions' own WHERE clause.
+    ///
+    /// Sessions created before the Agent split carry no `agent_id`, and they
+    /// are deliberately never rewritten to carry one — migrating a whole
+    /// history is a write with no upside. Instead the DEFAULT agent adopts
+    /// them on read, so old conversations stay reachable without a single row
+    /// being modified.
+    private static func applyingAgentFilter(_ list: [ChatSession], _ agentFilter: String?) -> [ChatSession] {
+        guard let agentFilter else { return list }
+        if agentFilter == AgentProfile.defaultAgentId {
+            return list.filter { $0.agentId == agentFilter || $0.agentId == nil }
+        }
+        return list.filter { $0.agentId == agentFilter }
+    }
     /// [T-ios-session-list-equatable-jank] id → ChatSession lookup backing the
     /// sidebar rows. Held in @State (not a per-body-eval computed `[String:
     /// ChatSession]`) on purpose: a plain `let byId = computedDict` inside the
@@ -588,7 +610,7 @@ struct ContentView: View {
             }
         }
         .task {
-            sessions = await ChatStore.shared.listSessions()
+            sessions = Self.applyingAgentFilter(await ChatStore.shared.listSessions(), agentFilter)
             let shareAlreadyHandled = shareCoordinator.bufferVersion > 0
             // A Home Screen Quick Action that fired during launch will
             // open the right session itself via `quickActionRouter.newChatTrigger`.
@@ -2290,7 +2312,7 @@ struct ContentView: View {
         }
         sessionRefreshInFlight = true
         Task(priority: .utility) { @MainActor in
-            sessions = await ChatStore.shared.listSessions()
+            sessions = Self.applyingAgentFilter(await ChatStore.shared.listSessions(), agentFilter)
             sessionRefreshInFlight = false
             if sessionRefreshPending {
                 sessionRefreshPending = false
@@ -4791,7 +4813,7 @@ private enum SettingsDestination: Hashable {
     case mcpServerDetail(serverId: String)
 }
 
-private struct SettingsSheet: View {
+struct SettingsSheet: View {
     @Binding var showTerminal: Bool
     @AppStorage("appearanceMode") private var appearanceMode: Int = 0
     @Environment(\.dismiss) private var dismiss

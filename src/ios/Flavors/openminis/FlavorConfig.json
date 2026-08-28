@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "flavor_id": "openminis",
+  "display_name": "Minis",
+  "pack": {
+    "resource_dir": "RolePack",
+    "id": "openminis-default",
+    "min_installer_api": 1
+  },
+  "root_experience": "agent_roster",
+  "scene_module_id": null,
+  "branding": {
+    "chat_placeholder": null,
+    "onboarding_title": null,
+    "onboarding_body": null
+  },
+  "defaults": {
+    "prefer_bundled_soul_on_first_launch": false,
+    "install_skills_enabled": true,
+    "show_advanced_settings": true
+  }
+}

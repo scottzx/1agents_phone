@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "flavor_id": "sales",
+  "display_name": "销售助手",
+  "pack": {
+    "resource_dir": "RolePack",
+    "id": "sales-default",
+    "min_installer_api": 1
+  },
+  "root_experience": "scene_home",
+  "scene_module_id": "sales",
+  "branding": {
+    "chat_placeholder": "描述客户、粘贴报价需求，或发送价目表图片…",
+    "onboarding_title": "销售智能助手",
+    "onboarding_body": "完整手机 Agent + 销售场景技能。待办/日历/客户以 iOS 系统为权威源。"
+  },
+  "defaults": {
+    "prefer_bundled_soul_on_first_launch": true,
+    "install_skills_enabled": true,
+    "show_advanced_settings": true
+  }
+}

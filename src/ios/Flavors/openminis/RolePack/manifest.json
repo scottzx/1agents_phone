@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "openminis-default",
+  "version": "0.0.1",
+  "flavor_ids": ["openminis"],
+  "installer_api": 1,
+  "soul": null,
+  "skills": [],
+  "quick_actions_path": null,
+  "system_bindings": null,
+  "meta": {
+    "title": "OpenMinis",
+    "description": "Default empty pack — full agent, no vertical shell",
+    "locale": "en"
+  }
+}

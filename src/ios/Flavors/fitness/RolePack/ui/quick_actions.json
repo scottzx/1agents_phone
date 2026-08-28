@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "actions": [
+    {
+      "id": "today_workout",
+      "title": "今日训练",
+      "subtitle": "生成可执行计划",
+      "icon": "figure.strengthtraining.traditional",
+      "kind": "prompt",
+      "prompt": "根据我的目标与最近状态，给出今天的训练计划（动作、组数、休息）。如需要可用 HealthKit 相关能力参考近期活动，并询问是否写入提醒事项。"
+    },
+    {
+      "id": "log_session",
+      "title": "记录训练",
+      "subtitle": "总结刚完成的一组",
+      "icon": "checkmark.circle",
+      "kind": "prompt",
+      "prompt": "我会描述刚完成的训练。请帮我结构化记录，并建议是否写入健康/提醒以便回顾。"
+    },
+    {
+      "id": "recovery_check",
+      "title": "恢复检查",
+      "subtitle": "睡眠与负荷",
+      "icon": "heart.text.square",
+      "kind": "prompt",
+      "prompt": "结合可读取的健康数据与我的主观感觉，评估今天是否适合高强度训练，并给出调整建议。"
+    }
+  ]
+}

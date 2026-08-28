@@ -132,3 +132,4 @@ deps/lame-3.100/**/*.la
 deps/lame-3.100/**/*.lai
 deps/lame-3.100/**/.libs/
 deps/lame-3.100/**/.deps/
+.gstack/

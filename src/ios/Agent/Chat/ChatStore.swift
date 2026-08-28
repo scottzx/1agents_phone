@@ -52,6 +52,27 @@ struct ChatSession: Identifiable, Codable, Hashable {
     var remoteDeviceName: String? // human-readable name of the remote device
     var pinnedAt: Date?       // non-nil if session is pinned; timestamp of when it was pinned
 
+    // MARK: - Agent linkage
+    //
+    // A session used to be a standalone unit of work. It is now owned by an
+    // AgentProfile, and `spawnRole` says which kind of session it is:
+    //   "main"     — the agent's single long-lived conversation
+    //   "subagent" — a scratch session holding one dispatched task; hidden
+    //                from every session list, reachable only from its parent's
+    //                task card
+    //   "legacy"   — a pre-Agent session migrated onto the default agent
+    //   nil        — not yet migrated
+    var agentId: String?
+    var parentSessionId: String?
+    var spawnRole: String?
+    var spawnTitle: String?
+    /// running | done | failed | stopped. Only meaningful for subagent rows.
+    var spawnStatus: String?
+    /// The subagent's final plain-text answer, handed back to the parent.
+    var spawnResult: String?
+
+    var isSubagent: Bool { spawnRole == "subagent" }
+
     /// Whether this session is from a remote device (read-only).
     var isRemote: Bool { remoteDeviceId != nil }
 
@@ -88,6 +109,7 @@ struct ChatSession: Identifiable, Codable, Hashable {
             && lhs.lastSyncedAt == rhs.lastSyncedAt
             && lhs.remoteDeviceId == rhs.remoteDeviceId
             && lhs.remoteDeviceName == rhs.remoteDeviceName
+            && lhs.spawnStatus == rhs.spawnStatus
         // Intentionally NOT comparing `lastMessage` (long string; `updatedAt`
         // is its change proxy) or the immutable `modelId` / `createdAt`.
     }
@@ -506,6 +528,65 @@ actor ChatStore {
         // (push only after priority=0 drains in each batch).
         addColumnIfMissing(table: "sync_dirty_records", column: "priority", definition: "INTEGER NOT NULL DEFAULT 0")
         addColumnIfMissing(table: "sync_dirty_records", column: "created_at", definition: "REAL NOT NULL DEFAULT 0")
+
+        // MARK: Agents
+        //
+        // A persistent Agent owns one long-lived "main" session plus any number
+        // of short-lived "subagent" scratch sessions. Metadata lives here; the
+        // persona body and per-agent memory live on disk under
+        // /var/minis/agents/<id>/ (see AgentProfile).
+        exec("""
+            CREATE TABLE IF NOT EXISTS agents (
+                id                    TEXT PRIMARY KEY,
+                name                  TEXT NOT NULL,
+                emoji                 TEXT NOT NULL DEFAULT '',
+                title                 TEXT NOT NULL DEFAULT '',
+                summary               TEXT NOT NULL DEFAULT '',
+                accent_color          TEXT NOT NULL DEFAULT '#5B8DEF',
+                main_session_id       TEXT,
+                default_model_entry   TEXT,
+                tool_policy           TEXT NOT NULL DEFAULT 'orchestrator',
+                memory_enabled        INTEGER NOT NULL DEFAULT 1,
+                created_at            REAL NOT NULL,
+                updated_at            REAL NOT NULL,
+                archived_at           REAL,
+                sort_order            INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+
+        // Placeholder for scheduled agent runs. The table is created so the
+        // Agent home screen has somewhere to point and so a later migration
+        // does not have to backfill, but nothing reads or writes it yet: iOS
+        // has no in-app scheduler (baseSystemPrompt says so explicitly), and
+        // shipping a half-wired scheduler would make the UI contradict the
+        // prompt. Android's ScheduledAgentRunner.kt is the reference for when
+        // this is actually implemented.
+        exec("""
+            CREATE TABLE IF NOT EXISTS agent_schedules (
+                id          TEXT PRIMARY KEY,
+                agent_id    TEXT NOT NULL,
+                title       TEXT NOT NULL,
+                prompt      TEXT NOT NULL,
+                cron        TEXT,
+                next_run_at REAL,
+                enabled     INTEGER NOT NULL DEFAULT 0,
+                created_at  REAL NOT NULL
+            )
+        """)
+
+        // Session → agent linkage. Idempotent adds, same as every migration
+        // above, so re-running on an already-migrated DB is a no-op.
+        addColumnIfMissing(table: "sessions", column: "agent_id", definition: "TEXT")
+        addColumnIfMissing(table: "sessions", column: "parent_session_id", definition: "TEXT")
+        addColumnIfMissing(table: "sessions", column: "spawn_role", definition: "TEXT")
+        addColumnIfMissing(table: "sessions", column: "spawn_title", definition: "TEXT")
+        addColumnIfMissing(table: "sessions", column: "spawn_status", definition: "TEXT")
+        addColumnIfMissing(table: "sessions", column: "spawn_result", definition: "TEXT")
+        exec("CREATE INDEX IF NOT EXISTS idx_sessions_agent ON sessions(agent_id, updated_at DESC)")
+        exec("CREATE INDEX IF NOT EXISTS idx_sessions_parent ON sessions(parent_session_id, created_at)")
+        // listSessions() filters subagent rows out on every call; without this
+        // the filter degrades into a full scan once scratch sessions pile up.
+        exec("CREATE INDEX IF NOT EXISTS idx_sessions_spawn_role ON sessions(spawn_role)")
 
         // One-shot cleanup: drop legacy v1 dirty rows that have a v2
         // counterpart. Under the V2 engine these have no consumer (the
@@ -1025,8 +1106,15 @@ actor ChatStore {
                      WHERE m.session_id = s.id
                        AND m.role = 'user'
                        AND (m.part_flags & \(userMask)) != 0
-                     ORDER BY m.sort_order DESC LIMIT 1)
-            FROM sessions s ORDER BY s.updated_at DESC
+                     ORDER BY m.sort_order DESC LIMIT 1),
+                   s.agent_id, s.parent_session_id, s.spawn_role,
+                   s.spawn_title, s.spawn_status
+            FROM sessions s
+            -- Subagent scratch sessions are an implementation detail of one
+            -- dispatched task. They are reachable from their parent's task
+            -- card and must never appear as a top-level conversation.
+            WHERE s.spawn_role IS NULL OR s.spawn_role != 'subagent'
+            ORDER BY s.updated_at DESC
             """
             // Note: `remote_tombstoned_at` column still exists on the
             // table for legacy rows but is no longer consulted. Peer-side
@@ -1085,12 +1173,19 @@ actor ChatStore {
                 let remoteDeviceId = sqlite3_column_text(stmt, 10).map { String(cString: $0) }
                 let pinnedAt: Date? = sqlite3_column_type(stmt, 11) != SQLITE_NULL
                     ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 11)) : nil
+                let agentId = sqlite3_column_text(stmt, 14).map { String(cString: $0) }
+                let parentSessionId = sqlite3_column_text(stmt, 15).map { String(cString: $0) }
+                let spawnRole = sqlite3_column_text(stmt, 16).map { String(cString: $0) }
+                let spawnTitle = sqlite3_column_text(stmt, 17).map { String(cString: $0) }
+                let spawnStatus = sqlite3_column_text(stmt, 18).map { String(cString: $0) }
 
                 sessions.append(ChatSession(
                     id: id, title: title, category: category, modelId: modelId,
                     createdAt: createdAt, updatedAt: updatedAt, lastMessage: lastMessage,
                     source: source, lastSyncedAt: lastSyncedAt,
-                    remoteDeviceId: remoteDeviceId, pinnedAt: pinnedAt
+                    remoteDeviceId: remoteDeviceId, pinnedAt: pinnedAt,
+                    agentId: agentId, parentSessionId: parentSessionId,
+                    spawnRole: spawnRole, spawnTitle: spawnTitle, spawnStatus: spawnStatus
                 ))
             }
         }
@@ -1627,7 +1722,7 @@ actor ChatStore {
     }
 
     func getSession(_ id: String) -> ChatSession? {
-        let sql = "SELECT id, title, model_id, created_at, updated_at, category, source, pinned_at FROM sessions WHERE id = ?"
+        let sql = "SELECT id, title, model_id, created_at, updated_at, category, source, pinned_at, agent_id, parent_session_id, spawn_role, spawn_title, spawn_status, spawn_result FROM sessions WHERE id = ?"
         var stmt: OpaquePointer?
         var session: ChatSession?
 
@@ -1642,17 +1737,218 @@ actor ChatStore {
                 let source = sqlite3_column_text(stmt, 6).map { String(cString: $0) }
                 let pinnedAt: Date? = sqlite3_column_type(stmt, 7) != SQLITE_NULL
                     ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 7)) : nil
+                let agentId = sqlite3_column_text(stmt, 8).map { String(cString: $0) }
+                let parentSessionId = sqlite3_column_text(stmt, 9).map { String(cString: $0) }
+                let spawnRole = sqlite3_column_text(stmt, 10).map { String(cString: $0) }
+                let spawnTitle = sqlite3_column_text(stmt, 11).map { String(cString: $0) }
+                let spawnStatus = sqlite3_column_text(stmt, 12).map { String(cString: $0) }
+                let spawnResult = sqlite3_column_text(stmt, 13).map { String(cString: $0) }
 
                 session = ChatSession(
                     id: id, title: title, category: category, modelId: modelId,
                     createdAt: createdAt, updatedAt: updatedAt, source: source,
-                    pinnedAt: pinnedAt
+                    pinnedAt: pinnedAt,
+                    agentId: agentId, parentSessionId: parentSessionId,
+                    spawnRole: spawnRole, spawnTitle: spawnTitle,
+                    spawnStatus: spawnStatus, spawnResult: spawnResult
                 )
             }
         }
         sqlite3_finalize(stmt)
 
         return session
+    }
+
+    // MARK: - Agent CRUD
+    //
+    // Agents live in the same minis.db as sessions and are read/written through
+    // this actor rather than a second store. One connection means the
+    // `sessions.agent_id` linkage, the roster read and the session write all
+    // serialize behind the same actor — no cross-connection SQLITE_BUSY window
+    // on the launch path, where bootstrap migration and the first listSessions()
+    // would otherwise race. AgentStore is the @MainActor facade over these.
+
+    private func decodeAgent(_ stmt: OpaquePointer?) -> AgentProfile {
+        AgentProfile(
+            id: String(cString: sqlite3_column_text(stmt, 0)),
+            name: String(cString: sqlite3_column_text(stmt, 1)),
+            emoji: sqlite3_column_text(stmt, 2).map { String(cString: $0) } ?? "",
+            title: sqlite3_column_text(stmt, 3).map { String(cString: $0) } ?? "",
+            summary: sqlite3_column_text(stmt, 4).map { String(cString: $0) } ?? "",
+            accentColor: sqlite3_column_text(stmt, 5).map { String(cString: $0) } ?? "#5B8DEF",
+            mainSessionId: sqlite3_column_text(stmt, 6).map { String(cString: $0) },
+            defaultModelEntryId: sqlite3_column_text(stmt, 7).map { String(cString: $0) },
+            toolPolicy: AgentToolPolicy(
+                rawValue: sqlite3_column_text(stmt, 8).map { String(cString: $0) } ?? ""
+            ) ?? .orchestrator,
+            memoryEnabled: sqlite3_column_int(stmt, 9) == 1,
+            createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 10)),
+            updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 11)),
+            archivedAt: sqlite3_column_type(stmt, 12) != SQLITE_NULL
+                ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 12)) : nil,
+            sortOrder: Int(sqlite3_column_int(stmt, 13))
+        )
+    }
+
+    private static let agentColumns =
+        "id, name, emoji, title, summary, accent_color, main_session_id, default_model_entry, tool_policy, memory_enabled, created_at, updated_at, archived_at, sort_order"
+
+    func listAgents(includeArchived: Bool = false) -> [AgentProfile] {
+        let filter = includeArchived ? "" : "WHERE archived_at IS NULL "
+        let sql = "SELECT \(Self.agentColumns) FROM agents \(filter)ORDER BY sort_order ASC, created_at ASC"
+        var stmt: OpaquePointer?
+        var result: [AgentProfile] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW { result.append(decodeAgent(stmt)) }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    func getAgent(_ id: String) -> AgentProfile? {
+        let sql = "SELECT \(Self.agentColumns) FROM agents WHERE id = ?"
+        var stmt: OpaquePointer?
+        var result: AgentProfile?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            if sqlite3_step(stmt) == SQLITE_ROW { result = decodeAgent(stmt) }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    func upsertAgent(_ agent: AgentProfile) {
+        let sql = """
+            INSERT INTO agents (id, name, emoji, title, summary, accent_color,
+                                main_session_id, default_model_entry, tool_policy,
+                                memory_enabled, created_at, updated_at, archived_at, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name, emoji = excluded.emoji, title = excluded.title,
+                summary = excluded.summary, accent_color = excluded.accent_color,
+                main_session_id = excluded.main_session_id,
+                default_model_entry = excluded.default_model_entry,
+                tool_policy = excluded.tool_policy, memory_enabled = excluded.memory_enabled,
+                updated_at = excluded.updated_at, archived_at = excluded.archived_at,
+                sort_order = excluded.sort_order
+            """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (agent.id as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, (agent.name as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 3, (agent.emoji as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 4, (agent.title as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 5, (agent.summary as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 6, (agent.accentColor as NSString).utf8String, -1, nil)
+            bindOptionalText(stmt, index: 7, value: agent.mainSessionId)
+            bindOptionalText(stmt, index: 8, value: agent.defaultModelEntryId)
+            sqlite3_bind_text(stmt, 9, (agent.toolPolicy.rawValue as NSString).utf8String, -1, nil)
+            sqlite3_bind_int(stmt, 10, agent.memoryEnabled ? 1 : 0)
+            sqlite3_bind_double(stmt, 11, agent.createdAt.timeIntervalSince1970)
+            sqlite3_bind_double(stmt, 12, agent.updatedAt.timeIntervalSince1970)
+            if let archived = agent.archivedAt {
+                sqlite3_bind_double(stmt, 13, archived.timeIntervalSince1970)
+            } else {
+                sqlite3_bind_null(stmt, 13)
+            }
+            sqlite3_bind_int(stmt, 14, Int32(agent.sortOrder))
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// Hard-delete an agent row. Its sessions are NOT deleted — archiving is
+    /// the user-facing action, and orphaning a transcript is preferable to
+    /// silently destroying conversation history.
+    func deleteAgentRow(_ id: String) {
+        let sql = "DELETE FROM agents WHERE id = ?"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    // MARK: - Session ↔ agent linkage
+
+    /// Stamp a session with its owning agent and role. Called once, right
+    /// after the session row is created.
+    func linkSession(
+        _ sessionId: String,
+        agentId: String,
+        role: String,
+        parentSessionId: String? = nil,
+        spawnTitle: String? = nil
+    ) {
+        invalidateSessionListCache()
+        let sql = """
+            UPDATE sessions
+               SET agent_id = ?, spawn_role = ?, parent_session_id = ?,
+                   spawn_title = ?, spawn_status = CASE WHEN ? = 'subagent' THEN 'running' ELSE spawn_status END
+             WHERE id = ?
+            """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (agentId as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, (role as NSString).utf8String, -1, nil)
+            bindOptionalText(stmt, index: 3, value: parentSessionId)
+            bindOptionalText(stmt, index: 4, value: spawnTitle)
+            sqlite3_bind_text(stmt, 5, (role as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 6, (sessionId as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// Record a subagent's terminal state and the answer it handed back.
+    func updateSpawnOutcome(_ sessionId: String, status: String, result: String?) {
+        invalidateSessionListCache()
+        let sql = "UPDATE sessions SET spawn_status = ?, spawn_result = COALESCE(?, spawn_result) WHERE id = ?"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (status as NSString).utf8String, -1, nil)
+            bindOptionalText(stmt, index: 2, value: result)
+            sqlite3_bind_text(stmt, 3, (sessionId as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// Every subagent scratch session dispatched from `parentSessionId`,
+    /// oldest first. Backs the parent's task-card list.
+    func subagentSessions(parentSessionId: String) -> [ChatSession] {
+        let sql = """
+            SELECT id, title, model_id, created_at, updated_at, category, source, pinned_at,
+                   agent_id, parent_session_id, spawn_role, spawn_title, spawn_status, spawn_result
+              FROM sessions
+             WHERE parent_session_id = ? AND spawn_role = 'subagent'
+             ORDER BY created_at ASC
+            """
+        var stmt: OpaquePointer?
+        var result: [ChatSession] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (parentSessionId as NSString).utf8String, -1, nil)
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                result.append(ChatSession(
+                    id: String(cString: sqlite3_column_text(stmt, 0)),
+                    title: sqlite3_column_text(stmt, 1).map { String(cString: $0) },
+                    category: sqlite3_column_text(stmt, 5).map { String(cString: $0) },
+                    modelId: String(cString: sqlite3_column_text(stmt, 2)),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3)),
+                    updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4)),
+                    source: sqlite3_column_text(stmt, 6).map { String(cString: $0) },
+                    agentId: sqlite3_column_text(stmt, 8).map { String(cString: $0) },
+                    parentSessionId: sqlite3_column_text(stmt, 9).map { String(cString: $0) },
+                    spawnRole: sqlite3_column_text(stmt, 10).map { String(cString: $0) },
+                    spawnTitle: sqlite3_column_text(stmt, 11).map { String(cString: $0) },
+                    spawnStatus: sqlite3_column_text(stmt, 12).map { String(cString: $0) },
+                    spawnResult: sqlite3_column_text(stmt, 13).map { String(cString: $0) }
+                ))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
     }
 
     func updateSessionModelId(_ id: String, modelId: String) {
@@ -3989,6 +4285,10 @@ extension RawMessage {
                 case "memory_write", "memory_get":
                     kind = .memoryTool(action: tu.name)
                     content = tu.name == "memory_write" ? "Writing memory..." : "Reading memory..."
+                case "spawn_subagent", "check_subagent", "message_subagent", "stop_subagent":
+                    let taskTitle = extractStringParam("task_title", from: tu.input)
+                    kind = .subagentTool(action: tu.name, taskTitle: taskTitle)
+                    content = taskTitle.isEmpty ? tu.name : taskTitle
                 default:
                     kind = .shellTool(command: tu.name)
                     content = tu.name

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "sales-default",
+  "version": "0.1.0",
+  "flavor_ids": ["sales"],
+  "installer_api": 1,
+  "soul": {
+    "mode": "optional",
+    "path": "SOUL.md",
+    "apply_policy": "first_launch_only"
+  },
+  "skills": [],
+  "quick_actions_path": "ui/quick_actions.json",
+  "system_bindings": {
+    "tasks": { "source": "ios.reminders", "write_through": true },
+    "calendar": { "source": "ios.calendar", "write_through": true },
+    "customers": { "source": "ios.contacts", "write_through": true }
+  },
+  "meta": {
+    "title": "Sales Assistant Pack",
+    "description": "Empty shell — skills and scene UI land next",
+    "locale": "zh-Hans"
+  }
+}

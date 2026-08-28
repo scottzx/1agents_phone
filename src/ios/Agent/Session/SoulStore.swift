@@ -141,6 +141,56 @@ enum SoulStore {
         AIChatViewModel.minisMemoryPersistentDir.appendingPathComponent("SOUL.md")
     }
 
+    // MARK: - Per-agent resolution
+    //
+    // SOUL.md used to be a device-wide singleton. Now each AgentProfile owns
+    // one. The DEFAULT agent deliberately keeps the legacy path: its file is
+    // the one Settings → Soul edits, the one `minis-config` writes, and the
+    // one the iCloud SoulV2 record round-trips. Repointing it would have
+    // orphaned every upgrading user's personality and broken sync, so the
+    // split is by agent id, not by moving files.
+
+    /// Where `agentId`'s persona file lives. `nil` (or the default agent)
+    /// resolves to the legacy device-wide path.
+    static func fileURL(for agentId: String?) -> URL {
+        guard let agentId, agentId != AgentProfile.defaultAgentId else { return fileURL }
+        return AgentProfile.soulURL(for: agentId)
+    }
+
+    /// Where `agentId`'s memory (GLOBAL.md + daily logs) lives. Same
+    /// default-agent carve-out as `fileURL(for:)`.
+    static func memoryDir(for agentId: String?) -> URL {
+        guard let agentId, agentId != AgentProfile.defaultAgentId else {
+            return AIChatViewModel.minisMemoryPersistentDir
+        }
+        return AgentProfile.memoryDir(for: agentId)
+    }
+
+    static func load(for agentId: String?) -> SoulFile? {
+        let url = fileURL(for: agentId)
+        guard FileManager.default.fileExists(atPath: url.path),
+              let data = try? Data(contentsOf: url),
+              let str = String(data: data, encoding: .utf8) else { return nil }
+        return SoulMDParser.parse(str)
+    }
+
+    /// Persist an agent's persona. The default agent routes through `save(_:)`
+    /// so it keeps the cache refresh, the change notification and the iCloud
+    /// dirty-marking that path already owns.
+    @MainActor
+    static func save(_ file: SoulFile, for agentId: String?) throws {
+        guard let agentId, agentId != AgentProfile.defaultAgentId else {
+            try save(file)
+            return
+        }
+        let url = fileURL(for: agentId)
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                 withIntermediateDirectories: true)
+        let text = SoulMDParser.serialize(file)
+        try text.data(using: .utf8)?.write(to: url, options: .atomic)
+        NotificationCenter.default.post(name: .soulMdChanged, object: agentId)
+    }
+
     // MARK: - Body length rules (unified token count)
     //
     // The personality body has a single hard cap of 2000 tokens, applied
@@ -410,8 +460,8 @@ enum SystemPromptBuilder {
     /// We never substitute a default body into the prompt — the identity
     /// sentence alone is the safe fallback when SOUL.md is missing or
     /// empty, matching pre-SOUL behavior.
-    static func identitySection() -> String {
-        let file = SoulStore.load()
+    static func identitySection(for agentId: String? = nil) -> String {
+        let file = SoulStore.load(for: agentId)
         let name: String = {
             let n = (file?.metadata.name ?? SoulMetadata.default.name)
                 .trimmingCharacters(in: .whitespacesAndNewlines)

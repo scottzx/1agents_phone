@@ -139,6 +139,11 @@ xcodebuild -project src/ios/Minis.xcodeproj -scheme Minis \
 `Minis` (app), `MinisShare` (share extension), `AgentWidgetExtension`,
 `MinisFileProvider`, plus `MinisTests` / `MinisUITests`.
 
+Vertical flavors share the same sources and ship as separate apps:
+`MinisSales` (`com.1agents.phone.sales`), `MinisEnglish`, `MinisFitness`.
+See [docs/architecture.md](docs/architecture.md) and
+[docs/specs/flavor-pack-contract.md](docs/specs/flavor-pack-contract.md).
+
 ---
 
 ## Android

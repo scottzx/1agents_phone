@@ -153,6 +153,9 @@ struct MinisApp: App {
         Bundle.enableLanguageOverride()
         let lang = UserDefaults.standard.string(forKey: "appLanguage") ?? ""
         Bundle.setLanguage(lang.isEmpty ? nil : lang)
+        // Log flavor identity early (full pack install runs in
+        // registerFileProviderDomain before SoulStore.ensureExists).
+        _ = FlavorRegistry.current
         // [T-ios-soul-name-sidebar-stale] Pre-load cachedMetadata synchronously so
         // ContentView's `@State soulName` gets the real SOUL.md name on its very
         // first render instead of the `.default` stub ("Minis"). Without this the
@@ -178,7 +181,7 @@ struct MinisApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView()
+                FlavorRootView()
                     .overlay(alignment: .top) {
                         BackgroundInterruptionBanner()
                     }
@@ -572,6 +575,10 @@ struct MinisApp: App {
             try? fm.createDirectory(at: root.appendingPathComponent(sub, isDirectory: true),
                                     withIntermediateDirectories: true)
         }
+        // Flavor Role Pack first: may seed SOUL.md from the vertical pack
+        // on first launch. Must run before ensureExists() so the pack wins
+        // over the generic Minis defaultContent.
+        RolePackInstaller.installIfNeeded()
         // [T-soul-md] Seed SOUL.md with default content on first launch so
         // the Soul settings page and chat bubble identity have something
         // to render before the user customizes anything. Never overwrites

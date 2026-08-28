@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "english-default",
+  "version": "0.1.0",
+  "flavor_ids": ["english"],
+  "installer_api": 1,
+  "soul": {
+    "mode": "optional",
+    "path": "SOUL.md",
+    "apply_policy": "first_launch_only"
+  },
+  "skills": [],
+  "quick_actions_path": "ui/quick_actions.json",
+  "system_bindings": {
+    "tasks": { "source": "ios.reminders", "write_through": true },
+    "calendar": { "source": "ios.calendar", "write_through": true }
+  },
+  "meta": {
+    "title": "English Coach Pack",
+    "description": "Empty shell — coaching skills next",
+    "locale": "en"
+  }
+}

@@ -153,9 +153,11 @@ src/ios/          iOS app (Swift / SwiftUI) + share, widget and file-provider ex
 src/android/      Android app (Kotlin / Compose) + JNI native code
 src/shared/       Assets shared by both platforms
 deps/             Native dependency build scripts and vendored sources
-docs/specs/       Architecture and interface specifications
+docs/             Architecture (architecture.md) and interface specs (specs/)
 scripts/          Rootfs preparation and developer tooling
 ```
+
+**→ [docs/architecture.md](docs/architecture.md)** — runtime, sandbox, and iOS multi-flavor (Minis / 销售助手 / 英语陪练 / 健身陪练) layout.
 
 ---
 

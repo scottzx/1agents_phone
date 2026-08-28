@@ -697,6 +697,8 @@ struct ToolLiveSheet: View {
             return "read_image(\(truncateParam(path)))"
         case .memoryTool(let action):
             return "\(truncateParam(action))"
+        case .subagentTool(let action, let taskTitle):
+            return taskTitle.isEmpty ? action : "\(action)(\(truncateParam(taskTitle)))"
         case .info:
             return ""
         }
@@ -716,6 +718,7 @@ struct ToolLiveSheet: View {
         case .browserTool: Image(systemName: "globe")
         case .readImageTool: Image(systemName: "photo")
         case .memoryTool: Image(systemName: "brain.head.profile")
+        case .subagentTool: Image(systemName: "person.2.badge.gearshape")
         case .info: Image(systemName: "arrow.triangle.2.circlepath")
         case .text: Image(systemName: "text.alignleft")
         case .thinking: Image("ThinkingIcon")
@@ -1984,6 +1987,7 @@ struct ToolLiveSheet: View {
         case .browserTool: return "Minis is using Browser"
         case .readImageTool: return "Minis is reading Image"
         case .memoryTool: return "Minis is using Memory"
+        case .subagentTool: return "Minis is running a task"
         case .info: return "Minis"
         case .text: return "Minis"
         case .thinking: return "Minis"
@@ -2017,6 +2021,7 @@ struct ToolLiveSheet: View {
         case .browserTool: return .blue
         case .readImageTool: return .purple
         case .memoryTool: return .pink
+        case .subagentTool: return .teal
         case .info: return .secondary
         case .text: return .primary
         case .thinking: return .blue
@@ -2357,6 +2362,7 @@ private struct ToolPreviewThumbnail: View {
         case .browserTool: return .blue
         case .readImageTool: return .purple
         case .memoryTool: return .pink
+        case .subagentTool: return .teal
         case .info: return .secondary
         case .text: return .primary
         case .thinking: return .blue

@@ -13,6 +13,7 @@
 		FK1000020000000000000004 /* FlavorRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FK1000010000000000000004 /* FlavorRootView.swift */; };
 		SC1000020000000000000001 /* SalesHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC1000010000000000000001 /* SalesHomeView.swift */; };
 		21FED4B7BB6F6D9476C9992E /* VoiceProvider+System.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88993FC8E3F0199C6638F664 /* VoiceProvider+System.swift */; };
+		HB00000000000000000000B1 /* VoiceProvider+SenseVoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = HB00000000000000000000B0 /* VoiceProvider+SenseVoice.swift */; };
 		241D530017827D7F0EB604DE /* VoiceProviderFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2941B643B8A2F048A2B154E /* VoiceProviderFactory.swift */; };
 		2A4FD49F872431D703328384 /* VoiceOutputPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 424510790AF3FB2452D3CCE3 /* VoiceOutputPlayer.swift */; };
 		30390D7AA90818BD4BDCE784 /* VoiceProviderTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3D1138DBE516F31D76ABF4 /* VoiceProviderTemplate.swift */; };
@@ -21,7 +22,7 @@
 		4123A4B6761EBBE587AE11C6 /* GroupSlotPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F5379380323FA8C6477708C /* GroupSlotPicker.swift */; };
 		489FD1413F4EE806C3F0C713 /* VoiceProviderResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86DD7E40E65177AB39C55882 /* VoiceProviderResolver.swift */; };
 		52535805A60BA4B26902EAFA /* VoiceInputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 535D58AA5C4B7B563E4C8821 /* VoiceInputModels.swift */; };
-		52F76965817EDFB2E37E8220 /* InlineVoiceInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D1A2B7331C508B0D3E77D28 /* InlineVoiceInputView.swift */; };
+		HB00000000000000000000C1 /* VoiceRecordingStatusBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = HB00000000000000000000C0 /* VoiceRecordingStatusBar.swift */; };
 		57E63023C8A9A3C505DF411B /* VoiceActivityDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7E2CB0D0D63E6D6FDB45568 /* VoiceActivityDetector.swift */; };
 		5EF8347C1EAA0066EFF631F8 /* GroupVoiceModelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0ED149397BEA7E0408C92688 /* GroupVoiceModelsView.swift */; };
 		77BB9741AB0EFC449FDBDFED /* VoiceWaveformView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16FF3462D09402F14B610CD6 /* VoiceWaveformView.swift */; };
@@ -566,13 +567,14 @@
 		28E23EA0E199D6D50EBC76F2 /* VoiceLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceLog.swift; sourceTree = "<group>"; };
 		2BB45FC87D39AE9AB4495BE9 /* VoiceProvider+Vendors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "VoiceProvider+Vendors.swift"; sourceTree = "<group>"; };
 		424510790AF3FB2452D3CCE3 /* VoiceOutputPlayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceOutputPlayer.swift; sourceTree = "<group>"; };
-		4D1A2B7331C508B0D3E77D28 /* InlineVoiceInputView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InlineVoiceInputView.swift; sourceTree = "<group>"; };
+		HB00000000000000000000C0 /* VoiceRecordingStatusBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceRecordingStatusBar.swift; sourceTree = "<group>"; };
 		535D58AA5C4B7B563E4C8821 /* VoiceInputModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceInputModels.swift; sourceTree = "<group>"; };
 		5F3D1138DBE516F31D76ABF4 /* VoiceProviderTemplate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceProviderTemplate.swift; sourceTree = "<group>"; };
 		7A302B074A0BE0AFED8EC7E9 /* SpeechPlayerControl.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpeechPlayerControl.swift; sourceTree = "<group>"; };
 		84758F712C9B9178FA9D0EF2 /* VoiceProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceProvider.swift; sourceTree = "<group>"; };
 		86DD7E40E65177AB39C55882 /* VoiceProviderResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceProviderResolver.swift; sourceTree = "<group>"; };
 		88993FC8E3F0199C6638F664 /* VoiceProvider+System.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "VoiceProvider+System.swift"; sourceTree = "<group>"; };
+		HB00000000000000000000B0 /* VoiceProvider+SenseVoice.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "VoiceProvider+SenseVoice.swift"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* SystemVoiceCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SystemVoiceCatalog.swift; sourceTree = "<group>"; };
 		AA0838A12F3B941A00049557 /* AboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AboutView.swift; sourceTree = "<group>"; };
 		AA0838BE2F3B941A00049557 /* RootfsManagementView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootfsManagementView.swift; sourceTree = "<group>"; };
@@ -1112,6 +1114,7 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		AA0838CB2F3CA8A900049557 /* Terminal */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Terminal; sourceTree = "<group>"; };
 		HB00000000000000000000A4 /* HardwareBridge */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = HardwareBridge; sourceTree = "<group>"; };
+		AK00000000000000000000A1 /* AgentKit */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = AgentKit; sourceTree = "<group>"; };
 		AA8A568C2F6FBB7A00A3E54E /* MinisUITests */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = MinisUITests; sourceTree = "<group>"; };
 		BB1000012F700000000000AA /* MinisTests */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (E5EXC0001 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MinisTests; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -1192,6 +1195,7 @@
 				84758F712C9B9178FA9D0EF2 /* VoiceProvider.swift */,
 				2BB45FC87D39AE9AB4495BE9 /* VoiceProvider+Vendors.swift */,
 				88993FC8E3F0199C6638F664 /* VoiceProvider+System.swift */,
+				HB00000000000000000000B0 /* VoiceProvider+SenseVoice.swift */,
 				A1B2C3D4E5F60718293A4B5D /* SystemVoiceCatalog.swift */,
 				F2941B643B8A2F048A2B154E /* VoiceProviderFactory.swift */,
 				86DD7E40E65177AB39C55882 /* VoiceProviderResolver.swift */,
@@ -1214,7 +1218,7 @@
 			children = (
 				16FF3462D09402F14B610CD6 /* VoiceWaveformView.swift */,
 				E8AB343B6D865C37CC5E9EDB /* VoiceInputPanel.swift */,
-				4D1A2B7331C508B0D3E77D28 /* InlineVoiceInputView.swift */,
+				HB00000000000000000000C0 /* VoiceRecordingStatusBar.swift */,
 				7A302B074A0BE0AFED8EC7E9 /* SpeechPlayerControl.swift */,
 			);
 			path = Voice;
@@ -1329,6 +1333,7 @@
 			children = (
 				E51000011 /* MinisApp.swift */,
 				HB00000000000000000000A4 /* HardwareBridge */,
+				AK00000000000000000000A1 /* AgentKit */,
 				FK1000030000000000000001 /* FlavorKit */,
 				SC1000030000000000000001 /* Scenes */,
 				E5QA0102 /* AppDelegate.swift */,
@@ -2244,6 +2249,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				AA0838CB2F3CA8A900049557 /* Terminal */,
+				AK00000000000000000000A1 /* AgentKit */,
 				HB00000000000000000000A4 /* HardwareBridge */,
 			);
 			name = Minis;
@@ -2277,6 +2283,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				AA0838CB2F3CA8A900049557 /* Terminal */,
+				AK00000000000000000000A1 /* AgentKit */,
 			);
 			name = MinisSales;
 			packageProductDependencies = (
@@ -2309,6 +2316,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				AA0838CB2F3CA8A900049557 /* Terminal */,
+				AK00000000000000000000A1 /* AgentKit */,
 			);
 			name = MinisEnglish;
 			packageProductDependencies = (
@@ -2341,6 +2349,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				AA0838CB2F3CA8A900049557 /* Terminal */,
+				AK00000000000000000000A1 /* AgentKit */,
 			);
 			name = MinisFitness;
 			packageProductDependencies = (
@@ -3003,6 +3012,7 @@
 				33643CC21B9402F949D76C3C /* VoiceProvider.swift in Sources */,
 				B02B7ADBAB47BDB33F664A21 /* VoiceProvider+Vendors.swift in Sources */,
 				21FED4B7BB6F6D9476C9992E /* VoiceProvider+System.swift in Sources */,
+				HB00000000000000000000B1 /* VoiceProvider+SenseVoice.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* SystemVoiceCatalog.swift in Sources */,
 				241D530017827D7F0EB604DE /* VoiceProviderFactory.swift in Sources */,
 				489FD1413F4EE806C3F0C713 /* VoiceProviderResolver.swift in Sources */,
@@ -3012,7 +3022,7 @@
 				38F28509AFBC2153A7C85E85 /* VoiceInputPanel.swift in Sources */,
 				30390D7AA90818BD4BDCE784 /* VoiceProviderTemplate.swift in Sources */,
 				5EF8347C1EAA0066EFF631F8 /* GroupVoiceModelsView.swift in Sources */,
-				52F76965817EDFB2E37E8220 /* InlineVoiceInputView.swift in Sources */,
+				HB00000000000000000000C1 /* VoiceRecordingStatusBar.swift in Sources */,
 				4123A4B6761EBBE587AE11C6 /* GroupSlotPicker.swift in Sources */,
 				FDD896F80E0A14A7B60B12EF /* VoiceLog.swift in Sources */,
 				8B886DA8A270E8FB58A9A1FA /* SpeechPlayerControl.swift in Sources */,

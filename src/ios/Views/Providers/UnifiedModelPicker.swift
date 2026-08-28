@@ -289,6 +289,7 @@ struct UnifiedModelPicker: View {
                 // privacy/offline. The user picks the trade-off explicitly.
                 pool.append(.systemASROnline)
                 pool.append(.systemASROffline)
+                pool.append(.senseVoiceASR)
             }
             if prefs.contains(where: { $0 == .audioOutput }) {
                 // "System Voice (Auto)" default first, then one row per installed
@@ -307,8 +308,18 @@ struct UnifiedModelPicker: View {
         candidateEntries.filter { VoiceProviderResolver.isSystemEntry($0.providerInstanceId) }
     }
 
+    /// Built-in SenseVoice engine entries — same "synthetic instance, never in
+    /// store.instances" situation as System, so it needs the same hand-added
+    /// section treatment below (the generic store.instances loop can't find it).
+    private var senseVoiceEntries: [ModelEntry] {
+        candidateEntries.filter { $0.providerInstanceId == SenseVoiceProvider.builtinProviderId }
+    }
+
     private var regularEntries: [ModelEntry] {
-        candidateEntries.filter { !VoiceProviderResolver.isSystemEntry($0.providerInstanceId) }
+        candidateEntries.filter {
+            !VoiceProviderResolver.isSystemEntry($0.providerInstanceId)
+                && $0.providerInstanceId != SenseVoiceProvider.builtinProviderId
+        }
     }
 
     private var entriesByInstance: [(instance: ProviderInstance, entries: [ModelEntry])] {
@@ -318,6 +329,10 @@ struct UnifiedModelPicker: View {
         // synthetic local-only instance rather than a parallel systemSection.
         if !systemEntries.isEmpty {
             result.append((SystemVoiceProvider.providerInstance, systemEntries))
+        }
+        // Built-in SenseVoice engine, same treatment, right after System.
+        if !senseVoiceEntries.isEmpty {
+            result.append((SenseVoiceProvider.providerInstance, senseVoiceEntries))
         }
         let grouped = Dictionary(grouping: regularEntries, by: { $0.providerInstanceId })
         var seen = Set<String>()

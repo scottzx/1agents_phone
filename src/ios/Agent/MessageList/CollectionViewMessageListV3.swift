@@ -211,6 +211,7 @@ private struct BridgedAssistantBlockV3: View {
         case .browserTool: return "assistantBrowserBlock"
         case .readImageTool: return "assistantReadImageBlock"
         case .memoryTool: return "assistantMemoryBlock"
+        case .subagentTool: return "assistantSubagentBlock"
         case .info: return "assistantInfoBlock"
         }
     }
@@ -2352,6 +2353,7 @@ extension CollectionViewMessageListV3 {
                         case .browserTool: "browser_use"
                         case .readImageTool: "read_image"
                         case .memoryTool: "memory"
+                        case .subagentTool(let a, _): a
                         default: "unknown"
                         }
                         AppLogger(category: "ToolLC").info("[ToolLifecycle] RENDERED_CHATUI toolId=\(block.toolUseId?.prefix(20) ?? "nil") tool=\(toolName) sid=\(sid) appState=\(appState) suspended=\(suspended) isProcessing=\(processing) caller=\(caller)")

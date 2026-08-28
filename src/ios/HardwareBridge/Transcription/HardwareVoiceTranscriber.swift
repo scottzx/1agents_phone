@@ -15,6 +15,10 @@ import Foundation
 /// SenseVoiceInferenceService.swift's private `run(samples:...)` (voice_type
 /// repo) but without its VAD/segmentation/diarization scaffolding.
 actor HardwareVoiceTranscriber {
+    /// Shared across every caller (hardware bridge + composer voice input) so the
+    /// 241MB model loads once, not once per feature.
+    static let shared = HardwareVoiceTranscriber()
+
     enum TranscriberError: LocalizedError {
         case modelResourceMissing
         case openFailed(String)

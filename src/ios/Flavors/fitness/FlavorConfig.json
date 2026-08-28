@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "flavor_id": "fitness",
+  "display_name": "健身陪练",
+  "pack": {
+    "resource_dir": "RolePack",
+    "id": "fitness-default",
+    "min_installer_api": 1
+  },
+  "root_experience": "chat_with_rail",
+  "scene_module_id": null,
+  "branding": {
+    "chat_placeholder": "描述今日训练、身体感觉，或同步健康数据…",
+    "onboarding_title": "健身陪练",
+    "onboarding_body": "完整手机 Agent + 训练场景默认。健康数据走 HealthKit；计划提醒写回系统日历/提醒事项。"
+  },
+  "defaults": {
+    "prefer_bundled_soul_on_first_launch": true,
+    "install_skills_enabled": true,
+    "show_advanced_settings": true
+  }
+}

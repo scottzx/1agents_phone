@@ -79,6 +79,33 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// If non-nil, this VM is in read-only mode viewing a remote device's session.
     var remoteDeviceId: String?
 
+    // MARK: - Agent identity
+    //
+    // Which persistent Agent this session belongs to, and which role the loop
+    // is playing for it. Together these pick the persona (`SoulStore` resolves
+    // SOUL.md per agent), the system prompt variant, and — critically — the
+    // tool set. A `.main` session on an orchestrator agent is never handed
+    // shell/browser/write tools, which is what keeps its long-lived transcript
+    // free of tool output. See `makeAgentTools(role:)`.
+    //
+    // `nil` agentId means "not yet resolved" and behaves exactly like the
+    // pre-Agent build (default agent, full toolset), so any code path that
+    // creates a VM without going through AgentStore still works.
+    var agentId: String?
+    var agentRole: AgentRunRole = .main
+
+    /// Effective tool ceiling for this VM. Executors always get the full
+    /// toolset regardless of what their parent agent is allowed — they are the
+    /// ones actually doing the work.
+    var effectiveToolPolicy: AgentToolPolicy {
+        if agentRole == .executor { return .standalone }
+        return resolvedToolPolicy
+    }
+
+    /// Cached copy of the owning agent's policy, refreshed by `loadSession()`.
+    /// Defaults to `.standalone` so an unresolved VM keeps historical behavior.
+    var resolvedToolPolicy: AgentToolPolicy = .standalone
+
     /// Short unique ID for this ViewModel instance (for debugging lifecycle).
     let vmInstanceId = UUID().uuidString.prefix(6)
 
@@ -1698,7 +1725,29 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         return _cachedTimeString
     }
 
+    /// The system prompt for this turn, selected by role.
+    ///
+    /// Every assemble site in runAgentLoop reads this one property, so the
+    /// orchestrator/executor split lands everywhere (including the provider-
+    /// fallback re-assembly) without touching those sites.
     private var baseSystemPrompt: String {
+        switch effectiveToolPolicy {
+        case .orchestrator:
+            return OrchestratorPrompt.render(agentId: agentId, memoryEnabled: memoryEnabled)
+        case .standalone:
+            // Executors get the full operator prompt below — it was always
+            // written for the thing that does the work — plus a short preamble
+            // telling them they are headless and who consumes their answer.
+            return agentRole == .executor
+                ? OrchestratorPrompt.executorPreamble + executorAndStandalonePrompt
+                : executorAndStandalonePrompt
+        }
+    }
+
+    /// The historical full-capability prompt. Unchanged apart from resolving
+    /// SOUL.md per agent; it is what `.standalone` agents and every dispatched
+    /// executor run on.
+    private var executorAndStandalonePrompt: String {
         // [T-soul-md] Layer 1 is rendered by SystemPromptBuilder, which
         // owns the "You are <name>, a capable AI assistant running on an
         // iOS device ..." identity sentence (parametric on SOUL.md's
@@ -1706,7 +1755,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         // Personality section from SOUL.md's body. The original wording
         // is preserved inside SystemPromptBuilder.identityTemplate so we
         // don't regress model behavior that depended on it.
-        SystemPromptBuilder.identitySection()
+        SystemPromptBuilder.identitySection(for: agentId)
             + "You should proactively use shell commands to accomplish the user's tasks — installing packages (apk add), "
             + "writing and running scripts, managing files, networking, and any other operations a Linux terminal can perform.\n\n"
             + "Available tools:\n"
@@ -3922,6 +3971,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 case .browserTool: return "browser"
                 case .readImageTool: return "readImage"
                 case .memoryTool: return "memory"
+                case .subagentTool: return "task"
                 case .info: return "info"
                 }
             }()
@@ -4298,10 +4348,10 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         // global default.
         AppLogger(category: "MemDiag").info("[MemDiag] inject-decision sid=\(self.sessionId?.prefix(8) ?? "nil") vm.memoryEnabled=\(self.memoryEnabled)")
         if memoryEnabled {
-            if let memoryFragment = Self.loadGlobalMemoryFragment() {
+            if let memoryFragment = Self.loadGlobalMemoryFragment(agentId: agentId) {
                 userSystemPrompt += "\n\n" + memoryFragment
             }
-            if let dailyFragment = Self.loadRecentDailyMemoryFragment() {
+            if let dailyFragment = Self.loadRecentDailyMemoryFragment(agentId: agentId) {
                 userSystemPrompt += "\n\n" + dailyFragment
             }
         }
@@ -4657,10 +4707,10 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 // new provider must respect the per-session memoryEnabled
                 // toggle the same way the initial system prompt did.
                 if memoryEnabled {
-                    if let memoryFragment = Self.loadGlobalMemoryFragment() {
+                    if let memoryFragment = Self.loadGlobalMemoryFragment(agentId: agentId) {
                         userSystemPrompt += "\n\n" + memoryFragment
                     }
-                    if let dailyFragment = Self.loadRecentDailyMemoryFragment() {
+                    if let dailyFragment = Self.loadRecentDailyMemoryFragment(agentId: agentId) {
                         userSystemPrompt += "\n\n" + dailyFragment
                     }
                 }

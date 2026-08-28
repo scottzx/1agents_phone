@@ -30,6 +30,9 @@ enum VoiceProviderFactory {
         if instance.id == SystemVoiceProvider.builtinProviderId {
             return SystemVoiceProvider.shared
         }
+        if instance.id == SenseVoiceProvider.builtinProviderId {
+            return SenseVoiceProvider.shared
+        }
 
         let apiKey = ProviderKeychainHelper.loadAPIKey(instanceId: instance.id, caller: "VoiceFactory")
         let custom = instance.effectiveCustomBaseURL

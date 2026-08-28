@@ -2633,6 +2633,110 @@
         }
       }
     },
+    "✅ Task completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Aufgabe abgeschlossen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Task completed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Tâche terminée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ タスク完了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ 작업 완료"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ Задача выполнена"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ 任务已完成"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "✅ 任務已完成"
+          }
+        }
+      }
+    },
+    "❌ Task failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Aufgabe fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Task failed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Échec de la tâche"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ タスク失敗"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ 작업 실패"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ Задача не выполнена"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ 任务失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "❌ 任務失敗"
+          }
+        }
+      }
+    },
     "$ %@" : {
       "localizations" : {
         "de" : {
@@ -2929,6 +3033,110 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "1 分鐘"
+          }
+        }
+      }
+    },
+    "1 task completed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Aufgabe abgeschlossen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 task completed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 tâche terminée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 件のタスクが完了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작업 1개 완료"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 задача выполнена"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成 1 个任务"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已完成 1 個任務"
+          }
+        }
+      }
+    },
+    "1 task failed" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 Aufgabe fehlgeschlagen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 task failed"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 tâche échouée"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 件のタスクが失敗"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작업 1개 실패"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 задача не выполнена"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 个任务失败"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1 個任務失敗"
           }
         }
       }
@@ -6136,6 +6344,7 @@
       }
     },
     "Always" : {
+      "comment" : "Location permission status",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -19993,7 +20202,7 @@
       }
     },
     "Denied" : {
-      "extractionState" : "stale",
+      "comment" : "Location permission status",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -21414,6 +21623,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "每個 AI 服務商都有自己的隱私政策和服務條款，規定其如何處理您的數據。"
+          }
+        }
+      }
+    },
+    "Earlier" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Früher"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Earlier"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus tôt"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "それ以前"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ранее"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更早"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更早"
           }
         }
       }
@@ -22913,7 +23175,7 @@
       }
     },
     "Enhanced" : {
-      "extractionState" : "stale",
+      "comment" : "Speech voice quality",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -24502,159 +24764,162 @@
       }
     },
     "Extended (Audio)" : {
+      "comment" : "Keep-alive tier",
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Erweitert (Audio)"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweitert (Audio)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extended (Audio)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étendu (audio)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延長（オーディオ）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연장 (오디오)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продлённый (аудио)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长时间存活（音频）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長時間存活（音訊）"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Extended (Audio)"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Étendu (audio)"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "延長（オーディオ）"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "연장 (오디오)"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Продлённый (аудио)"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "长时间存活（音频）"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "長時間存活（音訊）"
-        }
-      }
       }
     },
     "Extended (Location + Audio)" : {
+      "comment" : "Keep-alive tier",
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Erweitert (Standort + Audio)"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweitert (Standort + Audio)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extended (Location + Audio)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étendu (localisation + audio)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延長（位置情報＋オーディオ）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연장 (위치 + 오디오)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продлённый (геопозиция + аудио)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长时间存活（位置 + 音频）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長時間存活（位置 + 音訊）"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Extended (Location + Audio)"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Étendu (localisation + audio)"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "延長（位置情報＋オーディオ）"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "연장 (위치 + 오디오)"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Продлённый (геопозиция + аудио)"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "长时间存活（位置 + 音频）"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "長時間存活（位置 + 音訊）"
-        }
-      }
       }
     },
     "Extended (Location)" : {
+      "comment" : "Keep-alive tier",
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Erweitert (Standort)"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erweitert (Standort)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extended (Location)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étendu (localisation)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延長（位置情報）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연장 (위치)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продлённый (геопозиция)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "长时间存活（位置）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "長時間存活（位置）"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Extended (Location)"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Étendu (localisation)"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "延長（位置情報）"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "연장 (위치)"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Продлённый (геопозиция)"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "长时间存活（位置）"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "長時間存活（位置）"
-        }
-      }
       }
     },
     "Face ID Protection" : {
@@ -28653,6 +28918,58 @@
         }
       }
     },
+    "Hide session content on the Lock Screen, in the Dynamic Island and in notifications. Only the number of completed tasks and the elapsed time are shown — no session titles, tool status or reply content." : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbirgt Sitzungsinhalte auf dem Sperrbildschirm, in der Dynamic Island und in Mitteilungen. Es werden nur die Anzahl abgeschlossener Aufgaben und die verstrichene Zeit angezeigt – keine Sitzungstitel, Werkzeugstatus oder Antwortinhalte."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide session content on the Lock Screen, in the Dynamic Island and in notifications. Only the number of completed tasks and the elapsed time are shown — no session titles, tool status or reply content."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Masque le contenu des sessions sur l’écran verrouillé, dans la Dynamic Island et dans les notifications. Seuls le nombre de tâches terminées et le temps écoulé sont affichés — ni titre de session, ni statut d’outil, ni contenu de réponse."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロック画面、Dynamic Island、通知でセッションの内容を非表示にします。完了したタスク数と経過時間のみが表示され、セッション名やツールの状態、返信内容は表示されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠금 화면, 다이나믹 아일랜드, 알림에서 세션 내용을 숨깁니다. 완료된 작업 수와 경과 시간만 표시되며 세션 제목, 도구 상태, 응답 내용은 표시되지 않습니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скрывает содержимое сессий на заблокированном экране, в Dynamic Island и в уведомлениях. Отображаются только количество выполненных задач и затраченное время — без названий сессий, статуса инструментов и текста ответов."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在锁定屏幕、灵动岛和通知中隐藏会话内容。仅显示已完成的任务数量和耗时，不显示会话标题、工具状态或回复内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在鎖定畫面、動態島和通知中隱藏工作階段內容。僅顯示已完成的任務數量和耗時，不顯示工作階段標題、工具狀態或回覆內容。"
+          }
+        }
+      }
+    },
     "High" : {
       "localizations" : {
         "de" : {
@@ -28996,54 +29313,54 @@
     },
     "How long the app can keep working after moving to the background. Without any keep-alive mechanism, iOS suspends apps after roughly 30 seconds; enabling Location Tracking (and granting location permission) or Background Speak extends this for the duration of a task." : {
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Wie lange die App nach dem Wechsel in den Hintergrund weiterarbeiten kann. Ohne Keep-Alive-Mechanismus setzt iOS Apps nach etwa 30 Sekunden aus; das Aktivieren von Standortverfolgung (mit erteilter Standortberechtigung) oder Hintergrund-Sprachausgabe verlängert dies für die Dauer einer Aufgabe."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wie lange die App nach dem Wechsel in den Hintergrund weiterarbeiten kann. Ohne Keep-Alive-Mechanismus setzt iOS Apps nach etwa 30 Sekunden aus; das Aktivieren von Standortverfolgung (mit erteilter Standortberechtigung) oder Hintergrund-Sprachausgabe verlängert dies für die Dauer einer Aufgabe."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "How long the app can keep working after moving to the background. Without any keep-alive mechanism, iOS suspends apps after roughly 30 seconds; enabling Location Tracking (and granting location permission) or Background Speak extends this for the duration of a task."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durée pendant laquelle l’app peut continuer à travailler après passage en arrière-plan. Sans mécanisme de maintien, iOS suspend les apps après environ 30 secondes ; activer le suivi de localisation (avec l’autorisation accordée) ou la lecture vocale en arrière-plan prolonge ce délai pour la durée d’une tâche."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "バックグラウンドに移行した後、アプリが作業を継続できる時間です。維持機能がない場合、iOSは約30秒でアプリを一時停止します。「位置情報の追跡」（位置情報の許可が必要）または「バックグラウンド読み上げ」を有効にすると、タスクの実行中はこの時間が延長されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앱이 백그라운드로 이동한 후 계속 작업할 수 있는 시간입니다. 유지 메커니즘이 없으면 iOS는 약 30초 후 앱을 일시 중단합니다. 위치 추적(위치 권한 허용 필요) 또는 백그라운드 읽어주기를 켜면 작업이 진행되는 동안 이 시간이 연장됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как долго приложение может продолжать работу после перехода в фон. Без механизма поддержания активности iOS приостанавливает приложения примерно через 30 секунд; включение «Отслеживания местоположения» (с разрешением на доступ) или «Озвучивания в фоне» продлевает это на время выполнения задачи."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用切换到后台后还能继续工作多久。若没有任何保活机制，iOS 会在大约 30 秒后挂起应用；开启“位置追踪”（并授予位置权限）或“后台朗读”可在任务执行期间延长这一时间。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "應用程式切換到背景後還能繼續工作多久。若沒有任何保活機制，iOS 會在大約 30 秒後暫停應用程式；開啟「位置追蹤」（並授予位置權限）或「背景朗讀」可在任務執行期間延長這段時間。"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "How long the app can keep working after moving to the background. Without any keep-alive mechanism, iOS suspends apps after roughly 30 seconds; enabling Location Tracking (and granting location permission) or Background Speak extends this for the duration of a task."
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Durée pendant laquelle l’app peut continuer à travailler après passage en arrière-plan. Sans mécanisme de maintien, iOS suspend les apps après environ 30 secondes ; activer le suivi de localisation (avec l’autorisation accordée) ou la lecture vocale en arrière-plan prolonge ce délai pour la durée d’une tâche."
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "バックグラウンドに移行した後、アプリが作業を継続できる時間です。維持機能がない場合、iOSは約30秒でアプリを一時停止します。「位置情報の追跡」（位置情報の許可が必要）または「バックグラウンド読み上げ」を有効にすると、タスクの実行中はこの時間が延長されます。"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "앱이 백그라운드로 이동한 후 계속 작업할 수 있는 시간입니다. 유지 메커니즘이 없으면 iOS는 약 30초 후 앱을 일시 중단합니다. 위치 추적(위치 권한 허용 필요) 또는 백그라운드 읽어주기를 켜면 작업이 진행되는 동안 이 시간이 연장됩니다."
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Как долго приложение может продолжать работу после перехода в фон. Без механизма поддержания активности iOS приостанавливает приложения примерно через 30 секунд; включение «Отслеживания местоположения» (с разрешением на доступ) или «Озвучивания в фоне» продлевает это на время выполнения задачи."
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "应用切换到后台后还能继续工作多久。若没有任何保活机制，iOS 会在大约 30 秒后挂起应用；开启“位置追踪”（并授予位置权限）或“后台朗读”可在任务执行期间延长这一时间。"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "應用程式切換到背景後還能繼續工作多久。若沒有任何保活機制，iOS 會在大約 30 秒後暫停應用程式；開啟「位置追蹤」（並授予位置權限）或「背景朗讀」可在任務執行期間延長這段時間。"
-        }
-      }
       }
     },
     "How long to wait for this server's first initialize. Raise it for slow-starting servers (e.g. uvx). Leave blank for the default (60s). Minis setting, not part of the MCP protocol." : {
@@ -33688,54 +34005,54 @@
     },
     "Lets the agent keep working in the background and keeps the task Live Activity refreshing in real time. Uses coarse, low-accuracy location only as a background heartbeat — it does not track or store your precise location." : {
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Ermöglicht dem Agenten, im Hintergrund weiterzuarbeiten, und hält die Live-Aktivität der Aufgabe in Echtzeit aktuell. Verwendet nur einen grob aufgelösten Standort als Hintergrund-Heartbeat – dein genauer Standort wird nicht verfolgt oder gespeichert."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ermöglicht dem Agenten, im Hintergrund weiterzuarbeiten, und hält die Live-Aktivität der Aufgabe in Echtzeit aktuell. Verwendet nur einen grob aufgelösten Standort als Hintergrund-Heartbeat – dein genauer Standort wird nicht verfolgt oder gespeichert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lets the agent keep working in the background and keeps the task Live Activity refreshing in real time. Uses coarse, low-accuracy location only as a background heartbeat — it does not track or store your precise location."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permet à l’agent de continuer à travailler en arrière-plan et maintient l’actualisation en temps réel de l’activité en direct. Utilise uniquement une localisation approximative comme signal de fond — votre position précise n’est ni suivie ni enregistrée."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エージェントがバックグラウンドで作業を続けられるようにし、タスクのライブアクティビティをリアルタイムで更新します。バックグラウンドの動作維持のために大まかな低精度の位置情報のみを使用し、正確な位置を追跡・保存することはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에이전트가 백그라운드에서 계속 작업하도록 하고 작업 실시간 활동을 실시간으로 갱신합니다. 백그라운드 유지 신호로 정확도가 낮은 대략적인 위치만 사용하며, 정확한 위치를 추적하거나 저장하지 않습니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Позволяет агенту продолжать работу в фоне и обновлять Live Activity задачи в реальном времени. Использует только приблизительное местоположение как фоновый сигнал — точное местоположение не отслеживается и не сохраняется."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让智能体在后台继续工作，并使任务实时活动保持实时刷新。仅使用粗略的低精度位置作为后台心跳，不会追踪或存储你的精确位置。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "讓智能體在背景繼續工作，並使任務即時動態保持實時更新。僅使用粗略的低精度位置作為背景心跳，不會追蹤或儲存你的精確位置。"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Lets the agent keep working in the background and keeps the task Live Activity refreshing in real time. Uses coarse, low-accuracy location only as a background heartbeat — it does not track or store your precise location."
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Permet à l’agent de continuer à travailler en arrière-plan et maintient l’actualisation en temps réel de l’activité en direct. Utilise uniquement une localisation approximative comme signal de fond — votre position précise n’est ni suivie ni enregistrée."
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "エージェントがバックグラウンドで作業を続けられるようにし、タスクのライブアクティビティをリアルタイムで更新します。バックグラウンドの動作維持のために大まかな低精度の位置情報のみを使用し、正確な位置を追跡・保存することはありません。"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "에이전트가 백그라운드에서 계속 작업하도록 하고 작업 실시간 활동을 실시간으로 갱신합니다. 백그라운드 유지 신호로 정확도가 낮은 대략적인 위치만 사용하며, 정확한 위치를 추적하거나 저장하지 않습니다."
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Позволяет агенту продолжать работу в фоне и обновлять Live Activity задачи в реальном времени. Использует только приблизительное местоположение как фоновый сигнал — точное местоположение не отслеживается и не сохраняется."
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "让智能体在后台继续工作，并使任务实时活动保持实时刷新。仅使用粗略的低精度位置作为后台心跳，不会追踪或存储你的精确位置。"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "讓智能體在背景繼續工作，並使任務即時動態保持實時更新。僅使用粗略的低精度位置作為背景心跳，不會追蹤或儲存你的精確位置。"
-        }
-      }
       }
     },
     "Level" : {
@@ -43711,7 +44028,7 @@
       }
     },
     "Not Requested" : {
-      "extractionState" : "stale",
+      "comment" : "Location permission status",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -47782,6 +48099,59 @@
         }
       }
     },
+    "Pinned" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Angeheftet"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pinned"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Épinglé"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ピン留め"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "고정됨"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закреплённые"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置顶"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "置頂"
+          }
+        }
+      }
+    },
     "Pitch" : {
       "localizations" : {
         "de" : {
@@ -48166,7 +48536,7 @@
       }
     },
     "Premium" : {
-      "extractionState" : "stale",
+      "comment" : "Speech voice quality",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -54157,7 +54527,7 @@
       }
     },
     "Restricted" : {
-      "extractionState" : "stale",
+      "comment" : "Location permission status",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -59057,54 +59427,54 @@
     },
     "Short-Lived (~30s)" : {
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Kurzzeitig (~30 s)"
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kurzzeitig (~30 s)"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Short-Lived (~30s)"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Courte durée (~30 s)"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短時間（約30秒）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "짧은 유지 (~30초)"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Кратковременно (~30 с)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短暂存活（约 30 秒）"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "短暫存活（約 30 秒）"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Short-Lived (~30s)"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Courte durée (~30 s)"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "短時間（約30秒）"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "짧은 유지 (~30초)"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Кратковременно (~30 с)"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "短暂存活（约 30 秒）"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "短暫存活（約 30 秒）"
-        }
-      }
       }
     },
     "shortcut.cameraChat.title" : {
@@ -59530,54 +59900,54 @@
     },
     "Show agent task progress on the Lock Screen and in the Dynamic Island. Turning this off also removes the currently displayed Live Activity. Tip: enable Location Tracking below so the Live Activity keeps refreshing while the app stays in the background — without it, updates pause about 30 seconds after you leave the app." : {
       "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Zeigt den Fortschritt von Agent-Aufgaben auf dem Sperrbildschirm und in der Dynamic Island. Wenn du dies deaktivierst, wird die aktuell angezeigte Live-Aktivität entfernt. Tipp: Aktiviere unten „Standortverfolgung“, damit die Live-Aktivität weiter aktualisiert wird, während die App im Hintergrund bleibt – ohne sie pausieren Aktualisierungen etwa 30 Sekunden nach dem Verlassen der App."
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zeigt den Fortschritt von Agent-Aufgaben auf dem Sperrbildschirm und in der Dynamic Island. Wenn du dies deaktivierst, wird die aktuell angezeigte Live-Aktivität entfernt. Tipp: Aktiviere unten „Standortverfolgung“, damit die Live-Aktivität weiter aktualisiert wird, während die App im Hintergrund bleibt – ohne sie pausieren Aktualisierungen etwa 30 Sekunden nach dem Verlassen der App."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show agent task progress on the Lock Screen and in the Dynamic Island. Turning this off also removes the currently displayed Live Activity. Tip: enable Location Tracking below so the Live Activity keeps refreshing while the app stays in the background — without it, updates pause about 30 seconds after you leave the app."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Affiche la progression des tâches de l’agent sur l’écran verrouillé et dans la Dynamic Island. La désactivation supprime aussi l’activité en direct affichée. Astuce : activez le suivi de localisation ci-dessous pour que l’activité en direct continue de s’actualiser lorsque l’app reste en arrière-plan — sans cela, les mises à jour s’interrompent environ 30 secondes après avoir quitté l’app."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロック画面とDynamic Islandにエージェントのタスク進行状況を表示します。オフにすると、現在表示中のライブアクティビティも削除されます。ヒント：下の「位置情報の追跡」をオンにすると、アプリがバックグラウンドにある間もライブアクティビティが更新され続けます。オフの場合、アプリを離れてから約30秒で更新が停止します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "잠금 화면과 다이나믹 아일랜드에 에이전트 작업 진행 상황을 표시합니다. 이 기능을 끄면 현재 표시된 실시간 활동도 사라집니다. 팁: 아래에서 위치 추적을 켜면 앱이 백그라운드에 있는 동안에도 실시간 활동이 계속 갱신됩니다. 켜지 않으면 앱을 벗어난 후 약 30초 뒤에 업데이트가 중단됩니다."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Показывает прогресс задач агента на заблокированном экране и в Dynamic Island. При отключении текущая Live Activity также будет удалена. Совет: включите «Отслеживание местоположения» ниже, чтобы Live Activity продолжала обновляться, пока приложение остаётся в фоне — без этого обновления приостанавливаются примерно через 30 секунд после выхода из приложения."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在锁定屏幕和灵动岛上显示智能体任务进度。关闭后也会移除当前显示的实时活动。提示：开启下方的“位置追踪”可让实时活动在应用位于后台时持续刷新；未开启时，离开应用约 30 秒后更新会暂停。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在鎖定畫面和動態島上顯示智能體任務進度。關閉後也會移除目前顯示的即時動態。提示：開啟下方的「位置追蹤」可讓即時動態在應用程式位於背景時持續更新；未開啟時，離開應用程式約 30 秒後更新會暫停。"
+          }
         }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Show agent task progress on the Lock Screen and in the Dynamic Island. Turning this off also removes the currently displayed Live Activity. Tip: enable Location Tracking below so the Live Activity keeps refreshing while the app stays in the background — without it, updates pause about 30 seconds after you leave the app."
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Affiche la progression des tâches de l’agent sur l’écran verrouillé et dans la Dynamic Island. La désactivation supprime aussi l’activité en direct affichée. Astuce : activez le suivi de localisation ci-dessous pour que l’activité en direct continue de s’actualiser lorsque l’app reste en arrière-plan — sans cela, les mises à jour s’interrompent environ 30 secondes après avoir quitté l’app."
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "ロック画面とDynamic Islandにエージェントのタスク進行状況を表示します。オフにすると、現在表示中のライブアクティビティも削除されます。ヒント：下の「位置情報の追跡」をオンにすると、アプリがバックグラウンドにある間もライブアクティビティが更新され続けます。オフの場合、アプリを離れてから約30秒で更新が停止します。"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "잠금 화면과 다이나믹 아일랜드에 에이전트 작업 진행 상황을 표시합니다. 이 기능을 끄면 현재 표시된 실시간 활동도 사라집니다. 팁: 아래에서 위치 추적을 켜면 앱이 백그라운드에 있는 동안에도 실시간 활동이 계속 갱신됩니다. 켜지 않으면 앱을 벗어난 후 약 30초 뒤에 업데이트가 중단됩니다."
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Показывает прогресс задач агента на заблокированном экране и в Dynamic Island. При отключении текущая Live Activity также будет удалена. Совет: включите «Отслеживание местоположения» ниже, чтобы Live Activity продолжала обновляться, пока приложение остаётся в фоне — без этого обновления приостанавливаются примерно через 30 секунд после выхода из приложения."
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "在锁定屏幕和灵动岛上显示智能体任务进度。关闭后也会移除当前显示的实时活动。提示：开启下方的“位置追踪”可让实时活动在应用位于后台时持续刷新；未开启时，离开应用约 30 秒后更新会暂停。"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "在鎖定畫面和動態島上顯示智能體任務進度。關閉後也會移除目前顯示的即時動態。提示：開啟下方的「位置追蹤」可讓即時動態在應用程式位於背景時持續更新；未開啟時，離開應用程式約 30 秒後更新會暫停。"
-        }
-      }
       }
     },
     "Show Chat Title" : {
@@ -60086,6 +60456,9 @@
         }
       }
     },
+    "Sign in with Kimi Code" : {
+
+    },
     "Sign in with OpenAI" : {
       "localizations" : {
         "de" : {
@@ -60237,6 +60610,12 @@
           }
         }
       }
+    },
+    "Sign in with your Kimi Code / Coding Plan subscription" : {
+
+    },
+    "Sign in with your Kimi Code / Coding Plan subscription." : {
+
     },
     "Sign in with your OpenRouter account" : {
       "localizations" : {
@@ -64363,370 +64742,6 @@
     "Tap to view" : {
       "comment" : "Completed download card"
     },
-    "Working…" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Arbeitet …"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Working…"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "En cours…"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "実行中…"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "작업 중…"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Выполняется…"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "进行中…"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "進行中…"
-        }
-      }
-    }
-    },
-    "✅ Task completed" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ Aufgabe abgeschlossen"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ Task completed"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ Tâche terminée"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ タスク完了"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ 작업 완료"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ Задача выполнена"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ 任务已完成"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "✅ 任務已完成"
-        }
-      }
-    }
-    },
-    "❌ Task failed" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ Aufgabe fehlgeschlagen"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ Task failed"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ Échec de la tâche"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ タスク失敗"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ 작업 실패"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ Задача не выполнена"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ 任务失败"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "❌ 任務失敗"
-        }
-      }
-    }
-    },
-    "1 task completed" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 Aufgabe abgeschlossen"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 task completed"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 tâche terminée"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 件のタスクが完了"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "작업 1개 완료"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 задача выполнена"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "已完成 1 个任务"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "已完成 1 個任務"
-        }
-      }
-    }
-    },
-    "1 task failed" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 Aufgabe fehlgeschlagen"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 task failed"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 tâche échouée"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 件のタスクが失敗"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "작업 1개 실패"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 задача не выполнена"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 个任务失败"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "1 個任務失敗"
-        }
-      }
-    }
-    },
-    "Task Status Privacy" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Aufgabenstatus-Datenschutz"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Task Status Privacy"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Confidentialité du statut des tâches"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "タスク状況のプライバシー"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "작업 상태 개인 정보 보호"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Конфиденциальность статуса задач"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "任务状态隐私模式"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "任務狀態隱私模式"
-        }
-      }
-      }
-    },
-    "Hide session content on the Lock Screen, in the Dynamic Island and in notifications. Only the number of completed tasks and the elapsed time are shown — no session titles, tool status or reply content." : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Verbirgt Sitzungsinhalte auf dem Sperrbildschirm, in der Dynamic Island und in Mitteilungen. Es werden nur die Anzahl abgeschlossener Aufgaben und die verstrichene Zeit angezeigt – keine Sitzungstitel, Werkzeugstatus oder Antwortinhalte."
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Hide session content on the Lock Screen, in the Dynamic Island and in notifications. Only the number of completed tasks and the elapsed time are shown — no session titles, tool status or reply content."
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Masque le contenu des sessions sur l’écran verrouillé, dans la Dynamic Island et dans les notifications. Seuls le nombre de tâches terminées et le temps écoulé sont affichés — ni titre de session, ni statut d’outil, ni contenu de réponse."
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "ロック画面、Dynamic Island、通知でセッションの内容を非表示にします。完了したタスク数と経過時間のみが表示され、セッション名やツールの状態、返信内容は表示されません。"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "잠금 화면, 다이나믹 아일랜드, 알림에서 세션 내용을 숨깁니다. 완료된 작업 수와 경과 시간만 표시되며 세션 제목, 도구 상태, 응답 내용은 표시되지 않습니다."
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Скрывает содержимое сессий на заблокированном экране, в Dynamic Island и в уведомлениях. Отображаются только количество выполненных задач и затраченное время — без названий сессий, статуса инструментов и текста ответов."
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "在锁定屏幕、灵动岛和通知中隐藏会话内容。仅显示已完成的任务数量和耗时，不显示会话标题、工具状态或回复内容。"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "在鎖定畫面、動態島和通知中隱藏工作階段內容。僅顯示已完成的任務數量和耗時，不顯示工作階段標題、工具狀態或回覆內容。"
-        }
-      }
-      }
-    },
     "Task" : {
       "localizations" : {
         "de" : {
@@ -64953,6 +64968,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "任務已使用 %@ 啓動。完成後我會通知您。"
+          }
+        }
+      }
+    },
+    "Task Status Privacy" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aufgabenstatus-Datenschutz"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Task Status Privacy"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confidentialité du statut des tâches"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "タスク状況のプライバシー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작업 상태 개인 정보 보호"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Конфиденциальность статуса задач"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任务状态隐私模式"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任務狀態隱私模式"
           }
         }
       }
@@ -67688,6 +67755,59 @@
         }
       }
     },
+    "This Month" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diesen Monat"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Month"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce mois-ci"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이번 달"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В этом месяце"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本月"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本月"
+          }
+        }
+      }
+    },
     "This mount is exposed as read-only to protect it from accidental edits." : {
       "localizations" : {
         "de" : {
@@ -67988,6 +68108,59 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此語音服務與其服務商共享 API Key 和端點。如需變更，請編輯該服務商。"
+          }
+        }
+      }
+    },
+    "This Week" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Woche"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This Week"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette semaine"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "今週"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이번 주"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этой неделе"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本周"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本週"
           }
         }
       }
@@ -69149,214 +69322,6 @@
           }
         }
       }
-    },
-    "Earlier" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Früher"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Earlier"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Plus tôt"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "それ以前"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "이전"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Ранее"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "更早"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "更早"
-        }
-      }
-    }
-    },
-    "Pinned" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Angeheftet"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Pinned"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Épinglé"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "ピン留め"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "고정됨"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Закреплённые"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "置顶"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "置頂"
-        }
-      }
-    }
-    },
-    "This Month" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Diesen Monat"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "This Month"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Ce mois-ci"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "今月"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "이번 달"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "В этом месяце"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "本月"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "本月"
-        }
-      }
-    }
-    },
-    "This Week" : {
-      "localizations" : {
-      "de" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Diese Woche"
-        }
-      },
-      "en" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "This Week"
-        }
-      },
-      "fr" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "Cette semaine"
-        }
-      },
-      "ja" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "今週"
-        }
-      },
-      "ko" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "이번 주"
-        }
-      },
-      "ru" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "На этой неделе"
-        }
-      },
-      "zh-Hans" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "本周"
-        }
-      },
-      "zh-Hant" : {
-        "stringUnit" : {
-          "state" : "translated",
-          "value" : "本週"
-        }
-      }
-    }
     },
     "Today" : {
       "localizations" : {
@@ -70867,6 +70832,7 @@
 
     },
     "Unknown" : {
+      "comment" : "Location permission status",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -75193,7 +75159,7 @@
       }
     },
     "When In Use" : {
-      "extractionState" : "stale",
+      "comment" : "Location permission status",
       "localizations" : {
         "de" : {
           "stringUnit" : {
@@ -75623,6 +75589,58 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "處理中…"
+          }
+        }
+      }
+    },
+    "Working…" : {
+      "localizations" : {
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arbeitet …"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Working…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実行中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "작업 중…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выполняется…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "进行中…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "進行中…"
           }
         }
       }

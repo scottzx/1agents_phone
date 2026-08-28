@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "id": "fitness-default",
+  "version": "0.1.0",
+  "flavor_ids": ["fitness"],
+  "installer_api": 1,
+  "soul": {
+    "mode": "optional",
+    "path": "SOUL.md",
+    "apply_policy": "first_launch_only"
+  },
+  "skills": [],
+  "quick_actions_path": "ui/quick_actions.json",
+  "system_bindings": {
+    "tasks": { "source": "ios.reminders", "write_through": true },
+    "calendar": { "source": "ios.calendar", "write_through": true }
+  },
+  "meta": {
+    "title": "Fitness Coach Pack",
+    "description": "Empty shell — training skills next",
+    "locale": "zh-Hans"
+  }
+}

@@ -628,6 +628,29 @@ extension AIChatViewModel {
             toolOutput = memResult.output
             toolSuccess = memResult.success
 
+        case "spawn_subagent", "check_subagent", "message_subagent", "stop_subagent":
+            // Dispatch tools. Only an orchestrator is ever handed these (see
+            // makeAgentTools), and the work itself happens in a separate
+            // scratch session — so all that lands in THIS transcript is the
+            // short status/result text below, never the subagent's tool output.
+            let sid = sessionId ?? ""
+            if sid.isEmpty {
+                toolOutput = "Error: this conversation has no session yet, so a task cannot be dispatched."
+                toolSuccess = false
+            } else {
+                let reply = await SubagentCoordinator.shared.handle(
+                    toolName: tu.name,
+                    input: toolArgs,
+                    parentSessionId: sid,
+                    agentId: agentId
+                )
+                if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+                    messages[msgIdx].blocks[blockIdx].content = reply
+                }
+                toolOutput = reply
+                toolSuccess = !reply.hasPrefix("Error:")
+            }
+
         default:
             toolOutput = "Error: Unknown tool '\(tu.name)'"
             toolSuccess = false

@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "actions": [
+    {
+      "id": "today_followups",
+      "title": "今日跟进",
+      "subtitle": "从提醒事项列出今天该联系的事项",
+      "icon": "phone.badge.checkmark",
+      "kind": "prompt",
+      "prompt": "请用 apple-reminders 查看未完成且与销售/跟进相关的提醒，整理出今天应优先处理的清单，并给出简短行动建议。"
+    },
+    {
+      "id": "quote_from_image",
+      "title": "从图片报价",
+      "subtitle": "识别价目表或需求图",
+      "icon": "doc.text.viewfinder",
+      "kind": "prompt",
+      "prompt": "我将提供价目表或客户需求相关图片。请识别内容，协助整理报价要点；报价确认后可写入提醒事项以便跟进。"
+    },
+    {
+      "id": "sleeping_top",
+      "title": "沉睡客户",
+      "subtitle": "梳理久未联系的客户线索",
+      "icon": "person.crop.circle.badge.moon",
+      "kind": "prompt",
+      "prompt": "根据通讯录备注、历史会话记忆和提醒事项，帮我找出可能沉睡、值得唤醒的客户，按优先级排序并给联系话术建议。"
+    }
+  ]
+}

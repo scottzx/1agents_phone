@@ -665,6 +665,9 @@ extension AIChatViewModel {
             (Self.minisSkillsPersistentDir, Self.minisSkillsLinuxDir),
             (Self.minisSharedPersistentDir, Self.minisSharedLinuxDir),
             (Self.minisMcpServersPersistentDir, Self.minisMcpServersLinuxDir),
+            // Per-agent persona + memory. Mounted as one root rather than one
+            // mount per agent so creating an agent needs no remount.
+            (AgentProfile.agentsPersistentDir, AgentProfile.agentsLinuxDir),
         ]
 
         for (persistDir, linuxDir) in mappings {

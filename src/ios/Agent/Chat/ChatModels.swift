@@ -339,6 +339,9 @@ final class AssistantBlock: Identifiable, ObservableObject {
             return (!path.isEmpty && name != "/" && name.contains(".")) ? name : "Read image"
         case .memoryTool(let action):
             return action.isEmpty ? "Memory" : action
+        case .subagentTool(let action, let taskTitle):
+            if !taskTitle.isEmpty { return taskTitle }
+            return action.isEmpty ? "Task" : action
         case .info:
             return ""
         }
@@ -355,6 +358,11 @@ enum AssistantBlockKind: Equatable {
     case browserTool(action: String)
     case readImageTool(path: String)
     case memoryTool(action: String)
+    /// A dispatch tool call (spawn/check/message/stop_subagent). Rendered as a
+    /// task card rather than a tool row: it is the ONLY trace a delegated task
+    /// leaves in an orchestrator's transcript, so it carries the task title and
+    /// doubles as the way into the subagent's own session.
+    case subagentTool(action: String, taskTitle: String)
     case info
 }
 

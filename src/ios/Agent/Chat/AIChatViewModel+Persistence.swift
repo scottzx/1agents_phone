@@ -195,6 +195,21 @@ extension AIChatViewModel {
         // vm.memoryEnabled from the DB/global default, and which session.
         AppLogger(category: "MemDiag").info("[MemDiag] loadSession sid=\(sessionId.prefix(8)) → vm.memoryEnabled=\(self.memoryEnabled)")
 
+        // Resolve which Agent owns this session, and in what role. Both feed
+        // prompt assembly and tool-set construction, so they must be settled
+        // before the first runAgentLoop. A row with no agent_id predates the
+        // Agent migration (or was created outside AgentStore) and keeps the
+        // historical full-toolset behavior via the `.standalone` default.
+        if let row = await ChatStore.shared.getSession(sessionId) {
+            agentId = row.agentId
+            agentRole = (row.spawnRole == "subagent") ? .executor : .main
+            if let aid = row.agentId, let owner = await ChatStore.shared.getAgent(aid) {
+                resolvedToolPolicy = owner.toolPolicy
+            } else {
+                resolvedToolPolicy = .standalone
+            }
+        }
+
         // Clear stale compact/pending state from previous lifecycle
         skipCompactCheck = false
         if isCompacting {

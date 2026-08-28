@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "flavor_id": "english",
+  "display_name": "英语陪练",
+  "pack": {
+    "resource_dir": "RolePack",
+    "id": "english-default",
+    "min_installer_api": 1
+  },
+  "root_experience": "chat_with_rail",
+  "scene_module_id": null,
+  "branding": {
+    "chat_placeholder": "Say something in English, or ask for a drill…",
+    "onboarding_title": "English Practice Coach",
+    "onboarding_body": "Full on-device agent + English coaching defaults. Practice in chat; schedule drills via Reminders/Calendar."
+  },
+  "defaults": {
+    "prefer_bundled_soul_on_first_launch": true,
+    "install_skills_enabled": true,
+    "show_advanced_settings": true
+  }
+}

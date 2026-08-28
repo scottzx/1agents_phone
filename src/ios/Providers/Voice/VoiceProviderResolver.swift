@@ -31,13 +31,6 @@ final class VoiceModePreference: ObservableObject {
     static let shared = VoiceModePreference()
     /// True = composer is in inline-voice mode; false = text mode.
     @Published var isVoiceActive = false
-    /// Whether the inline voice panel is expanded (vs compact). In-memory, carried
-    /// across sessions — the panel resumes whatever the user left it at. Reset to
-    /// the default (expanded) only on cold start.
-    @Published var expanded = true
-    /// One-shot: set true when the user switches text→voice, so the panel opens
-    /// expanded that one time, then resumes the remembered state afterwards.
-    var enteredFromText = false
     /// True while the mic is actively capturing (VAD running). Reply TTS is
     /// SUPPRESSED while this is true — capture and playback are mutually exclusive
     /// (no echo, no AVAudioSession category fight). Set by VoiceInputViewModel
@@ -486,6 +479,7 @@ enum VoiceProviderResolver {
         // The built-in System engine needs no credential (offline / on-device), so
         // it's always usable; cloud instances need a stored credential.
         if instance.id == SystemVoiceProvider.builtinProviderId { return true }
+        if instance.id == SenseVoiceProvider.builtinProviderId { return true }
         return instance.hasAnyCredential
     }
 

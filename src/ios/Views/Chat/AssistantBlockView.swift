@@ -66,6 +66,13 @@ struct AssistantBlockView: View {
             ToolCapsuleView(block: block, icon: "brain.head.profile", accentColor: .pink,
                             commandStartTime: commandStartTime, onStop: onStop,
                             toolSnapshots: toolSnapshots, detailBlock: $detailBlock)
+        case .subagentTool:
+            // Reuses the tool capsule rather than a bespoke card: the capsule
+            // already carries title + status + tap-through, and the status text
+            // the coordinator returns is written to be read as-is.
+            ToolCapsuleView(block: block, icon: "person.2.badge.gearshape", accentColor: .teal,
+                            commandStartTime: commandStartTime, onStop: onStop,
+                            toolSnapshots: toolSnapshots, detailBlock: $detailBlock)
         case .info:
             let allLines = block.content.components(separatedBy: "\n").filter { !$0.isEmpty }
             // Separate reason lines (⚠️) from the final switched line (✅)
@@ -242,6 +249,7 @@ struct ToolCapsuleView: View {
         case .browserTool:   toolName = "browser_use"
         case .readImageTool: toolName = "read_image"
         case .memoryTool:    toolName = "memory"
+        case .subagentTool(let a, _): toolName = a
         case .text, .thinking, .info: toolName = "unknown"
         }
 

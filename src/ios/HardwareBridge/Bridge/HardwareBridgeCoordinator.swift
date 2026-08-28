@@ -32,7 +32,7 @@ final class HardwareBridgeCoordinator: ObservableObject {
     @Published private(set) var lastReply = ""
     @Published private(set) var bridgeLog: [String] = []
 
-    private let transcriber = HardwareVoiceTranscriber()
+    private let transcriber = HardwareVoiceTranscriber.shared
     private var sequence: UInt8 = 0
     private var cancellables = Set<AnyCancellable>()
 

@@ -40,6 +40,25 @@ final class GroupChatOrchestrator {
     /// answer instead of sitting in the transcript unanswered.
     private var pendingRerun: Set<String> = []
 
+    /// Thinking level forced on every member turn.
+    ///
+    /// A room is latency-critical in a way a 1:1 chat is not: the user waits
+    /// through every member in sequence, so reasoning tokens are paid N times
+    /// over for one answer. It is also unreachable by hand — a group-member
+    /// session is hidden from every list, so no picker can reach it. Setting it
+    /// here is therefore both the fast default and the only place it CAN be
+    /// set. Change this one constant to give rooms their reasoning back.
+    ///
+    /// Lives here rather than next to the other limits in GroupChatLimits
+    /// because `ThinkingLevel` comes from Providers, and GroupProfile.swift is
+    /// deliberately dependency-free — that is what lets the routing and
+    /// projection tests compile without the rest of the app.
+    ///
+    /// Note this controls what the app REQUESTS. Some models reason regardless
+    /// of what is asked — see the vendor notes in
+    /// OpenAIAgentProvider.injectThinkingParams.
+    static let memberThinkingLevel: ThinkingLevel = .off
+
     private init() {}
 
     func isRunning(groupId: String) -> Bool { running.contains(groupId) }
@@ -304,6 +323,16 @@ final class GroupChatOrchestrator {
             isOwner: member.id == group.ownerAgentId,
             peers: members.filter { $0.id != member.id }
         )
+
+        // Forced every turn, not once at session creation: a member session
+        // created before this existed still carries whatever the model group's
+        // default seeded into it, and there is no UI that can reach it.
+        var inference = ProviderConfigStore.shared.inferenceConfig(for: sessionId) ?? SessionInferenceConfig()
+        if inference.thinkingLevel != Self.memberThinkingLevel {
+            inference.thinkingLevel = Self.memberThinkingLevel
+            ProviderConfigStore.shared.setInferenceConfig(inference, for: sessionId)
+            logger.info("group \(group.id.prefix(8)): \(member.name) 的群内会话思考档位设为 \(Self.memberThinkingLevel.rawValue)")
+        }
 
         if vm.isProcessing {
             vm.cancel()

@@ -676,6 +676,16 @@ extension AIChatViewModel {
                 toolSuccess = !reply.hasPrefix("Error:")
             }
 
+        case ChatHistorySearchTool.name:
+            // Pure read over minis.db — nothing outside this transcript
+            // changes, so the formatted hits are the whole result.
+            let reply = await ChatHistorySearchTool.handle(input: toolArgs, callerAgentId: agentId)
+            if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+                messages[msgIdx].blocks[blockIdx].content = reply
+            }
+            toolOutput = reply
+            toolSuccess = !reply.hasPrefix("Error:")
+
         default:
             toolOutput = "Error: Unknown tool '\(tu.name)'"
             toolSuccess = false

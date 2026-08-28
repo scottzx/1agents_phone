@@ -166,6 +166,67 @@ enum DebugMethodRegistry {
             example: ["clear": true]
         ),
         MethodSpec(
+            name: "debug.hardware.roster",
+            description: "Return the agent_link roster snapshot (agent names, emoji, accent colors) plus the exact frames each transport would emit — 0x33 to the roster0 I/O endpoint, and fragmented 0x37. Lets the identity path be verified with no board attached.",
+            params: [
+                ParamSpec(name: "agentIds", type: "array", required: false, default: nil, description: "Bind a roster to these agent ids first. Pass several to exercise the multi-member (roundtable) case."),
+                ParamSpec(name: "conversationId", type: "string", required: false, default: "debug-conversation", description: "Conversation id carried in the snapshot."),
+                ParamSpec(name: "title", type: "string", required: false, default: "调试会话", description: "Conversation title."),
+                ParamSpec(name: "fragmentBudget", type: "int", required: false, default: 180, description: "Bytes per 0x37 fragment; mirrors the firmware's ATT-MTU arithmetic."),
+            ],
+            returns: "{rev, conversationKind, memberCount, json, jsonBytes, routeA:{endpoint, commandId, frameBytes, frameHex, fitsOneWrite}, routeB:{commandId, fragmentBudget, fragmentCount, fragmentsHex}, pushedToDevice}",
+            example: ["agentIds": ["agent-default"]]
+        ),
+        MethodSpec(
+            name: "debug.hardware.state",
+            description: "Encode (and send, if a device is connected) one round-screen state transition from DEMO_PRD.md §5 to the state0 endpoint.",
+            params: [
+                ParamSpec(name: "state", type: "string", required: true, default: nil, description: "One of idle, listening, thinking, market_speaking, product_speaking, tech_speaking, moderator_speaking, done."),
+                ParamSpec(name: "name", type: "string", required: false, default: "", description: "Display name of the speaker, e.g. 市场专家."),
+                ParamSpec(name: "textBrief", type: "string", required: false, default: "", description: "One short line for under the node."),
+            ],
+            returns: "{endpoint, json, frameHex, sentToDevice}",
+            example: ["state": "market_speaking", "name": "市场专家"]
+        ),
+        MethodSpec(
+            name: "debug.hardware.manifest",
+            description: "Return the board's last reassembled 0x18 I/O manifest: capability bits and every self-described endpoint.",
+            params: [],
+            returns: "{proto, rev, caps, capabilities, endpoints:[{id, dir, kind, value, llmVisible}], rawJSON}",
+            example: [:]
+        ),
+        MethodSpec(
+            name: "debug.group.list",
+            description: "List the groups on this device with their ids, members, mode and whether a turn is running right now.",
+            params: [],
+            returns: "{count, groups:[{id, title, mode, sessionId, ownerAgentId, memberIds, archived, running}]}",
+            example: [:]
+        ),
+        MethodSpec(
+            name: "debug.group.route",
+            description: "Dry-run group @-routing and the per-member turn projection against a synthetic transcript. No model call — answers 'who would speak, and what exactly would they see'. Pass groupId for a real group, or agentIds to build a throwaway roster.",
+            params: [
+                ParamSpec(name: "groupId", type: "string", required: false, default: nil, description: "Route against this real group (from debug.group.list)."),
+                ParamSpec(name: "agentIds", type: "array", required: false, default: nil, description: "Build a throwaway roster from these agent ids instead. Order is the roster order / hardware slot."),
+                ParamSpec(name: "ownerAgentId", type: "string", required: false, default: nil, description: "Which member is the group owner — the only one whose @所有人 counts. Ignored when groupId is given."),
+                ParamSpec(name: "title", type: "string", required: false, default: "调试群", description: "Group title used in the prompt tag. Ignored when groupId is given."),
+                ParamSpec(name: "history", type: "array", required: true, default: nil, description: "Transcript, oldest first, as \"user:文本\" or \"<agentId>:文本\" strings. Mentions may be written readably as @名字 — they are encoded to the canonical <@id> form the way the composer does, before routing."),
+                ParamSpec(name: "newCount", type: "int", required: false, default: 1, description: "How many trailing history entries count as this round's new messages."),
+            ],
+            returns: "{members:[{id, name, slot, token, looseHandles}], everyoneToken, ownerAgentId, newMessages, reason, responders, downgradedEveryoneBy, usedLooseNamesBy, rounds, maxMemberTurns, prompts:[{member, systemBlock, turnPrompt}]}",
+            example: ["agentIds": ["agent-default"], "history": ["user:@所有人 说说看"]]
+        ),
+        MethodSpec(
+            name: "debug.group.run",
+            description: "Really run one group turn — models, member sessions, hardware events and all — and return the resulting transcript. Slow; this is the end-to-end check.",
+            params: [
+                ParamSpec(name: "groupId", type: "string", required: true, default: nil, description: "Group to run, from debug.group.list."),
+                ParamSpec(name: "text", type: "string", required: true, default: nil, description: "What the user says into the room."),
+            ],
+            returns: "{group, mode, closing, transcript}",
+            example: ["groupId": "<id>", "text": "@所有人 这个方案可行吗？"]
+        ),
+        MethodSpec(
             name: "debug.appInfo",
             description: "Return app metadata: paths, build date, disk usage.",
             params: [],

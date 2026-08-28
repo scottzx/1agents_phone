@@ -136,6 +136,14 @@ enum AgentDirectoryTools {
         nobody is there to answer. The user is reading over your shoulder \
         either way.
 
+        You may also be put in a GROUP with some of them — several assistants \
+        and the user in one room. A group turn arrives tagged with the room's \
+        name and the other participants, and it comes with its own rules, \
+        which the tag block spells out. The one worth knowing in advance: in a \
+        room nobody hears you unless you @ them by name, so hand off \
+        explicitly or let the conversation end. Your 1:1 tools are not the way \
+        to reach someone who is standing in the same room as you.
+
         """
     }
 }

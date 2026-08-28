@@ -354,6 +354,9 @@ extension AIChatViewModel {
                     case "browser_use": .browserTool(action: "")
                     case "read_image": .readImageTool(path: "")
                     case "memory_write", "memory_get": .memoryTool(action: name)
+                    // Reading old conversation is a memory lookup as far as
+                    // the user is concerned; the capsule reads the same.
+                    case ChatHistorySearchTool.name: .memoryTool(action: name)
                     case let n where SubagentTools.names.contains(n) || AgentDirectoryTools.names.contains(n):
                         .subagentTool(action: n, taskTitle: "")
                     default: .shellTool(command: name)

@@ -324,6 +324,12 @@ struct RawMessage: Identifiable, Codable, Hashable {
     /// column so the error indicator survives reload. nil = no error.
     var errorInfo: String? = nil
 
+    /// Which agent spoke this line, in a group transcript. Nil everywhere else,
+    /// which is every message this app wrote before groups existed: a 1:1
+    /// session's assistant turn is unambiguously its own agent, so nothing had
+    /// to record a speaker. A group session has several, so it does.
+    var senderAgentId: String? = nil
+
     /// True if this message contains only tool results (no user text).
     /// These are internal agent loop messages that shouldn't render as user bubbles.
     var isToolResultOnly: Bool {
@@ -518,6 +524,9 @@ actor ChatStore {
         // error_info): inbound merge / backfill recompute it locally on write.
         // Backfilled once for pre-existing rows below.
         addColumnIfMissing(table: "messages", column: "part_flags", definition: "INTEGER NOT NULL DEFAULT 0")
+        // Group chat: which member spoke this line. NULL for every 1:1 message,
+        // so existing rows and every existing query are unaffected.
+        addColumnIfMissing(table: "messages", column: "sender_agent_id", definition: "TEXT")
         // v2 sync: soft-delete tombstone for sessions deleted on a peer
         // device but kept locally. Non-nil = tombstoned at that timestamp.
         // See SyncV2 §3.3.
@@ -587,6 +596,43 @@ actor ChatStore {
         // listSessions() filters subagent rows out on every call; without this
         // the filter degrades into a full scan once scratch sessions pile up.
         exec("CREATE INDEX IF NOT EXISTS idx_sessions_spawn_role ON sessions(spawn_role)")
+
+        // MARK: Groups
+        //
+        // A group is a roster plus a transcript — see AgentKit/Group/GroupProfile.swift.
+        // It owns no persona and no memory of its own; its members bring theirs.
+        // The transcript is an ordinary `sessions` row (spawn_role = 'group',
+        // agent_id NULL), and each member's private thread inside the group is
+        // another one (spawn_role = 'group-member', parent_session_id = the
+        // group's session). So membership is the only thing that needs storage.
+        exec("""
+            CREATE TABLE IF NOT EXISTS agent_groups (
+                id             TEXT PRIMARY KEY,
+                session_id     TEXT NOT NULL,
+                title          TEXT NOT NULL,
+                emoji          TEXT NOT NULL DEFAULT '',
+                accent_color   TEXT NOT NULL DEFAULT '#5B8DEF',
+                mode           TEXT NOT NULL DEFAULT 'freeform',
+                owner_agent_id TEXT,
+                created_at     REAL NOT NULL,
+                updated_at     REAL NOT NULL,
+                archived_at    REAL
+            )
+        """)
+        // No FK to agents(id): archiving an agent must not cascade a group's
+        // roster away, and a row for a departed member is more useful than a
+        // silently shortened group (resolveMembers skips what it can't load).
+        exec("""
+            CREATE TABLE IF NOT EXISTS agent_group_members (
+                group_id   TEXT NOT NULL,
+                agent_id   TEXT NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                joined_at  REAL NOT NULL,
+                PRIMARY KEY (group_id, agent_id)
+            )
+        """)
+        exec("CREATE INDEX IF NOT EXISTS idx_group_members_group ON agent_group_members(group_id, sort_order)")
+        exec("CREATE INDEX IF NOT EXISTS idx_agent_groups_session ON agent_groups(session_id)")
 
         // One-shot cleanup: drop legacy v1 dirty rows that have a v2
         // counterpart. Under the V2 engine these have no consumer (the
@@ -1112,8 +1158,12 @@ actor ChatStore {
             FROM sessions s
             -- Subagent scratch sessions are an implementation detail of one
             -- dispatched task. They are reachable from their parent's task
-            -- card and must never appear as a top-level conversation.
-            WHERE s.spawn_role IS NULL OR s.spawn_role != 'subagent'
+            -- card and must never appear as a top-level conversation. A
+            -- 'group-member' row is the same kind of thing for a group: the
+            -- member's private thread, reachable from the group. The group's
+            -- own transcript ('group') deliberately stays, so it is searchable
+            -- and browsable like any other conversation.
+            WHERE s.spawn_role IS NULL OR s.spawn_role NOT IN ('subagent', 'group-member')
             ORDER BY s.updated_at DESC
             """
             // Note: `remote_tombstoned_at` column still exists on the
@@ -1366,6 +1416,8 @@ actor ChatStore {
             return cap("browser_use \(action)")
         case "memory_write":
             if let content = str("content") { return cap("memory_write: " + content) }
+        case ChatHistorySearchTool.name:
+            if let kw = str("keywords") { return cap("搜索聊天记录：" + kw) }
         case "memory_get":
             if let kw = input["keywords"] as? [Any] {
                 let joined = kw.compactMap { $0 as? String }.joined(separator: ", ")
@@ -1400,7 +1452,11 @@ actor ChatStore {
                     ORDER BY m2.sort_order DESC LIMIT 1)
             FROM sessions s
             LEFT JOIN messages m ON m.session_id = s.id
-            WHERE s.title LIKE ? OR m.parts_json LIKE ?
+            WHERE (s.title LIKE ? OR m.parts_json LIKE ?)
+              -- Same exclusions listSessions applies: a hit inside a scratch
+              -- task or a member's private group thread would point the user at
+              -- a conversation they have no way to navigate to.
+              AND (s.spawn_role IS NULL OR s.spawn_role NOT IN ('subagent', 'group-member'))
             GROUP BY s.id
             ORDER BY s.updated_at DESC
             """
@@ -1629,6 +1685,155 @@ actor ChatStore {
                 results.append((sessionId: sessionId, sessionTitle: sessionTitle, messageId: messageId, role: role, createdAt: createdAt, snippet: snippet))
                 if results.count >= limit { break }
             }
+        }
+        sqlite3_finalize(stmt)
+        return results
+    }
+
+    // MARK: - Chat history search (agent-facing)
+
+    /// One hit from `searchChatHistory`, carrying enough context that an agent
+    /// can say WHERE it found something rather than just quoting it.
+    struct ChatHistoryHit {
+        let sessionId: String
+        let sessionTitle: String?
+        let messageId: String
+        /// "user" or "assistant".
+        let role: String
+        let createdAt: Date
+        let snippet: String
+        /// The agent whose conversation this is. Nil on a group transcript
+        /// (which belongs to no single agent) and on pre-Agent rows.
+        let agentId: String?
+        /// sessions.spawn_role — "main" / "group" / "group-member" / …
+        let spawnRole: String?
+        /// In a group transcript, which member spoke this line.
+        let senderAgentId: String?
+    }
+
+    /// Which conversations a history search may look at.
+    enum ChatHistoryScope {
+        /// Everything the user can see. Subagent scratch is excluded — it is
+        /// working notes from a task whose result was already delivered, and
+        /// it would swamp any real hit.
+        case all
+        /// One agent's own conversations, its group threads included.
+        case agent(String)
+        /// Group rooms and the members' threads inside them.
+        case groups
+        /// Specific sessions, e.g. following up on an earlier hit.
+        case sessions([String])
+    }
+
+    /// Keyword search over conversation history, for the `search_chat_history`
+    /// tool.
+    ///
+    /// Kept separate from `searchMessages` rather than widening it: that one
+    /// backs `minis-sessions-cli` and its tuple shape is a contract with the
+    /// iSH side. This one answers a different question — it scopes by agent and
+    /// by group, and it reports who spoke, which only means anything in a room.
+    func searchChatHistory(
+        keywords: [String],
+        scope: ChatHistoryScope = .all,
+        limit: Int = 20,
+        startDate: Date? = nil,
+        endDate: Date? = nil
+    ) -> [ChatHistoryHit] {
+        let terms = keywords
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !terms.isEmpty else { return [] }
+
+        var conditions: [String] = []
+        var textBindings: [String] = []
+        var doubleBindings: [(Int32, Double)] = []
+
+        for term in terms {
+            conditions.append("m.parts_json LIKE ?")
+            textBindings.append("%\(term)%")
+        }
+
+        switch scope {
+        case .all:
+            conditions.append("(s.spawn_role IS NULL OR s.spawn_role != 'subagent')")
+        case .agent(let agentId):
+            conditions.append("s.agent_id = ?")
+            textBindings.append(agentId)
+        case .groups:
+            conditions.append("s.spawn_role IN ('group', 'group-member')")
+        case .sessions(let ids):
+            guard !ids.isEmpty else { return [] }
+            conditions.append("m.session_id IN (\(ids.map { _ in "?" }.joined(separator: ",")))")
+            textBindings.append(contentsOf: ids)
+        }
+
+        // Date bindings are bound after every text binding, so their indexes
+        // start where the text ones stop.
+        var bindIndex = Int32(textBindings.count) + 1
+        if let start = startDate {
+            conditions.append("m.created_at >= ?")
+            doubleBindings.append((bindIndex, start.timeIntervalSince1970))
+            bindIndex += 1
+        }
+        if let end = endDate {
+            conditions.append("m.created_at <= ?")
+            doubleBindings.append((bindIndex, end.timeIntervalSince1970))
+            bindIndex += 1
+        }
+
+        let sql = """
+            SELECT m.session_id, s.title, m.id, m.role, m.created_at, m.parts_json,
+                   s.agent_id, s.spawn_role, m.sender_agent_id
+              FROM messages m
+              LEFT JOIN sessions s ON s.id = m.session_id
+             WHERE \(conditions.joined(separator: " AND "))
+             ORDER BY m.created_at DESC
+             LIMIT ?
+            """
+
+        var stmt: OpaquePointer?
+        var results: [ChatHistoryHit] = []
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            sqlite3_finalize(stmt)
+            return []
+        }
+        for (offset, value) in textBindings.enumerated() {
+            sqlite3_bind_text(stmt, Int32(offset) + 1, (value as NSString).utf8String, -1, nil)
+        }
+        for (index, value) in doubleBindings {
+            sqlite3_bind_double(stmt, index, value)
+        }
+        // Over-fetch, the same way searchMessages does: rows whose keyword
+        // matched inside tool JSON rather than message text drop out below.
+        sqlite3_bind_int(stmt, bindIndex, Int32(max(1, limit) * 3))
+
+        func text(_ column: Int32) -> String? {
+            guard sqlite3_column_type(stmt, column) != SQLITE_NULL else { return nil }
+            let value = String(cString: sqlite3_column_text(stmt, column))
+            return value.isEmpty ? nil : value
+        }
+
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let partsJSON = String(cString: sqlite3_column_text(stmt, 5))
+            let fullText = extractTextFromPartsJSON(partsJSON) ?? ""
+            guard !fullText.isEmpty else { continue }
+            let snippet = Self.keywordSnippet(from: fullText, keywords: terms, maxLength: 400)
+            guard !snippet.isEmpty else { continue }
+
+            results.append(
+                ChatHistoryHit(
+                    sessionId: String(cString: sqlite3_column_text(stmt, 0)),
+                    sessionTitle: text(1),
+                    messageId: String(cString: sqlite3_column_text(stmt, 2)),
+                    role: String(cString: sqlite3_column_text(stmt, 3)),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4)),
+                    snippet: snippet,
+                    agentId: text(6),
+                    spawnRole: text(7),
+                    senderAgentId: text(8)
+                )
+            )
+            if results.count >= limit { break }
         }
         sqlite3_finalize(stmt)
         return results
@@ -1951,6 +2156,67 @@ actor ChatStore {
         return result
     }
 
+    // MARK: - Scratch-session retention
+
+    /// How long a finished subagent session is kept before it is swept.
+    ///
+    /// A dispatched task's session is scratch: it is hidden from the session
+    /// list, its transcript is tool exhaust, and its one durable output (the
+    /// result text) was already copied onto the row and delivered to the user
+    /// weeks ago. Keeping them forever grows minis.db and the per-session file
+    /// buckets without bound, so they age out. Files a task meant to hand back
+    /// live under /var/minis/shared/tasks/<task_id>/, which is NOT touched
+    /// here — deliverables outlive the transcript that produced them.
+    static let subagentRetentionDays = 30
+
+    /// Delete finished subagent sessions older than `days`, plus their
+    /// messages, media and per-session scratch buckets. Returns how many went.
+    ///
+    /// Running tasks are never swept regardless of age: `spawn_status` is only
+    /// reconciled when someone checks on them, so an old row still marked
+    /// `running` may be a task the app was killed in the middle of — deleting
+    /// it under a live executor would leave that executor writing to a session
+    /// that no longer exists.
+    /// Deliberately scoped to `spawn_role = 'subagent'`. A 'group-member' row
+    /// looks similar — hidden, machine-created, parented to another session —
+    /// but it is not scratch: it is a member's memory of a room the user can
+    /// still scroll back through, and sweeping it would silently amnesia an
+    /// agent mid-conversation. Group sessions are never auto-deleted.
+    @discardableResult
+    func purgeExpiredSubagentSessions(olderThan days: Int = ChatStore.subagentRetentionDays) -> Int {
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86_400).timeIntervalSince1970
+        let sql = """
+            SELECT id FROM sessions
+             WHERE spawn_role = 'subagent'
+               AND updated_at < ?
+               AND COALESCE(spawn_status, '') != 'running'
+            """
+        var ids: [String] = []
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_double(stmt, 1, cutoff)
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                ids.append(String(cString: sqlite3_column_text(stmt, 0)))
+            }
+        }
+        sqlite3_finalize(stmt)
+        guard !ids.isEmpty else { return 0 }
+
+        for id in ids {
+            // Full funnel: queues the cloud tombstone and drops messages,
+            // compact markers and media the same way a user-initiated delete
+            // does, so peers converge instead of resurrecting the row.
+            deleteSession(id)
+            // deleteSessionMedia only covers browser/attachments/images; a
+            // scratch session's workspace and offloads are usually the bulk of
+            // what it left on disk, so take the whole per-session directory.
+            let dir = minisBaseURL.appendingPathComponent(id, isDirectory: true)
+            try? FileManager.default.removeItem(at: dir)
+        }
+        logger.info("purged \(ids.count) subagent session(s) older than \(days)d")
+        return ids.count
+    }
+
     func updateSessionModelId(_ id: String, modelId: String) {
         invalidateSessionListCache()
         let sql = "UPDATE sessions SET model_id = ? WHERE id = ?"
@@ -2200,6 +2466,210 @@ actor ChatStore {
                   operation: "delete")
     }
 
+    // MARK: - Groups
+    //
+    // Membership is the only thing a group needs stored: the transcript is an
+    // ordinary session and the members are ordinary agents. Kept next to the
+    // agent CRUD above and on the same actor for the same reason that section
+    // gives — a group read almost always sits between a session read and an
+    // agent read, and a second actor would just add hops between them.
+
+    private func decodeGroup(_ stmt: OpaquePointer?) -> GroupProfile {
+        let archivedAt: Date? = sqlite3_column_type(stmt, 9) == SQLITE_NULL
+            ? nil
+            : Date(timeIntervalSince1970: sqlite3_column_double(stmt, 9))
+        return GroupProfile(
+            id: String(cString: sqlite3_column_text(stmt, 0)),
+            sessionId: String(cString: sqlite3_column_text(stmt, 1)),
+            title: String(cString: sqlite3_column_text(stmt, 2)),
+            emoji: String(cString: sqlite3_column_text(stmt, 3)),
+            accentColor: String(cString: sqlite3_column_text(stmt, 4)),
+            mode: GroupChatMode(rawValue: String(cString: sqlite3_column_text(stmt, 5))) ?? .freeform,
+            ownerAgentId: sqlite3_column_text(stmt, 6).map { String(cString: $0) },
+            memberIds: [],
+            createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 7)),
+            updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8)),
+            archivedAt: archivedAt
+        )
+    }
+
+    private static let groupColumns =
+        "id, session_id, title, emoji, accent_color, mode, owner_agent_id, created_at, updated_at, archived_at"
+
+    /// Member agent ids for one group, in roster order.
+    func groupMemberIds(_ groupId: String) -> [String] {
+        let sql = "SELECT agent_id FROM agent_group_members WHERE group_id = ? ORDER BY sort_order ASC, joined_at ASC"
+        var stmt: OpaquePointer?
+        var ids: [String] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (groupId as NSString).utf8String, -1, nil)
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                ids.append(String(cString: sqlite3_column_text(stmt, 0)))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return ids
+    }
+
+    func listGroups(includeArchived: Bool = false) -> [GroupProfile] {
+        let sql = """
+            SELECT \(Self.groupColumns) FROM agent_groups
+             \(includeArchived ? "" : "WHERE archived_at IS NULL")
+             ORDER BY updated_at DESC
+            """
+        var stmt: OpaquePointer?
+        var groups: [GroupProfile] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                groups.append(decodeGroup(stmt))
+            }
+        }
+        sqlite3_finalize(stmt)
+        // Second pass rather than a JOIN: a group has at most
+        // GroupProfile.maxMembers rows, and keeping the roster query separate
+        // means decodeGroup stays a plain column read.
+        return groups.map { group in
+            var resolved = group
+            resolved.memberIds = groupMemberIds(group.id)
+            return resolved
+        }
+    }
+
+    func getGroup(_ id: String) -> GroupProfile? {
+        let sql = "SELECT \(Self.groupColumns) FROM agent_groups WHERE id = ?"
+        var stmt: OpaquePointer?
+        var group: GroupProfile?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+            if sqlite3_step(stmt) == SQLITE_ROW { group = decodeGroup(stmt) }
+        }
+        sqlite3_finalize(stmt)
+        guard var group else { return nil }
+        group.memberIds = groupMemberIds(group.id)
+        return group
+    }
+
+    /// The group a transcript session belongs to, if any. This is how a chat
+    /// screen opened by session id discovers it is a group.
+    func groupForSession(_ sessionId: String) -> GroupProfile? {
+        let sql = "SELECT \(Self.groupColumns) FROM agent_groups WHERE session_id = ? LIMIT 1"
+        var stmt: OpaquePointer?
+        var group: GroupProfile?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (sessionId as NSString).utf8String, -1, nil)
+            if sqlite3_step(stmt) == SQLITE_ROW { group = decodeGroup(stmt) }
+        }
+        sqlite3_finalize(stmt)
+        guard var group else { return nil }
+        group.memberIds = groupMemberIds(group.id)
+        return group
+    }
+
+    /// Insert or update a group and replace its roster wholesale.
+    ///
+    /// Membership is rewritten rather than diffed: the list is at most six
+    /// entries, and a delete-then-insert makes reordering, adding and removing
+    /// one single code path with no chance of a stale sort_order.
+    func upsertGroup(_ group: GroupProfile) {
+        let sql = """
+            INSERT INTO agent_groups (\(Self.groupColumns))
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                session_id = excluded.session_id, title = excluded.title,
+                emoji = excluded.emoji, accent_color = excluded.accent_color,
+                mode = excluded.mode, owner_agent_id = excluded.owner_agent_id,
+                updated_at = excluded.updated_at, archived_at = excluded.archived_at
+            """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (group.id as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, (group.sessionId as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 3, (group.title as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 4, (group.emoji as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 5, (group.accentColor as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 6, (group.mode.rawValue as NSString).utf8String, -1, nil)
+            bindOptionalText(stmt, index: 7, value: group.ownerAgentId)
+            sqlite3_bind_double(stmt, 8, group.createdAt.timeIntervalSince1970)
+            sqlite3_bind_double(stmt, 9, group.updatedAt.timeIntervalSince1970)
+            if let archived = group.archivedAt {
+                sqlite3_bind_double(stmt, 10, archived.timeIntervalSince1970)
+            } else {
+                sqlite3_bind_null(stmt, 10)
+            }
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+
+        exec("BEGIN TRANSACTION")
+        var delStmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, "DELETE FROM agent_group_members WHERE group_id = ?", -1, &delStmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(delStmt, 1, (group.id as NSString).utf8String, -1, nil)
+            sqlite3_step(delStmt)
+        }
+        sqlite3_finalize(delStmt)
+
+        let now = Date().timeIntervalSince1970
+        let memberSQL = "INSERT INTO agent_group_members (group_id, agent_id, sort_order, joined_at) VALUES (?, ?, ?, ?)"
+        for (index, agentId) in group.memberIds.prefix(GroupProfile.maxMembers).enumerated() {
+            var memberStmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, memberSQL, -1, &memberStmt, nil) == SQLITE_OK {
+                sqlite3_bind_text(memberStmt, 1, (group.id as NSString).utf8String, -1, nil)
+                sqlite3_bind_text(memberStmt, 2, (agentId as NSString).utf8String, -1, nil)
+                sqlite3_bind_int(memberStmt, 3, Int32(index))
+                sqlite3_bind_double(memberStmt, 4, now)
+                sqlite3_step(memberStmt)
+            }
+            sqlite3_finalize(memberStmt)
+        }
+        exec("COMMIT")
+    }
+
+    /// Stamp a freshly created session as a group transcript.
+    ///
+    /// Not `linkSession`: that one requires an agent id, and the whole point of
+    /// a group transcript is that it belongs to no single agent. `agent_id`
+    /// stays NULL so nothing downstream resolves a persona for it.
+    func linkGroupSession(_ sessionId: String, title: String) {
+        invalidateSessionListCache()
+        let sql = """
+            UPDATE sessions
+               SET agent_id = NULL, spawn_role = ?, parent_session_id = NULL,
+                   title = COALESCE(NULLIF(title, ''), ?)
+             WHERE id = ?
+            """
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (GroupSessionRole.group as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, (title as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 3, (sessionId as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// The session holding one member's private thread inside one group, if it
+    /// has been opened before. Nil means the member has not spoken in this
+    /// group yet and GroupStore should create one.
+    func groupMemberSessionId(groupSessionId: String, agentId: String) -> String? {
+        let sql = """
+            SELECT id FROM sessions
+             WHERE parent_session_id = ? AND agent_id = ? AND spawn_role = ?
+             ORDER BY created_at ASC LIMIT 1
+            """
+        var stmt: OpaquePointer?
+        var result: String?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (groupSessionId as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, (agentId as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 3, (GroupSessionRole.member as NSString).utf8String, -1, nil)
+            if sqlite3_step(stmt) == SQLITE_ROW {
+                result = String(cString: sqlite3_column_text(stmt, 0))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
     // MARK: - Message CRUD
 
     func appendMessage(_ message: RawMessage) {
@@ -2233,8 +2703,8 @@ actor ChatStore {
         logger.info("[Store] appendMessages enter count=\(messages.count) dbOpen=\(dbOK) sid=\(firstSid)")
 
         let sql = """
-            INSERT INTO messages (id, session_id, role, parts_json, created_at, token_usage, sort_order, reasoning_content, stream_interrupt_count, updated_at, error_info, part_flags)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO messages (id, session_id, role, parts_json, created_at, token_usage, sort_order, reasoning_content, stream_interrupt_count, updated_at, error_info, part_flags, sender_agent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         exec("BEGIN TRANSACTION")
@@ -2276,6 +2746,7 @@ actor ChatStore {
                 sqlite3_bind_double(stmt, 10, message.createdAt.timeIntervalSince1970)
                 bindOptionalText(stmt, index: 11, value: message.errorInfo)  // [T-error-persist-ios]
                 sqlite3_bind_int64(stmt, 12, Int64(partFlags))  // [T-ios-listsessions-part-flags]
+                bindOptionalText(stmt, index: 13, value: message.senderAgentId)
                 let stepRC = sqlite3_step(stmt)
                 if stepRC != SQLITE_DONE {
                     let errMsg = String(cString: sqlite3_errmsg(db))
@@ -2337,7 +2808,7 @@ actor ChatStore {
     func loadMessages(sessionId: String) -> [RawMessage] {
         let totalStart = CFAbsoluteTimeGetCurrent()
         let sql = """
-            SELECT id, session_id, role, parts_json, created_at, token_usage, reasoning_content, stream_interrupt_count, sort_order, error_info
+            SELECT id, session_id, role, parts_json, created_at, token_usage, reasoning_content, stream_interrupt_count, sort_order, error_info, sender_agent_id
             FROM messages WHERE session_id = ? ORDER BY sort_order ASC, created_at ASC, id ASC
         """
         var stmt: OpaquePointer?
@@ -2387,6 +2858,7 @@ actor ChatStore {
                 )
                 msg.sortOrder = sortOrder
                 msg.errorInfo = errorInfo
+                msg.senderAgentId = sqlite3_column_text(stmt, 10).map { String(cString: $0) }
                 messages.append(msg)
             }
         } else {
@@ -4285,6 +4757,9 @@ extension RawMessage {
                 case "memory_write", "memory_get":
                     kind = .memoryTool(action: tu.name)
                     content = tu.name == "memory_write" ? "Writing memory..." : "Reading memory..."
+                case ChatHistorySearchTool.name:
+                    kind = .memoryTool(action: tu.name)
+                    content = "Searching chat history..."
                 case "spawn_subagent", "check_subagent", "message_subagent", "stop_subagent":
                     let taskTitle = extractStringParam("task_title", from: tu.input)
                     kind = .subagentTool(action: tu.name, taskTitle: taskTitle)
@@ -4363,6 +4838,9 @@ extension RawMessage {
             )
         }
         msg.streamInterruptCount = streamInterruptCount
+        // Carries the group speaker through to the message-list header, which
+        // is the only place a group transcript differs visually from a 1:1 one.
+        msg.senderAgentId = senderAgentId
         // [T-error-persist-ios] Restore the persisted error indicator so a failed
         // past turn still shows its error after session reload / app restart.
         // Treat empty/whitespace as no-error (UI gates on `error != nil`, so an

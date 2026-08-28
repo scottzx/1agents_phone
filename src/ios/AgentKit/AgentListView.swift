@@ -22,6 +22,7 @@ import SwiftUI
 enum AgentRoute: Hashable {
     case agent(String)
     case session(String)
+    case group(String)
 }
 
 struct AgentListView: View {
@@ -31,9 +32,14 @@ struct AgentListView: View {
     /// the user never sent — another agent's `send_agent_message` lands there —
     /// so the roster has to be able to say "something arrived in here".
     @ObservedObject private var badges = SessionBadgeStore.shared
+    @ObservedObject private var groups = GroupStore.shared
 
     @State private var path: [AgentRoute] = []
     @State private var showingCreate = false
+    @State private var showingCreateGroup = false
+    /// Members per group, resolved once when the roster loads so each row can
+    /// show who is in it without an async lookup per redraw.
+    @State private var groupMembers: [String: [GroupMember]] = [:]
     @State private var showingSettings = false
     /// Owned here because SettingsSheet can hand control to the iSH terminal,
     /// the same way ContentView drives it.
@@ -60,10 +66,22 @@ struct AgentListView: View {
                     .accessibilityLabel(String(localized: "设置"))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingCreate = true } label: {
+                    Menu {
+                        Button {
+                            showingCreate = true
+                        } label: {
+                            Label(String(localized: "新建 Agent"), systemImage: "person.badge.plus")
+                        }
+                        Button {
+                            showingCreateGroup = true
+                        } label: {
+                            Label(String(localized: "新建群聊"), systemImage: "person.2.badge.plus")
+                        }
+                        .disabled(store.agents.count < 2)
+                    } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel(String(localized: "新建 Agent"))
+                    .accessibilityLabel(String(localized: "新建"))
                 }
             }
             .navigationDestination(for: AgentRoute.self) { route in
@@ -72,12 +90,20 @@ struct AgentListView: View {
                     AgentMainSessionView(agentId: agentId)
                 case .session(let sessionId):
                     AIChatView(sessionId: sessionId)
+                case .group(let groupId):
+                    GroupSessionView(groupId: groupId)
                 }
             }
             .sheet(isPresented: $showingCreate) {
                 AgentCreateView { newAgentId in
                     showingCreate = false
                     path.append(.agent(newAgentId))
+                }
+            }
+            .sheet(isPresented: $showingCreateGroup) {
+                GroupCreateView { newGroupId in
+                    showingCreateGroup = false
+                    path.append(.group(newGroupId))
                 }
             }
             .sheet(isPresented: $showingSettings) {
@@ -94,8 +120,15 @@ struct AgentListView: View {
             NotificationNavigationStore.shared.markHandled()
             openSession(sessionId)
         }
+        .onChange(of: groups.groups) { _ in
+            // A group created or edited elsewhere in this launch changes the
+            // roster, and each row's subtitle is its member list.
+            Task { await resolveGroupMembers() }
+        }
         .task {
             await store.bootstrap()
+            await groups.bootstrap()
+            await resolveGroupMembers()
             // Cold launch: the tap that started the app posted its event before
             // this view existed, so the id was buffered instead. Drain it.
             if let pending = NotificationNavigationStore.shared.takePending() {
@@ -122,6 +155,32 @@ struct AgentListView: View {
 
     private var roster: some View {
         List {
+            // Groups first: a room is a thing you check on, and it changes
+            // more often than the roster below it does.
+            if !groups.groups.isEmpty {
+                Section(String(localized: "群聊")) {
+                    ForEach(groups.groups) { group in
+                        Button {
+                            path.append(.group(group.id))
+                        } label: {
+                            AgentGroupRow(
+                                group: group,
+                                members: groupMembers[group.id] ?? [],
+                                isTalking: GroupChatOrchestrator.shared.isRunning(groupId: group.id)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task { await groups.archive(group.id) }
+                            } label: {
+                                Label(String(localized: "归档"), systemImage: "archivebox")
+                            }
+                        }
+                    }
+                }
+            }
+
             ForEach(store.agents) { agent in
                 Button {
                     path.append(.agent(agent.id))
@@ -145,7 +204,19 @@ struct AgentListView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .refreshable { await store.refresh() }
+        .refreshable {
+            await store.refresh()
+            await groups.refresh()
+            await resolveGroupMembers()
+        }
+    }
+
+    private func resolveGroupMembers() async {
+        var resolved: [String: [GroupMember]] = [:]
+        for group in groups.groups {
+            resolved[group.id] = await groups.members(of: group)
+        }
+        groupMembers = resolved
     }
 
     /// Live count of this agent's in-flight tasks, derived from the activity

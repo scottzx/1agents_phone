@@ -7,7 +7,73 @@ import Foundation
 /// picker incident. See T-ios-mention-list-stuck-diag.
 private let mentionPickerLogger = AppLogger(category: "MentionPicker")
 
+// MARK: - Group Mentions
+
+/// One row of the `@` menu inside a group: a member, or the whole room.
+///
+/// Separate from FileMentionEntry rather than a case on it because the two
+/// mean opposite things — a file mention pastes a path INTO the message, a
+/// group mention decides WHO the message wakes up (GroupMentionRouter).
+///
+/// Picking one inserts the readable `@名字`; `send()` encodes that to the
+/// canonical `<@id>` against the live roster. The composer is a plain
+/// UITextView and cannot draw a chip, so this is the same split Telegram uses
+/// for a typed @username.
+struct GroupMentionCandidate: Identifiable, Equatable {
+    /// Agent id, or `Self.everyoneId` for the whole room.
+    let id: String
+    /// What gets typed after the `@`.
+    let handle: String
+    let display: String
+    let emoji: String
+    let subtitle: String
+
+    static let everyoneId = "__everyone__"
+    var isEveryone: Bool { id == Self.everyoneId }
+}
+
 extension AIChatViewModel {
+
+    /// Group members matching the active `@` query, `@所有人` first.
+    ///
+    /// Empty in every 1:1 conversation, which is what keeps the existing file
+    /// picker untouched: the group rows simply do not exist there.
+    var filteredGroupMentions: [GroupMentionCandidate] {
+        guard isGroupTranscript, !groupMembers.isEmpty else { return [] }
+        let query = mentionFilter.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        var rows: [GroupMentionCandidate] = [
+            GroupMentionCandidate(
+                id: GroupMentionCandidate.everyoneId,
+                handle: "所有人",
+                display: String(localized: "所有人"),
+                emoji: "📣",
+                subtitle: String(localized: "群里每个人都会依次发言")
+            )
+        ]
+        rows += groupMembers.map { member in
+            GroupMentionCandidate(
+                id: member.id,
+                handle: member.name,
+                display: member.name,
+                emoji: member.emoji.isEmpty ? "🤖" : member.emoji,
+                subtitle: member.title.isEmpty ? member.summary : member.title
+            )
+        }
+
+        guard !query.isEmpty else { return rows }
+        return rows.filter { row in
+            row.handle.lowercased().hasPrefix(query) || row.display.lowercased().contains(query)
+        }
+    }
+
+    /// Insert `@<handle> ` into the input, replacing the active `@<token>`.
+    ///
+    /// Same span arithmetic as `selectMention` — from the `@` up to the next
+    /// whitespace — so the two paths cannot disagree about what they replaced.
+    func selectGroupMention(_ candidate: GroupMentionCandidate) {
+        replaceActiveMentionToken(with: "@\(candidate.handle) ")
+    }
 
     /// Rows to render in the menu. Recomputed on each access so that
     /// `FileMentionIndex.entries` / `mentionFilter` changes propagate without
@@ -219,6 +285,14 @@ extension AIChatViewModel {
     /// Insert `entry.linuxPath` into the input, replacing the active `@<token>`.
     /// Leaves a trailing space so the user can keep typing.
     func selectMention(_ entry: FileMentionEntry) {
+        mentionPickerLogger.info("[MentionPicker] event=select basename=\(entry.basename) pathLen=\((entry.linuxPath as NSString).length) candidatesAtSelect=\(self.filteredMentionEntries.count)")
+        replaceActiveMentionToken(with: "@\(entry.linuxPath) ")
+    }
+
+    /// Replace the active `@<token>` with `replacement`, leaving the caret
+    /// after it. Shared by the file picker and the group-member picker so the
+    /// two can never disagree about what span an `@` owns.
+    private func replaceActiveMentionToken(with replacement: String) {
         guard mentionAnchor >= 0 else { return }
         let nsText = inputText as NSString
         let anchor = min(mentionAnchor, nsText.length)
@@ -229,13 +303,11 @@ extension AIChatViewModel {
             if let s = UnicodeScalar(ch), CharacterSet.whitespacesAndNewlines.contains(s) { break }
             endOffset += 1
         }
-        let replacement = "@\(entry.linuxPath) "
         let newText = nsText.replacingCharacters(
             in: NSRange(location: anchor, length: endOffset - anchor),
             with: replacement
         )
         let newCaret = anchor + (replacement as NSString).length
-        mentionPickerLogger.info("[MentionPicker] event=select basename=\(entry.basename) pathLen=\((entry.linuxPath as NSString).length) candidatesAtSelect=\(self.filteredMentionEntries.count)")
         // Dismiss *before* text mutation so `updateMentionMenuState` in the
         // didSet doesn't re-open on the fresh input.
         dismissMentionMenu()

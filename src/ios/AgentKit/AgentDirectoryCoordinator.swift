@@ -328,33 +328,14 @@ final class AgentDirectoryCoordinator {
 
     // MARK: - Delivery helpers
 
-    /// Park until the recipient's turn ends. Returns false if the wait ran out
-    /// with the turn still going.
+    // Waiting for the recipient's turn and reading its answer both moved to
+    // AgentTurnAwaiter when group chat needed the same two operations.
     private func awaitTurn(vm: AIChatViewModel, seconds: Int) async -> Bool {
-        let deadline = Date().addingTimeInterval(TimeInterval(seconds))
-        while vm.isProcessing && Date() < deadline {
-            // The caller's own turn is suspended inside this tool call, so a
-            // tighter poll buys nothing — same reasoning as the dispatch
-            // tools' 1s granularity.
-            if Task.isCancelled { return false }
-            do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return false }
-        }
-        return !vm.isProcessing
+        await AgentTurnAwaiter.awaitTurn(vm: vm, seconds: seconds)
     }
 
-    /// The recipient's answer: the text of the assistant turn that followed our
-    /// message. Bounded by `after` so a stalled turn cannot hand back the reply
-    /// to whatever the user asked previously.
     private func lastAssistantText(vm: AIChatViewModel, after index: Int) -> String? {
-        guard index <= vm.messages.count else { return nil }
-        let fresh = vm.messages.suffix(from: min(index, vm.messages.count))
-        guard let last = fresh.last(where: { $0.role == .assistant }) else { return nil }
-        let joined = last.blocks
-            .filter { $0.kind == .text }
-            .map(\.content)
-            .joined(separator: "\n")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return joined.isEmpty ? nil : joined
+        AgentTurnAwaiter.lastAssistantText(vm: vm, after: index)
     }
 
     /// How the message is presented in the recipient's transcript. The header

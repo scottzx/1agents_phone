@@ -208,6 +208,34 @@ extension AIChatViewModel {
             } else {
                 resolvedToolPolicy = .standalone
             }
+
+            // Group linkage. A transcript row points at its group by
+            // session_id; a member's private thread points at the group's
+            // session through parent_session_id.
+            switch row.spawnRole {
+            case GroupSessionRole.group:
+                isGroupTranscript = true
+                let group = await ChatStore.shared.groupForSession(sessionId)
+                groupId = group?.id
+                // Resolved once here rather than per keystroke: the `@` picker
+                // reads it on every character typed.
+                if let group {
+                    groupMembers = await GroupStore.shared.members(of: group)
+                } else {
+                    groupMembers = []
+                }
+            case GroupSessionRole.member:
+                isGroupTranscript = false
+                if let parent = row.parentSessionId {
+                    let group = await ChatStore.shared.groupForSession(parent)
+                    groupId = group?.id
+                } else {
+                    groupId = nil
+                }
+            default:
+                isGroupTranscript = false
+                groupId = nil
+            }
         }
 
         // Clear stale compact/pending state from previous lifecycle
@@ -302,6 +330,15 @@ extension AIChatViewModel {
             }
 
             if raw.role == .assistant {
+                // Consecutive assistant rows are normally one agent-loop turn
+                // streamed across several rows, so they merge into one UI
+                // message. In a group they are usually DIFFERENT members
+                // speaking in sequence, and merging those would splice two
+                // people's words into one bubble under one name. A change of
+                // speaker breaks the chain.
+                if let assistant = currentAssistant, assistant.senderAgentId != raw.senderAgentId {
+                    currentAssistant = nil
+                }
                 if let assistant = currentAssistant {
                     // Continuation of an agent loop — append new blocks to
                     // existing assistant message AND extend the source-sort
@@ -352,6 +389,21 @@ extension AIChatViewModel {
             msg.sourceSortOrder = raw.sortOrder
             msg.lastSourceSortOrder = raw.sortOrder
             loadedUIMessages.append(msg)
+        }
+
+        // Group transcripts store mentions canonically as `<@id>` so routing
+        // and renames stay exact; the reader sees names. The stored rows and
+        // `agentHistory` are untouched — only these display copies change, and
+        // only for a room.
+        if isGroupTranscript, !groupMembers.isEmpty {
+            for uiMsg in loadedUIMessages {
+                let rendered = GroupMentionRouter.render(uiMsg.content, members: groupMembers)
+                if rendered != uiMsg.content { uiMsg.content = rendered }
+                for block in uiMsg.blocks where block.kind == .text {
+                    let renderedBlock = GroupMentionRouter.render(block.content, members: groupMembers)
+                    if renderedBlock != block.content { block.content = renderedBlock }
+                }
+            }
         }
 
         // [BlocksLost] MERGE TRACE — log every text block of the last assistant

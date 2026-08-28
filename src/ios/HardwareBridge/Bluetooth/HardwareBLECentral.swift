@@ -41,6 +41,23 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     /// Fired once a real-time ASR audio stream finishes (0x53 StreamEnd) with
     /// the assembled raw PCM16 (16kHz mono) bytes and whether it was truncated.
     var onAudioStreamFinished: ((Data, Bool) -> Void)?
+    /// Every decoded event, including the ones with dedicated callbacks below.
+    /// The catch-all exists so a new firmware event is observable without
+    /// another callback property.
+    var onEvent: ((AgentLinkEvent) -> Void)?
+    /// 0x18 fragments reassembled and parsed.
+    var onManifest: ((IoManifestAssembler.Manifest) -> Void)?
+    /// 0x14 PowerStatus.
+    var onPowerStatus: ((AgentLinkEvent.PowerState, UInt8) -> Void)?
+    /// 0x19 IoReading, already decoded per the endpoint's `agent_val_t`.
+    var onReading: ((String, AgentLinkValue) -> Void)?
+    /// 0x16 SelectedAgent — the device telling us which agent the user picked
+    /// on its own screen.
+    var onSelectedAgent: ((UInt8, String) -> Void)?
+
+    /// The board's last reassembled self-description, or nil before the first
+    /// 0x18 arrives (a board with no registered endpoints never sends one).
+    @Published private(set) var latestManifest: IoManifestAssembler.Manifest?
 
     private static let identityService = CBUUID(string: "AB883C83-3FCC-4A0F-A951-E18D0C944DA4")
     private static let controlService = CBUUID(string: "FFC0")
@@ -54,6 +71,12 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     private var eventChannel: CBCharacteristic?
     private var scanRequested = false
     private var l2capChannelRequested = false
+    private var manifestAssembler = IoManifestAssembler()
+    /// Sequence counter for frames this class originates (manifest re-fetches,
+    /// roster fragments). Kept separate from the coordinator's counter, which
+    /// brackets voice sessions; the firmware only uses `sequence` to pair a
+    /// response with its command, so two independent counters are fine.
+    private var localSequence: UInt8 = 0x80
 
     let l2capReceiver = AgentLinkL2CAPReceiver()
 
@@ -109,17 +132,200 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     }
 
     func sendScreenText(_ text: String, sequence: UInt8) throws {
+        let data = AgentLinkCodec.screenTextCommand(text, sequence: sequence)
+        try sendCommand(data)
+        appendLog("下发 screen0：\(text)")
+    }
+
+    /// Which wire path a roster push takes.
+    ///
+    /// Both exist because they have different prerequisites, not because one is
+    /// better. Route A needs two `register_io` calls on the board and no SDK
+    /// change at all, so it can be brought up while the firmware roadmap is
+    /// still moving; route B needs an SDK command handler but carries a roster
+    /// of any size.
+    enum RosterTransport: String, CaseIterable, Identifiable {
+        /// 0x33 IoActuate to the `roster0` endpoint. One frame, so the JSON
+        /// must fit the ATT write budget (~470 bytes ≈ 5 members).
+        case ioEndpoint
+        /// 0x37 SetAgentRoster, fragmented exactly like the firmware's own
+        /// 0x18 manifest. No size limit; requires firmware support.
+        case fragmentedCommand
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .ioEndpoint: return "通用 I/O（0x33，零固件改动）"
+            case .fragmentedCommand: return "分片命令（0x37，需固件支持）"
+            }
+        }
+    }
+
+    /// Pushes the roster. Returns the number of frames written.
+    ///
+    /// Route A refuses rather than truncates when the roster doesn't fit: a
+    /// half-parsed roster would leave the device drawing the wrong names, which
+    /// is worse than drawing none.
+    @discardableResult
+    func sendRoster(_ snapshot: DeviceRosterSnapshot, transport: RosterTransport) throws -> Int {
+        let json = try DeviceRosterJSON.encode(snapshot)
+
+        switch transport {
+        case .ioEndpoint:
+            let frame = AgentLinkCodec.ioActuateCommand(
+                endpointId: DeviceEndpoint.roster,
+                args: json,
+                sequence: nextLocalSequence()
+            )
+            guard frame.count <= writeBudget else {
+                throw BLEError.rosterTooLarge(bytes: json.count, budget: rosterJSONBudget)
+            }
+            try sendCommand(frame)
+            appendLog("下发 roster0：rev=\(snapshot.rev)，\(snapshot.members.count) 名成员，\(json.count) 字节")
+            return 1
+
+        case .fragmentedCommand:
+            let frames = AgentLinkCodec.agentRosterCommands(
+                json: json,
+                fragmentBudget: fragmentBudget,
+                startingSequence: nextLocalSequence(advancing: 0)
+            )
+            for frame in frames { try sendCommand(frame) }
+            localSequence = localSequence &+ UInt8(truncatingIfNeeded: frames.count)
+            appendLog("下发 0x37 roster：rev=\(snapshot.rev)，\(json.count) 字节分 \(frames.count) 片")
+            return frames.count
+        }
+    }
+
+    /// Pushes one message with its sender attached, so the device can render
+    /// who is speaking without re-reading the roster.
+    func sendChatMessage(_ message: DeviceChatMessage) throws {
+        let json = try DeviceRosterJSON.encode(message)
+        let frame = AgentLinkCodec.ioActuateCommand(
+            endpointId: DeviceEndpoint.chat,
+            args: json,
+            sequence: nextLocalSequence()
+        )
+        guard frame.count <= writeBudget else {
+            throw BLEError.messageTooLarge(frame.count)
+        }
+        try sendCommand(frame)
+        appendLog("下发 chat0：from=\(message.from) seq=\(message.sequence)")
+    }
+
+    /// Pushes a roundtable state transition (DEMO_PRD.md §5) so the round
+    /// screen can light the node for whoever is speaking.
+    func sendStateEvent(_ event: DeviceStateEvent) throws {
+        let json = try DeviceRosterJSON.encode(event)
+        let frame = AgentLinkCodec.ioActuateCommand(
+            endpointId: DeviceEndpoint.state,
+            args: json,
+            sequence: nextLocalSequence()
+        )
+        guard frame.count <= writeBudget else {
+            throw BLEError.messageTooLarge(frame.count)
+        }
+        try sendCommand(frame)
+        appendLog("下发 state0：\(event.state.rawValue)（\(event.name)）")
+    }
+
+    /// 0x34 GetIoManifest. Best-effort: a board with no endpoints answers with
+    /// an ACK and no 0x18, which is a valid outcome, so failure only logs.
+    func requestIoManifest() {
+        manifestAssembler.reset()
+        do {
+            try sendCommand(AgentLinkCodec.getIoManifestCommand(sequence: nextLocalSequence()))
+            appendLog("请求 I/O manifest（0x34）")
+        } catch {
+            appendLog("请求 manifest 失败：\(error.localizedDescription)")
+        }
+    }
+
+    /// Largest complete frame a GATT write can carry, or a conservative floor
+    /// before a peripheral is attached.
+    private var writeBudget: Int {
+        connectedPeripheral?.maximumWriteValueLength(for: .withResponse) ?? 180
+    }
+
+    /// JSON bytes that fit one 0x33 frame: the write budget minus the 6-byte
+    /// agent_link header and the `[id_len][id]` prefix.
+    private var rosterJSONBudget: Int {
+        max(0, writeBudget - AgentLinkCodec.headerSize - 1 - DeviceEndpoint.roster.utf8.count)
+    }
+
+    /// Mirrors the firmware's own fragment arithmetic. `maximumWriteValueLength`
+    /// already excludes the 3 bytes of ATT overhead the firmware subtracts, so
+    /// only the 6-byte frame header plus 2-byte chunk header come off here.
+    private var fragmentBudget: Int {
+        AgentLinkCodec.fragmentBudget(attMTU: writeBudget + 3)
+    }
+
+    private func nextLocalSequence(advancing: UInt8 = 1) -> UInt8 {
+        let current = localSequence
+        localSequence = localSequence &+ advancing
+        return current
+    }
+
+    /// Sends headerless little-endian PCM16/16 kHz/mono to the device speaker.
+    /// VoiceReply status 2/3 brackets the bytes on the shared audio L2CAP CoC.
+    func sendVoicePCM16(
+        _ pcm16: Data,
+        sessionID: UInt32,
+        startSequence: UInt8,
+        endSequence: UInt8
+    ) async throws {
+        try await beginVoicePCM16(sessionID: sessionID, sequence: startSequence)
+        do {
+            try await appendVoicePCM16(pcm16)
+        } catch {
+            try? endVoicePCM16(sessionID: sessionID, sequence: endSequence)
+            throw error
+        }
+        try endVoicePCM16(sessionID: sessionID, sequence: endSequence)
+    }
+
+    /// Opens one logical TTS reply while keeping the underlying CoC persistent.
+    func beginVoicePCM16(sessionID: UInt32, sequence: UInt8) async throws {
+        let start = AgentLinkCodec.voiceReplyCommand(
+            sessionID: sessionID,
+            status: 2,
+            sequence: sequence
+        )
+        try sendCommand(start)
+        l2capReceiver.beginPacedWrite()
+        appendLog("TTS 流式下行开始")
+
+        // Let the GATT start command reach the firmware before the independent
+        // L2CAP data path begins sending its first SDU.
+        try await Task.sleep(for: .milliseconds(80))
+    }
+
+    func appendVoicePCM16(_ pcm16: Data) async throws {
+        try await l2capReceiver.writePCM16Chunk(pcm16)
+    }
+
+    func endVoicePCM16(sessionID: UInt32, sequence: UInt8) throws {
+        l2capReceiver.endPacedWrite()
+        let end = AgentLinkCodec.voiceReplyCommand(
+            sessionID: sessionID,
+            status: 3,
+            sequence: sequence
+        )
+        try sendCommand(end)
+        appendLog("TTS 流式下行完成")
+    }
+
+    private func sendCommand(_ data: Data) throws {
         guard let peripheral = connectedPeripheral,
               let commandChannel,
               state.isReady else {
             throw BLEError.notReady
         }
-        let data = AgentLinkCodec.screenTextCommand(text, sequence: sequence)
         guard data.count <= peripheral.maximumWriteValueLength(for: .withResponse) else {
             throw BLEError.messageTooLarge(data.count)
         }
         peripheral.writeValue(data, for: commandChannel, type: .withResponse)
-        appendLog("下发 screen0：\(text)")
     }
 
     private func resetConnection() {
@@ -128,6 +334,10 @@ final class HardwareBLECentral: NSObject, ObservableObject {
         eventChannel = nil
         l2capChannelRequested = false
         l2capReceiver.detach()
+        // A reconnect renegotiates the MTU and replays the manifest from
+        // fragment 0, so nothing from the old link may survive into the new one.
+        manifestAssembler.reset()
+        latestManifest = nil
         state = .idle
     }
 
@@ -146,11 +356,16 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     enum BLEError: LocalizedError {
         case notReady
         case messageTooLarge(Int)
+        /// Route A (0x33 to `roster0`) can only carry one frame. Refusing beats
+        /// truncating, which would leave the device showing a partial roster.
+        case rosterTooLarge(bytes: Int, budget: Int)
 
         var errorDescription: String? {
             switch self {
             case .notReady: return "BLE 设备尚未就绪"
             case .messageTooLarge(let bytes): return "BLE 消息过长（\(bytes) 字节）"
+            case .rosterTooLarge(let bytes, let budget):
+                return "roster \(bytes) 字节超出单帧上限 \(budget) 字节，请改用 0x37 分片路线"
             }
         }
     }
@@ -334,32 +549,88 @@ extension HardwareBLECentral: @preconcurrency CBPeripheralDelegate {
         appendLog("L2CAP 音频通道已打开 (PSM 0x\(String(AgentLinkL2CAPReceiver.psm, radix: 16)))")
     }
 
+    /// Routes one device→App event.
+    ///
+    /// Previously this tried the prompt decoder, then the two stream decoders,
+    /// and returned — so 0x14 battery, 0x18 I/O manifest, 0x19 readings and
+    /// 0x1A manifest-changed all arrived and were discarded without a trace.
+    /// Now every event decodes into a typed case and reaches `onEvent`, with
+    /// the three that drive existing machinery still getting their dedicated
+    /// callbacks.
     private func handleEvent(_ data: Data) {
+        let event: AgentLinkEvent
         do {
-            if let prompt = try AgentLinkCodec.prompt(from: data) {
-                appendLog("收到 Prompt：\(prompt)")
-                onPrompt?(prompt)
-                return
-            }
-            if let start = try AgentLinkCodec.streamStart(from: data) {
-                appendLog("音频流开始：\(start.name)")
-                l2capReceiver.streamStarted()
-                return
-            }
-            if let end = try AgentLinkCodec.streamEnd(from: data) {
-                appendLog("音频流结束：\(end.validBytes) 字节，truncated=\(end.isTruncated)")
-                Task { [weak self] in
-                    guard let self else { return }
-                    guard let audio = await self.l2capReceiver.streamEnded(validBytes: end.validBytes) else { return }
-                    await MainActor.run {
-                        self.onAudioStreamFinished?(audio, end.isTruncated)
-                    }
-                }
-                return
-            }
+            guard let decoded = try AgentLinkCodec.event(from: data) else { return }
+            event = decoded
         } catch {
             appendLog("忽略无效 agent_link 帧：\(error.localizedDescription)")
+            return
         }
+
+        appendLog(event.logDescription)
+
+        switch event {
+        case .prompt(let text):
+            guard !text.isEmpty else { break }
+            onPrompt?(text)
+
+        case .recordStreamStart:
+            l2capReceiver.streamStarted()
+
+        case .recordStreamEnd(let payload):
+            Task { [weak self] in
+                guard let self else { return }
+                guard let audio = await self.l2capReceiver.streamEnded(validBytes: payload.validBytes) else { return }
+                await MainActor.run {
+                    self.onAudioStreamFinished?(audio, payload.isTruncated)
+                }
+            }
+
+        case .ioManifestChunk(let index, let isLast, let fragment):
+            switch manifestAssembler.accept(index: index, isLast: isLast, fragment: fragment) {
+            case .incomplete:
+                break
+            case .complete(let json):
+                guard let manifest = IoManifestAssembler.parse(json) else {
+                    appendLog("I/O manifest JSON 解析失败（\(json.count) 字节）")
+                    break
+                }
+                latestManifest = manifest
+                appendLog("I/O manifest 就绪：rev=\(manifest.rev)，\(manifest.endpoints.count) 个端点，能力 \(capabilitySummary(manifest))")
+                onManifest?(manifest)
+            case .desynchronized(let expected, let received):
+                appendLog("manifest 分片乱序（期望 #\(expected)，收到 #\(received)），重新拉取")
+                requestIoManifest()
+            }
+
+        case .manifestChanged:
+            // The board only tells us the revision moved; the content comes
+            // from a 0x34 re-fetch.
+            requestIoManifest()
+
+        case .powerStatus(let state, let level):
+            onPowerStatus?(state, level)
+
+        case .ioReading(let endpointId, let value):
+            onReading?(endpointId, value)
+
+        case .selectedAgent(let index, let agentId):
+            onSelectedAgent?(index, agentId)
+
+        case .button, .sensor, .wakeword, .imageStreamStart, .imageStreamEnd, .custom, .unknown:
+            // No dedicated consumer yet; `onEvent` below still sees these, and
+            // the log line above records them.
+            break
+        }
+
+        onEvent?(event)
+    }
+
+    private func capabilitySummary(_ manifest: IoManifestAssembler.Manifest) -> String {
+        let names = IoManifestAssembler.DeviceCapability.allCases
+            .filter { manifest.hasCapability($0) }
+            .map(\.displayName)
+        return names.isEmpty ? "无" : names.joined(separator: "/")
     }
 
     private func updateReadyState(for peripheral: CBPeripheral) {

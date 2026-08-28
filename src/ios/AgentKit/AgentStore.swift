@@ -18,7 +18,7 @@ import SwiftUI
 final class AgentStore: ObservableObject {
     static let shared = AgentStore()
 
-    private let logger = AppLogger(category: "AgentStore")
+    fileprivate let logger = AppLogger(category: "AgentStore")
 
     /// Non-archived agents, in roster order.
     @Published private(set) var agents: [AgentProfile] = []
@@ -74,6 +74,17 @@ final class AgentStore: ObservableObject {
         await refresh()
         isReady = true
         logger.info("bootstrap done — roster=\(self.agents.count) isReady=true")
+
+        // Age out finished scratch sessions. Deliberately after `isReady` and
+        // off the bootstrap path: it touches the filesystem once per expired
+        // task and the roster must not wait on it. Once per launch is enough —
+        // the retention window is 30 days.
+        Task.detached(priority: .utility) {
+            let purged = await ChatStore.shared.purgeExpiredSubagentSessions()
+            if purged > 0 {
+                await MainActor.run { AgentStore.shared.logger.info("swept \(purged) expired subagent session(s)") }
+            }
+        }
     }
 
     // MARK: - Roster

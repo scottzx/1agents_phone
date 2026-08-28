@@ -44,6 +44,11 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
     private var inputStream: InputStream?
     private var outputStream: OutputStream?
     private let readChunkSize = 4096
+    private let writeChunkSize = 512
+    private let playbackBytesPerSecond = 16_000 * MemoryLayout<Int16>.size
+    private let playbackLeadBytes = 8_000 // 250 ms at 16 kHz PCM16 mono
+    private var pacedWriteStartedAt: Date?
+    private var pacedWriteBytes = 0
 
     func attach(_ channel: CBL2CAPChannel) {
         detach()
@@ -59,6 +64,18 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
         outputStream = output
     }
 
+    /// True once the CoC is attached and its write side is usable. The audio
+    /// route checks this before choosing the device over the phone speaker —
+    /// a link whose GATT control channel is ready can still be missing this
+    /// channel, and discovering that only at write time costs a whole turn.
+    var isWritable: Bool {
+        guard let outputStream else { return false }
+        switch outputStream.streamStatus {
+        case .notOpen, .closed, .error: return false
+        default: return true
+        }
+    }
+
     func detach() {
         inputStream?.close()
         outputStream?.close()
@@ -67,6 +84,8 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
         inputStream = nil
         outputStream = nil
         channel = nil
+        pacedWriteStartedAt = nil
+        pacedWriteBytes = 0
     }
 
     func streamStarted() {
@@ -82,6 +101,82 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
     func streamEnded(validBytes: UInt32) async -> Data? {
         drainAvailableBytes()
         return await buffer.finish(validBytes: validBytes)
+    }
+
+    /// Writes a complete TTS segment to the channel output stream. OutputStream
+    /// can accept partial writes and temporarily run out of L2CAP credits, so
+    /// this method yields until space is available instead of dropping bytes.
+    @MainActor
+    func writePCM16(_ data: Data, timeout: TimeInterval = 60) async throws {
+        beginPacedWrite()
+        defer { endPacedWrite() }
+        try await writePCM16Chunk(data, timeout: timeout)
+    }
+
+    /// Starts one logical TTS stream. The L2CAP channel itself stays open for
+    /// the whole BLE connection; this state only rate-limits bytes to the
+    /// speaker's real consumption speed.
+    @MainActor
+    func beginPacedWrite() {
+        pacedWriteStartedAt = Date()
+        pacedWriteBytes = 0
+    }
+
+    @MainActor
+    func endPacedWrite() {
+        pacedWriteStartedAt = nil
+        pacedWriteBytes = 0
+    }
+
+    /// Writes one streaming TTS chunk and applies end-to-end playback pacing.
+    /// L2CAP credits only describe Bluetooth buffer space, not the board's I2S
+    /// queue, so relying on `hasSpaceAvailable` alone can still overrun audio.
+    @MainActor
+    func writePCM16Chunk(_ data: Data, timeout: TimeInterval = 60) async throws {
+        guard !data.isEmpty else { throw ChannelError.emptyAudio }
+        guard let outputStream else { throw ChannelError.notOpen }
+
+        if pacedWriteStartedAt == nil { beginPacedWrite() }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        var offset = 0
+        while offset < data.count {
+            try Task.checkCancellation()
+            guard Date() < deadline else { throw ChannelError.writeTimedOut }
+            if let error = outputStream.streamError { throw ChannelError.stream(error.localizedDescription) }
+            guard outputStream.streamStatus != .closed,
+                  outputStream.streamStatus != .error else {
+                throw ChannelError.notOpen
+            }
+            guard outputStream.hasSpaceAvailable else {
+                try await Task.sleep(for: .milliseconds(5))
+                continue
+            }
+
+            let requested = min(writeChunkSize, data.count - offset)
+            let written = data.withUnsafeBytes { rawBuffer -> Int in
+                guard let base = rawBuffer.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return -1 }
+                return outputStream.write(base.advanced(by: offset), maxLength: requested)
+            }
+            if written < 0 {
+                throw ChannelError.stream(outputStream.streamError?.localizedDescription ?? "未知写入错误")
+            }
+            if written == 0 {
+                try await Task.sleep(for: .milliseconds(5))
+            } else {
+                offset += written
+            }
+        }
+
+        pacedWriteBytes += data.count
+        if let startedAt = pacedWriteStartedAt {
+            let pacedBytes = max(0, pacedWriteBytes - playbackLeadBytes)
+            let targetElapsed = Double(pacedBytes) / Double(playbackBytesPerSecond)
+            let elapsed = Date().timeIntervalSince(startedAt)
+            if targetElapsed > elapsed {
+                try await Task.sleep(for: .seconds(targetElapsed - elapsed))
+            }
+        }
     }
 
     private func drainAvailableBytes() {
@@ -114,6 +209,22 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
             break
         default:
             break
+        }
+    }
+
+    enum ChannelError: LocalizedError {
+        case notOpen
+        case emptyAudio
+        case writeTimedOut
+        case stream(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .notOpen: return "L2CAP 音频通道尚未打开"
+            case .emptyAudio: return "TTS 音频为空"
+            case .writeTimedOut: return "L2CAP 音频发送超时"
+            case .stream(let message): return "L2CAP 音频发送失败：\(message)"
+            }
         }
     }
 }

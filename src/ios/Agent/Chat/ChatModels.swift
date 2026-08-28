@@ -60,6 +60,11 @@ final class ChatMessage: Identifiable, ObservableObject {
     @Published var isCompactedHistory = false
     /// True when this compact divider is still loading (LLM generating summary).
     @Published var isCompactLoading = false
+    /// In a group transcript: which member spoke this turn. Nil in every 1:1
+    /// conversation, where the single agent is implied. The message-list header
+    /// reads this to draw the speaker's own emoji, name and accent instead of
+    /// the app-wide SOUL identity.
+    var senderAgentId: String?
     /// SF Symbol name for systemInfo rows (e.g. "brain.head.profile", "arrow.down.right.and.arrow.up.left").
     var systemIcon: String?
     /// LLM-generated compact summary (for display in info sheet on compact divider).

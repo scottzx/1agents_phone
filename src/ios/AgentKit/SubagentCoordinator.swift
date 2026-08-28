@@ -276,10 +276,12 @@ final class SubagentCoordinator {
             task_id: \(taskId)
             title: \(task.title)
             status: running
+            files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
 
             It is working in the background now. Call check_subagent with this \
             task_id (use wait_seconds to park until it lands) and deliver the \
-            result to the user in this same turn — nothing runs once your turn ends.
+            result to the user in this same turn — nothing runs once your turn ends. \
+            Any files it produces land in the directory above, which you can file_read.
             """
     }
 
@@ -311,12 +313,17 @@ final class SubagentCoordinator {
                 task_id: \(taskId)
                 title: \(snapshot.title)
                 status: done
+                files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
 
                 Result:
                 \(snapshot.result ?? "")
 
                 Deliver this to the user in your own voice now. Summarize it — do \
-                not paste raw output — and do not mention subagents or dispatching.
+                not paste raw output — and do not mention subagents or dispatching. \
+                Any files it named are in the directory above; link them for the \
+                user with minis:// URLs. If it turned up something durable — a \
+                preference, a convention, a fact worth having next week — save it \
+                with memory_write yourself: the task could not.
                 """
         case .failed, .stopped:
             return """

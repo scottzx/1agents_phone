@@ -75,6 +75,16 @@ extension AIChatViewModel {
 
     /// Execute a memory_write tool call: prepend a timestamped entry to today's daily log.
     func executeMemoryWrite(from json: String) -> FileToolResult {
+        // [T-agent-subagent-memory-readonly] Second line of defense behind the
+        // tool-definition gate in makeAgentTools(): a subagent that calls
+        // memory_write anyway (a stale definition in a resumed transcript, a
+        // model inventing the name) must not reach the agent's daily log.
+        guard agentRole != .executor else {
+            return FileToolResult(
+                output: "memory_write is not available here. Memory is read-only for a background task — include anything worth remembering in your final answer, and the assistant that dispatched you will decide what to save.",
+                success: false
+            )
+        }
         guard memoryEnabled else {
             return FileToolResult(output: "Memory saving is disabled for this session. Use /memory to re-enable.", success: false)
         }

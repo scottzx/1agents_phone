@@ -158,25 +158,69 @@ struct CollectionViewMessageListV3: UIViewControllerRepresentable {
 /// Name comes from SOUL.md (user-editable in Soul Settings); the
 /// sparkles glyph is fixed — custom emoji is no longer supported,
 /// matching the Soul Settings UI.
+///
+/// In a GROUP transcript the turn carries a `senderAgentId`, and the header
+/// shows that member's own emoji, name and accent instead. This one view is
+/// the entire visual difference between a group and a 1:1 conversation:
+/// consecutive assistant turns already render as separate header + blocks
+/// spans (loadSession breaks the merge chain when the speaker changes), so
+/// naming the speaker here is all a reader needs to follow the room.
 private struct BridgedAssistantHeaderV3: View {
     @ObservedObject var message: ChatMessage
     var maxWidth: CGFloat = 0
     @State private var soulMeta: SoulMetadata = SoulStore.cachedMetadata
+    /// Republishes when an agent is renamed or recolored mid-conversation.
+    @ObservedObject private var agents = AgentStore.shared
+
+    /// The speaking member, when this turn came from one.
+    private var speaker: AgentProfile? {
+        guard let id = message.senderAgentId else { return nil }
+        return agents.agents.first { $0.id == id }
+    }
+
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(red: 0.72, green: 0.69, blue: 0.59),
-                                 Color(red: 0.6, green: 0.6, blue: 0.55)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            if let speaker {
+                Text(speaker.emoji.isEmpty ? "🤖" : speaker.emoji)
+                    .font(.system(size: 18))
+                    .frame(width: 22, height: 22)
+                    .background(AgentAccent.color(speaker.accentColor).opacity(0.18))
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text(speaker.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(ChatColors.primaryText)
+                if !speaker.title.isEmpty {
+                    Text(speaker.title)
+                        .font(.caption2)
+                        .padding(.horizontal, 5).padding(.vertical, 1)
+                        .background(AgentAccent.color(speaker.accentColor).opacity(0.14))
+                        .clipShape(Capsule())
+                        .foregroundStyle(.secondary)
+                }
+            } else if message.senderAgentId != nil {
+                // Spoke in this room, then left it. The line stays readable
+                // rather than silently reattributing to the app identity.
+                Image(systemName: "person.crop.circle.badge.xmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(.tertiary)
+                Text(String(localized: "已退出的成员"))
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            } else {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [Color(red: 0.72, green: 0.69, blue: 0.59),
+                                     Color(red: 0.6, green: 0.6, blue: 0.55)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-            Text(soulMeta.name.isEmpty ? "Minis" : soulMeta.name)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(ChatColors.primaryText)
+                Text(soulMeta.name.isEmpty ? "Minis" : soulMeta.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(ChatColors.primaryText)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .soulMdChanged)) { _ in
             soulMeta = SoulStore.cachedMetadata

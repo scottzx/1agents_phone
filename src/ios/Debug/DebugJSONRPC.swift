@@ -171,6 +171,18 @@ final class DebugJSONRPC: @unchecked Sendable {
             return try handleWriteFile(params: params)
         case "debug.shellExecute":
             return try await handleShellExecute(params: params)
+        case "debug.hardware.roster":
+            return await MainActor.run { HardwareBridgeDebugRPC.roster(params: params) }
+        case "debug.hardware.state":
+            return await MainActor.run { HardwareBridgeDebugRPC.state(params: params) }
+        case "debug.hardware.manifest":
+            return await MainActor.run { HardwareBridgeDebugRPC.manifest() }
+        case "debug.group.list":
+            return await GroupChatDebugRPC.list()
+        case "debug.group.route":
+            return await GroupChatDebugRPC.route(params: params)
+        case "debug.group.run":
+            return await GroupChatDebugRPC.run(params: params)
         case "debug.appInfo":
             return handleAppInfo(params: params)
         case "debug.auth.list":

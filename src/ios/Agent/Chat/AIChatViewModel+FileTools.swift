@@ -107,9 +107,18 @@ extension AIChatViewModel {
     /// For /var/minis/ paths, queries ISHExecutionCoordinator's active bind mount table
     /// to get the actual host URL, avoiding races when mounts switch between concurrent sessions.
     /// Falls back to resolveHostPath for non-/var/minis/ paths (e.g. /tmp, /root).
+    ///
+    /// [T-agent-subagent-path-drift] `sessionId:` is passed explicitly. The
+    /// per-session buckets (workspace / attachments / offloads / browser) are
+    /// routed by MinisFsRouter keyed on a session id, and `hostURL(for:)`
+    /// without one falls back to `mountedSessionId` — the LAST session that
+    /// ran a shell command, which for an orchestrator waiting on a dispatched
+    /// task is usually the subagent. That made an orchestrator's file_read of
+    /// /var/minis/workspace/x silently resolve into someone else's bucket.
+    /// With our own sid, every VM reads and writes its own.
     func resolvePathForDirectRead(_ linuxPath: String) async -> URL? {
         if linuxPath.hasPrefix("/var/minis/") || linuxPath == "/var/minis" {
-            if let resolved = await ISHExecutionCoordinator.shared.hostURL(for: linuxPath) {
+            if let resolved = await ISHExecutionCoordinator.shared.hostURL(for: linuxPath, sessionId: sessionId) {
                 let exists = FileManager.default.fileExists(atPath: resolved.path)
                 logger.notice("📂[RESOLVE] \(linuxPath) → \(resolved.path) exists=\(exists) sid=\(self.sessionId ?? "nil")")
                 if exists { return resolved }
@@ -392,7 +401,7 @@ extension AIChatViewModel {
         // into iSH and visible in iOS Files).
         let hostURL: URL?
         if path.hasPrefix("/var/minis/mounts/") {
-            let mountURL = await ISHExecutionCoordinator.shared.hostURL(for: path)
+            let mountURL = await ISHExecutionCoordinator.shared.hostURL(for: path, sessionId: sessionId)
             #if DEBUG
             print("[FileWrite] hostURL(for:\(path)) → \(mountURL?.path ?? "<nil>")")
             #endif

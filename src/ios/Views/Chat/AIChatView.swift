@@ -3740,15 +3740,37 @@ struct AIChatView: View {
     }
 
     /// `@` file-mention popup — mirrors slashCommandMenu styling.
+    ///
+    /// In a group the same popup leads with the room's members, because `@` in
+    /// a group means "who should answer this" far more often than it means
+    /// "attach this file" — and both still work from one keystroke.
     private var mentionMenu: some View {
         let rows = vm.filteredMentionEntries
         #if DEBUG
         let preview = rows.prefix(6).map { $0.basename }.joined(separator: ",")
         print("[MentionRender] mentionMenu body filter=\"\(vm.mentionFilter)\" rows.count=\(rows.count) first6=[\(preview)]")
         #endif
+        let groupRows = vm.filteredGroupMentions
         return InputBarPopupChrome(maxContentWidth: maxContentWidth) {
             VStack(spacing: 0) {
-                if rows.isEmpty {
+                if !groupRows.isEmpty {
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(groupRows) { candidate in
+                                Button {
+                                    vm.selectGroupMention(candidate)
+                                } label: {
+                                    GroupMentionRow(candidate: candidate)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(SlashMenuButtonStyle(isSelected: false))
+                            }
+                        }
+                    }
+                    .scrollIndicators(.visible)
+                    .frame(height: min(Self.slashPickerFixedHeight,
+                                       CGFloat(groupRows.count) * 44))
+                } else if rows.isEmpty {
                     // Lock empty-state height to slashPickerFixedHeight so
                     // the popup card stays the same size whether matches
                     // are present or not — otherwise it collapses to a
@@ -3862,6 +3884,38 @@ struct AIChatView: View {
     }
 
     /// A single row in the file-mention menu.
+    /// One member (or the whole room) in the `@` popup. Deliberately shaped
+    /// like the roster row rather than like MentionRow below: this is a person
+    /// you are addressing, not a path you are pasting.
+    private struct GroupMentionRow: View {
+        let candidate: GroupMentionCandidate
+
+        var body: some View {
+            HStack(spacing: 10) {
+                Text(candidate.emoji)
+                    .font(.system(size: 16))
+                    .frame(width: 26, height: 26)
+                    .background(Color.secondary.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(candidate.display)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(ChatColors.primaryText)
+                        .lineLimit(1)
+                    if !candidate.subtitle.isEmpty {
+                        Text(candidate.subtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(ChatColors.secondaryText)
+                            .lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+        }
+    }
+
     private struct MentionRow: View {
         let entry: FileMentionEntry
         let isSelected: Bool

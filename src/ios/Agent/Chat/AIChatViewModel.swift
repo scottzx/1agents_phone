@@ -94,6 +94,34 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     var agentId: String?
     var agentRole: AgentRunRole = .main
 
+    // MARK: Group chat
+    //
+    // Two different things carry a group id, and the difference matters:
+    //
+    //  - On a GROUP TRANSCRIPT vm (`isGroupTranscript` true), `agentId` is nil
+    //    and this vm never runs the agent loop at all — `send()` hands the
+    //    message to GroupChatOrchestrator instead. It exists purely so the
+    //    whole chat UI can be reused for a conversation with several speakers.
+    //  - On a MEMBER vm, `agentId` is that member and the loop runs normally;
+    //    the group id only tells prompt assembly to add the room's rules and
+    //    tool assembly to withhold the roster tools.
+    var groupId: String?
+    /// True on the vm that owns the room's transcript.
+    var isGroupTranscript = false
+    /// The room's cast, for the `@` picker on a group transcript. Resolved by
+    /// `loadSession()` and refreshed when the roster changes.
+    @Published var groupMembers: [GroupMember] = []
+
+    /// The room's rules and cast, prepended to this member's own persona while
+    /// it is taking group turns.
+    ///
+    /// Cached as a string rather than assembled in `baseSystemPrompt` because
+    /// building it needs the group and every member profile — async lookups
+    /// that a synchronous computed property cannot do. GroupChatOrchestrator
+    /// sets it just before each turn, which is also the only moment it could
+    /// have changed.
+    var groupPromptBlock: String?
+
     /// Effective tool ceiling for this VM. Executors always get the full
     /// toolset regardless of what their parent agent is allowed — they are the
     /// ones actually doing the work.
@@ -1731,9 +1759,21 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// orchestrator/executor split lands everywhere (including the provider-
     /// fallback re-assembly) without touching those sites.
     private var baseSystemPrompt: String {
+        // In a group the room's rules come first, before the agent's own
+        // persona and tool instructions: "you are one of several voices here"
+        // has to frame everything below it, not read as an afterthought.
+        let groupBlock = groupPromptBlock.map { $0 + "\n" } ?? ""
+        let hardwareBlock = sessionSource == "hardware" ? """
+
+        \nHardware voice response mode:
+        - Reply in the same language as the user and lead with the answer.
+        - Default to 1-3 short sentences. For Chinese, aim for no more than about 80 characters.
+        - Avoid Markdown, tables, long lists, headings, and unnecessary preambles because the reply is shown on a small screen and spoken aloud.
+        - Keep essential safety warnings and required steps. Be longer only when the user explicitly asks for detail or correctness requires it.
+        """ : ""
         switch effectiveToolPolicy {
         case .orchestrator:
-            return OrchestratorPrompt.render(agentId: agentId, memoryEnabled: memoryEnabled)
+            return groupBlock + OrchestratorPrompt.render(agentId: agentId, memoryEnabled: memoryEnabled) + hardwareBlock
         case .standalone:
             // Executors get the full operator prompt below — it was always
             // written for the thing that does the work — plus a short preamble
@@ -1742,8 +1782,8 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // session, which is the only role that is handed those tools (see
             // makeAgentTools), and never to an executor that could not act on it.
             return agentRole == .executor
-                ? OrchestratorPrompt.executorPreamble + executorAndStandalonePrompt
-                : executorAndStandalonePrompt + "\n\n" + AgentDirectoryTools.promptSection(canDispatch: false)
+                ? OrchestratorPrompt.executorPreamble(taskId: sessionId ?? "") + executorAndStandalonePrompt + hardwareBlock
+                : groupBlock + executorAndStandalonePrompt + "\n\n" + AgentDirectoryTools.promptSection(canDispatch: false) + hardwareBlock
         }
     }
 
@@ -1787,16 +1827,23 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             + "- file_edit: Edit existing files with exact string replacement (old_string → new_string). Preferred over file_write for modifications — always file_read first.\n"
             + "- browser_use: Web browsing (navigate, screenshot, click, type, get_text, scroll, scroll_and_collect, get_readable, get_backbone, fetch, etc.). "
             + "Starts with a desktop Safari user agent. Use screenshot to see the page.\n"
-            + "- memory_write: Save a memory entry to today's daily log (YYYY-MM-DD.md). Use proactively to note user preferences, project patterns, and important context.\n"
+            // [T-agent-subagent-memory-readonly] memory_write is not registered
+            // for an executor (see makeAgentTools), so it must not be described
+            // here either — a listed tool the model cannot call is a guaranteed
+            // failed call and a confused turn.
+            + (agentRole == .executor
+                ? ""
+                : "- memory_write: Save a memory entry to today's daily log (YYYY-MM-DD.md). Use proactively to note user preferences, project patterns, and important context.\n")
             + "- memory_get: Recall memories with keyword search. Check memory at the start of new topics to leverage past knowledge.\n\n"
             + "Current time (approximate): \(approximateTimeString) (\(TimeZone.current.identifier)). "
             + "Device languages: \((UserDefaults.standard.object(forKey: "AppleLanguages") as? [String] ?? Locale.preferredLanguages).joined(separator: ", ")).\n\n"
-            + "Shared directory /var/minis/ (bidirectional read/write between shell and app):\n"
+            + "Directories under /var/minis/ (bidirectional read/write between shell and app):\n"
             + "  /var/minis/attachments/ — Media files (images, audio, video). Display inline with ![desc](minis://attachments/filename).\n"
-            + "  /var/minis/workspace/   — Working files (scripts, data, configs). Link with [name](minis://workspace/filename).\n"
-            + "  /var/minis/offloads/    — Auto-saved large outputs. Read with file_read.\n"
-            + "  /var/minis/browser/     — Browser screenshots and extracts.\n"
-            + "  /var/minis/shared/      — Cross-session shared storage for artifacts and documents. Organize by project or topic (e.g. shared/myproject/, shared/datasets/). Do NOT store temporary files here.\n"
+            + "  /var/minis/workspace/   — Scratch space for THIS session only, like /tmp: private to this conversation and discarded with it. Download, unpack, build and experiment here. Nothing another session or agent needs may be left here — it cannot see it.\n"
+            + "  /var/minis/offloads/    — Auto-saved large outputs. Read with file_read. Also per-session.\n"
+            + "  /var/minis/browser/     — Browser screenshots and extracts. Also per-session.\n"
+            + "  /var/minis/shared/      — The ONLY cross-session storage: artifacts, documents and anything that must outlive this conversation. Organize by project or topic (e.g. shared/myproject/, shared/datasets/). Copy finished work here from workspace; do not use it as scratch.\n"
+            + "  /var/minis/shared/tasks/<task_id>/ — Where a dispatched background task delivers its files, so the assistant that dispatched it can read them.\n"
             + "  /var/minis/memory/GLOBAL.md    — Persistent global memory (read-only, user-maintained via Settings).\n"
             + "  /var/minis/memory/YYYY-MM-DD.md — Daily memory log.\n"
             + "  /var/minis/mounts/<name>/ — User-mounted external folders from iOS Files (e.g. an Obsidian vault, Downloads, another app's iCloud container). Presence and names vary per user. Check this directory first when the task references external/user files. Some mounts may be read-only; write tools will reject writes with a clear error.\n\n"
@@ -1934,6 +1981,12 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// be injected, and what to tell the user if they ask about memory.
     private var memoryStatusFragment: String {
         if memoryEnabled {
+            // [T-agent-subagent-memory-readonly] This footer is authoritative —
+            // it overrides anything said earlier in the prompt — so it must not
+            // promise a subagent a memory_write it was never handed.
+            if agentRole == .executor {
+                return "\n\nMemory status: READ-ONLY for this task. GLOBAL.md and recent daily logs have been injected above (if non-empty) and memory_get is available, but memory_write is NOT registered — do not attempt to call it. Anything worth remembering goes in your final answer; the assistant that dispatched you decides what to save."
+            }
             return "\n\nMemory status: ENABLED for this session. GLOBAL.md and recent daily logs have been injected above (if non-empty), and memory_get / memory_write are available in the tool list."
         } else {
             return "\n\nMemory status: DISABLED for this session. "
@@ -2099,9 +2152,42 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
     // MARK: - Send Message
 
+    /// Sessions driven by something other than a person at the composer, and so
+    /// with no way to answer a "compact before sending?" prompt. A group
+    /// member's thread is one: the orchestrator is mid-round waiting on it.
+    var isHeadlessSession: Bool {
+        sessionSource == "shortcut" || sessionSource == "hardware" || sessionSource == "group"
+    }
+
     func send() {
         // Read-only mode — cannot send messages
         guard remoteDeviceId == nil else { return }
+
+        // A group transcript belongs to no single agent and never runs the
+        // agent loop. The user's line goes into the room and
+        // GroupChatOrchestrator decides which members answer — which is what
+        // lets the whole chat UI be reused for a conversation with several
+        // speakers without an AIChatViewModel ever having to hold two agents.
+        if isGroupTranscript, let groupId {
+            let typed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !typed.isEmpty else { return }
+            // The composer is plain text, so the user edits `@市场专家`; the
+            // room stores `<@id>`. Resolving here, once, against the live
+            // roster is what makes a mention survive a later rename — and it
+            // is the same thing Telegram does with a typed @username at send
+            // time. Anything already in token form is left alone.
+            let text = GroupMentionRouter.encode(typed, members: groupMembers)
+            inputText = ""
+            // Attachments are deliberately NOT cleared: a room carries text
+            // only for now, and silently swallowing a file the user attached
+            // would look like it was delivered. Leaving the chips in the
+            // composer is the honest signal that it was not.
+            // The orchestrator persists the message and pushes it into
+            // `messages`, so it lands in the transcript exactly once whether it
+            // came from here or from the hardware bridge.
+            GroupChatOrchestrator.shared.userDidSend(groupId: groupId, text: text)
+            return
+        }
 
         // [T-ios-photo-pick-placeholder] Drop any non-ready attachments (failed
         // photo loads, or a stray still-loading placeholder) so only fully-loaded
@@ -2163,11 +2249,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             case .ok:
                 break
             case .needsCompact:
-                if sessionSource == "shortcut" || sessionSource == "hardware" || autoCompactEnabled {
+                if isHeadlessSession || autoCompactEnabled {
                     // Shortcut and hardware sessions can't show UI prompts;
                     // auto-compact opt-in [T-chat-auto-compact-opt-in] rides
                     // the same no-prompt path — compact and send without asking.
-                    logger.info("[Context] Near capacity — auto-compacting (\(sessionSource == "shortcut" || sessionSource == "hardware" ? "headless session" : "autoCompactEnabled"))")
+                    logger.info("[Context] Near capacity — auto-compacting (\(isHeadlessSession ? "headless session" : "autoCompactEnabled"))")
                     pendingSendText = text
                     pendingSendAttachments = pendingAttachments
                     inputText = ""
@@ -2183,7 +2269,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 logger.info("[Context] Near capacity — prompting user to compact before send")
                 return
             case .exhausted:
-                if sessionSource == "shortcut" || sessionSource == "hardware" {
+                if isHeadlessSession {
                     // Shortcut and hardware sessions can't show UI — set inline error
                     logger.info("[Context] Exhausted — headless session cannot continue")
                     let errMsg = ChatMessage(role: .assistant, content: "", blocks: [])
@@ -3484,6 +3570,16 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     }
 
     func cancel() {
+        // Stop on a group transcript stops the ROOM, not a loop — this vm has
+        // none. The member currently speaking finishes into its own session
+        // (interrupting it mid-write would leave a torn transcript there), but
+        // nothing further is posted to the room.
+        if isGroupTranscript, let groupId {
+            GroupChatOrchestrator.shared.cancel(groupId: groupId)
+            isProcessing = false
+            return
+        }
+
         let lastBlocks = (messages.last?.role == .assistant) ? messages.last!.blocks.count : -1
         let lastRole = messages.last.map { $0.role == .assistant ? "assistant" : "user" } ?? "nil"
         logger.info("⏹️ cancel() START session=\(self.sessionId ?? "nil") isProcessing=\(self.isProcessing) lastRole=\(lastRole) lastBlocks=\(lastBlocks) currentTask=\(self.currentTask != nil)")
@@ -5880,4 +5976,3 @@ enum LLMProviderError: LocalizedError {
         }
     }
 }
-

@@ -31,6 +31,16 @@ extension AIChatViewModel {
         // tell the user to re-enable memory via /memory or Settings.
         let includeMemoryTools = memoryEnabled
 
+        // [T-agent-subagent-memory-readonly] Memory WRITING belongs to the
+        // persistent agent alone. A subagent runs in a throwaway session but
+        // its `agentId` is the parent's, so `memory_write` would append to the
+        // agent's real daily log — a temporary task editing a permanent
+        // asset, with the orchestrator never seeing what was written. Reading
+        // stays on (a task benefits from knowing the user's preferences); the
+        // write is routed back through the orchestrator, which is the one
+        // holding the conversation and can judge what is worth keeping.
+        let includeMemoryWrite = includeMemoryTools && agentRole != .executor
+
         var tools: [AgentToolDefinition] = []
 
         // Dispatch tools — orchestrators only. An executor that could spawn
@@ -45,8 +55,28 @@ extension AIChatViewModel {
         // mint agents and start conversations between them off the back of one
         // dispatched task, which is the same unbounded-graph problem that
         // keeps `spawn_subagent` off executors.
+        //
+        // Inside a group the addressing tools are withheld: a member reaches a
+        // colleague by @-ing them in the room, where the user can read the
+        // exchange. Leaving send_agent_message in as well would give it a
+        // second, invisible channel to the same colleague — two orderings of
+        // the same conversation, one of which nobody can see. `list_agents`
+        // stays: knowing who exists is not a way of talking to them.
         if agentRole == .main {
-            tools.append(contentsOf: AgentDirectoryTools.definitions)
+            if groupId == nil {
+                tools.append(contentsOf: AgentDirectoryTools.definitions)
+            } else {
+                tools.append(contentsOf: AgentDirectoryTools.definitions.filter { $0.name == "list_agents" })
+            }
+        }
+
+        // History search — everyone except orchestrators, which is to say every
+        // subagent (an executor's effectiveToolPolicy is always .standalone).
+        // A 总管 is deliberately left out for the same reason it has no shell:
+        // twenty snippets of old conversation is exactly the bulk its
+        // transcript exists to stay clear of. It dispatches the lookup instead.
+        if policy == .standalone {
+            tools.append(ChatHistorySearchTool.definition)
         }
 
         // Heavy, transcript-polluting tools — everyone except orchestrators.
@@ -153,7 +183,7 @@ extension AIChatViewModel {
             )
         }
 
-        if includeMemoryTools {
+        if includeMemoryWrite {
             tools.append(AgentToolDefinition(
                 name: "memory_write",
                 description: "Write a memory entry to today's daily log (YYYY-MM-DD.md). Memories persist across all sessions. Each entry is prepended with a timestamp. Save: user preferences, recurring patterns, key facts, project conventions, reusable knowledge. Avoid saving passwords, API keys, tokens, or secrets unless the user explicitly confirms after being warned. Keep entries concise and general-purpose. GLOBAL.md is read-only (user-maintained via Settings).",
@@ -164,6 +194,9 @@ extension AIChatViewModel {
                 required: ["tool_title", "content"],
                 propertyOrdering: ["tool_title", "content"]
             ))
+        }
+
+        if includeMemoryTools {
             tools.append(AgentToolDefinition(
                 name: "memory_get",
                 description: "Retrieve memories from persistent storage. Supports keyword-based fuzzy search across memory files. Returns matching lines with surrounding context. Use this to recall previous knowledge, user preferences, or past notes.",

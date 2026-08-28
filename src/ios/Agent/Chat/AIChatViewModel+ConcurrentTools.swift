@@ -651,6 +651,31 @@ extension AIChatViewModel {
                 toolSuccess = !reply.hasPrefix("Error:")
             }
 
+        case "create_agent", "list_agents", "send_agent_message":
+            // Roster tools. Only a `.main` session is handed these (see
+            // makeAgentTools). Like the dispatch tools above, everything they
+            // touch happens outside this transcript — a created agent lands in
+            // the roster, and a relayed message lands in the RECIPIENT's
+            // conversation — so all that arrives here is the short summary the
+            // coordinator writes.
+            let sid = sessionId ?? ""
+            if sid.isEmpty {
+                toolOutput = "Error: this conversation has no session yet, so it cannot reach the roster."
+                toolSuccess = false
+            } else {
+                let reply = await AgentDirectoryCoordinator.shared.handle(
+                    toolName: tu.name,
+                    input: toolArgs,
+                    callerSessionId: sid,
+                    callerAgentId: agentId
+                )
+                if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+                    messages[msgIdx].blocks[blockIdx].content = reply
+                }
+                toolOutput = reply
+                toolSuccess = !reply.hasPrefix("Error:")
+            }
+
         default:
             toolOutput = "Error: Unknown tool '\(tu.name)'"
             toolSuccess = false

@@ -4289,6 +4289,13 @@ extension RawMessage {
                     let taskTitle = extractStringParam("task_title", from: tu.input)
                     kind = .subagentTool(action: tu.name, taskTitle: taskTitle)
                     content = taskTitle.isEmpty ? tu.name : taskTitle
+                case "create_agent", "list_agents", "send_agent_message":
+                    // Roster tools share the dispatch block kind — same capsule,
+                    // same tap-through. They carry no `task_title`, so the
+                    // model-written `tool_title` is the label.
+                    let label = extractStringParam("tool_title", from: tu.input)
+                    kind = .subagentTool(action: tu.name, taskTitle: label)
+                    content = label.isEmpty ? tu.name : label
                 default:
                     kind = .shellTool(command: tu.name)
                     content = tu.name

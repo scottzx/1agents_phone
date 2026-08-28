@@ -1738,9 +1738,12 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // Executors get the full operator prompt below — it was always
             // written for the thing that does the work — plus a short preamble
             // telling them they are headless and who consumes their answer.
+            // The roster section is the mirror image: it goes only to a `.main`
+            // session, which is the only role that is handed those tools (see
+            // makeAgentTools), and never to an executor that could not act on it.
             return agentRole == .executor
                 ? OrchestratorPrompt.executorPreamble + executorAndStandalonePrompt
-                : executorAndStandalonePrompt
+                : executorAndStandalonePrompt + "\n\n" + AgentDirectoryTools.promptSection(canDispatch: false)
         }
     }
 

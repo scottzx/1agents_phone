@@ -27,6 +27,10 @@ enum AgentRoute: Hashable {
 struct AgentListView: View {
     @ObservedObject private var store = AgentStore.shared
     @ObservedObject private var activity = SessionActivityTracker.shared
+    /// Drives the unread dot. An agent's conversation can now gain a message
+    /// the user never sent — another agent's `send_agent_message` lands there —
+    /// so the roster has to be able to say "something arrived in here".
+    @ObservedObject private var badges = SessionBadgeStore.shared
 
     @State private var path: [AgentRoute] = []
     @State private var showingCreate = false
@@ -122,7 +126,11 @@ struct AgentListView: View {
                 Button {
                     path.append(.agent(agent.id))
                 } label: {
-                    AgentRow(agent: agent, runningTasks: runningTasks(for: agent))
+                    AgentRow(
+                        agent: agent,
+                        runningTasks: runningTasks(for: agent),
+                        hasUnread: agent.mainSessionId.map { badges.hasUnread(for: $0) } ?? false
+                    )
                 }
                 .buttonStyle(.plain)
                 .swipeActions(edge: .trailing) {
@@ -155,6 +163,7 @@ struct AgentListView: View {
 private struct AgentRow: View {
     let agent: AgentProfile
     let runningTasks: Int
+    let hasUnread: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -163,6 +172,16 @@ private struct AgentRow: View {
                 .frame(width: 46, height: 46)
                 .background(AgentAccent.color(agent.accentColor).opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                // Same top-trailing red dot SessionRow uses, for the same
+                // meaning: unread content, cleared the moment it is opened.
+                .overlay(alignment: .topTrailing) {
+                    if hasUnread {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 9, height: 9)
+                            .offset(x: 3, y: -3)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {

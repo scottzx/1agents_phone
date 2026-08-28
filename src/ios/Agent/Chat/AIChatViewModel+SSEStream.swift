@@ -354,7 +354,8 @@ extension AIChatViewModel {
                     case "browser_use": .browserTool(action: "")
                     case "read_image": .readImageTool(path: "")
                     case "memory_write", "memory_get": .memoryTool(action: name)
-                    case let n where SubagentTools.names.contains(n): .subagentTool(action: n, taskTitle: "")
+                    case let n where SubagentTools.names.contains(n) || AgentDirectoryTools.names.contains(n):
+                        .subagentTool(action: n, taskTitle: "")
                     default: .shellTool(command: name)
                     }
                     if name == "file_write" || name == "file_edit" {

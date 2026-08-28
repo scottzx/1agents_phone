@@ -39,6 +39,16 @@ extension AIChatViewModel {
             tools.append(contentsOf: SubagentTools.definitions)
         }
 
+        // Roster tools — every agent's OWN conversation, both policies, and
+        // never a subagent's. Creating colleagues and talking to them is part
+        // of being the thing the user talks to; an executor handed these could
+        // mint agents and start conversations between them off the back of one
+        // dispatched task, which is the same unbounded-graph problem that
+        // keeps `spawn_subagent` off executors.
+        if agentRole == .main {
+            tools.append(contentsOf: AgentDirectoryTools.definitions)
+        }
+
         // Heavy, transcript-polluting tools — everyone except orchestrators.
         if policy == .standalone {
             tools.append(

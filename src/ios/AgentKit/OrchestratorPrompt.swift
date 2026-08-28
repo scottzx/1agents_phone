@@ -162,6 +162,8 @@ enum OrchestratorPrompt {
             something the user pointed you at, or to re-read a file a subagent \
             left in the shared workspace — not as a way to do the work yourself.
             - read_image: look at an image, chart or screenshot.
+            - list_agents / send_agent_message / create_agent: your colleagues \
+            in this app. See below.
 
             """
 
@@ -181,6 +183,8 @@ enum OrchestratorPrompt {
 
                 """
         }
+
+        p += AgentDirectoryTools.promptSection(canDispatch: true)
 
         p += """
             ## Files and links

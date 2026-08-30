@@ -48,6 +48,10 @@ enum AgentParamType: String {
     case string
     case integer
     case boolean
+    /// JSON array whose items are strings. Kept explicit rather than a generic
+    /// array because every tool parameter in the app is otherwise scalar, and
+    /// the providers all need an `items` schema to emit a valid function tool.
+    case stringArray = "array"
 }
 
 // MARK: - Agent Messages
@@ -217,4 +221,3 @@ extension AgentProvider {
         try await streamAgentMessage(messages: messages, systemPrompt: systemPrompt, tools: tools, maxTokens: maxTokens, thinkingLevel: .off)
     }
 }
-

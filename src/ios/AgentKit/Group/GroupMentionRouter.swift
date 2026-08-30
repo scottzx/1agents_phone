@@ -234,6 +234,67 @@ enum GroupMentionRouter {
         static let none = MentionScan(isEveryone: false, memberIds: [])
     }
 
+    /// Validation failures for the structured A2A group-message tool. Kept in
+    /// this pure layer so permission and addressing rules have unit tests and
+    /// cannot drift away from the text mention router.
+    enum A2AError: Error, Equatable {
+        case senderNotInGroup
+        case noTargets
+        case targetNotInGroup(String)
+        case cannotTargetSelf
+        case everyoneRequiresOwner
+        case messageContainsMentions
+    }
+
+    /// Build the canonical transcript line emitted by
+    /// `send_agent_message(is_group:group_id:agent_id[]:message:)`.
+    ///
+    /// The structured target parameters are authoritative. Mentions inside
+    /// `message` are rejected so a non-owner cannot smuggle `<@everyone>` (or
+    /// an undeclared extra recipient) through the free-text field.
+    static func composeA2AMessage(
+        message: String,
+        targetAgentIds: [String],
+        mentionEveryone: Bool,
+        senderAgentId: String,
+        members: [GroupMember],
+        ownerAgentId: String?
+    ) -> Result<String, A2AError> {
+        guard members.contains(where: { $0.id == senderAgentId }) else {
+            return .failure(.senderNotInGroup)
+        }
+
+        let body = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let bodyMentions = parseMentions(in: body, members: members)
+        guard !body.contains("<@"), !bodyMentions.isEveryone, bodyMentions.memberIds.isEmpty else {
+            return .failure(.messageContainsMentions)
+        }
+
+        if mentionEveryone {
+            guard senderAgentId == ownerAgentId else {
+                return .failure(.everyoneRequiresOwner)
+            }
+            return .success("\(everyoneToken) \(body)")
+        }
+
+        let requested = Set(targetAgentIds)
+        guard !requested.isEmpty else { return .failure(.noTargets) }
+        let memberIds = Set(members.map(\.id))
+        if let invalid = targetAgentIds.first(where: { !memberIds.contains($0) }) {
+            return .failure(.targetNotInGroup(invalid))
+        }
+        guard !requested.contains(senderAgentId) else { return .failure(.cannotTargetSelf) }
+
+        // Roster order gives persistence and tests a deterministic canonical
+        // line even when a provider emits the ids in a different order.
+        let tokens = members
+            .map(\.id)
+            .filter { requested.contains($0) }
+            .map { token(for: $0) }
+            .joined(separator: " ")
+        return .success("\(tokens) \(body)")
+    }
+
     /// Parse the mentions in one message.
     ///
     /// Two passes, in this order:

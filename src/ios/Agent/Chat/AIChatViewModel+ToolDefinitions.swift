@@ -56,17 +56,17 @@ extension AIChatViewModel {
         // dispatched task, which is the same unbounded-graph problem that
         // keeps `spawn_subagent` off executors.
         //
-        // Inside a group the addressing tools are withheld: a member reaches a
-        // colleague by @-ing them in the room, where the user can read the
-        // exchange. Leaving send_agent_message in as well would give it a
-        // second, invisible channel to the same colleague — two orderings of
-        // the same conversation, one of which nobody can see. `list_agents`
-        // stays: knowing who exists is not a way of talking to them.
+        // A group member keeps list + send. send_agent_message switches to its
+        // explicit `is_group + group_id + agent_id[]` shape there and publishes through the
+        // shared transcript; create_agent stays out because changing the roster
+        // is unrelated to taking a group turn.
         if agentRole == .main {
             if groupId == nil {
                 tools.append(contentsOf: AgentDirectoryTools.definitions)
             } else {
-                tools.append(contentsOf: AgentDirectoryTools.definitions.filter { $0.name == "list_agents" })
+                tools.append(contentsOf: AgentDirectoryTools.definitions.filter {
+                    $0.name == "list_agents" || $0.name == "send_agent_message"
+                })
             }
         }
 

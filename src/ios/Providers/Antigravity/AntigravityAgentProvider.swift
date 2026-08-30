@@ -202,6 +202,9 @@ final class AntigravityAgentProvider: AgentProvider {
                     "type": param.type.geminiType,
                     "description": param.description,
                 ]
+                if param.type == .stringArray {
+                    prop["items"] = ["type": "STRING"]
+                }
                 if let enumValues = param.enumValues {
                     prop["description"] = "\(param.description) (values: \(enumValues.joined(separator: ", ")))"
                 }

@@ -1666,6 +1666,9 @@ final class OpenAIAgentProvider: AgentProvider {
                     "type": param.type.rawValue,
                     "description": param.description,
                 ]
+                if param.type == .stringArray {
+                    prop["items"] = ["type": "string"]
+                }
                 if let enumValues = param.enumValues {
                     prop["enum"] = enumValues
                 }
@@ -1695,6 +1698,9 @@ final class OpenAIAgentProvider: AgentProvider {
                     "type": param.type.rawValue,
                     "description": param.description,
                 ]
+                if param.type == .stringArray {
+                    prop["items"] = ["type": "string"]
+                }
                 if let enumValues = param.enumValues {
                     prop["enum"] = enumValues
                 }

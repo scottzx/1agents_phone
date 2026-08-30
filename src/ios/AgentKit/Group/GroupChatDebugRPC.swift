@@ -17,6 +17,7 @@ enum GroupChatDebugRPC {
         let members: [GroupMember]
         let ownerAgentId: String?
         var groupTitle = params["title"] as? String ?? "调试群"
+        var resolvedGroupId = params["groupId"] as? String ?? "debug-group"
 
         if let groupId = params["groupId"] as? String {
             guard let group = await GroupStore.shared.loadGroup(groupId) else {
@@ -25,6 +26,7 @@ enum GroupChatDebugRPC {
             members = await GroupStore.shared.members(of: group)
             ownerAgentId = group.ownerAgentId
             groupTitle = group.title
+            resolvedGroupId = group.id
         } else if let agentIds = params["agentIds"] as? [String], !agentIds.isEmpty {
             // Synthetic roster, so routing can be exercised before any group
             // exists — the same affordance debug.hardware.roster offers.
@@ -71,7 +73,7 @@ enum GroupChatDebugRPC {
             return [
                 "member": member.name,
                 "systemBlock": GroupChatPrompt.memberSystemBlock(
-                    member: member, groupTitle: groupTitle, mode: .freeform,
+                    member: member, groupId: resolvedGroupId, groupTitle: groupTitle, mode: .freeform,
                     isOwner: member.id == ownerAgentId,
                     peers: members.filter { $0.id != member.id }
                 ),

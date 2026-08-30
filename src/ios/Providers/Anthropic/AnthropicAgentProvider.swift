@@ -792,10 +792,12 @@ final class AnthropicAgentProvider: AgentProvider {
                 case .string: .string
                 case .integer: .integer
                 case .boolean: .boolean
+                case .stringArray: .array
                 }
                 properties[name] = JSONSchema.Property(
                     type: type,
                     description: param.description,
+                    items: param.type == .stringArray ? JSONSchema.Items(type: .string) : nil,
                     enumValues: param.enumValues
                 )
             }

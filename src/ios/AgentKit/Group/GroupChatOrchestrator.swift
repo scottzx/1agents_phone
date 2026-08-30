@@ -77,6 +77,17 @@ final class GroupChatOrchestrator {
     /// Returns the last thing said in the room, or nil if nobody spoke.
     @discardableResult
     func run(groupId: String, userText: String) async -> String? {
+        await run(groupId: groupId, userText: userText, initialMessages: nil)
+    }
+
+    /// The normal entry point seeds the routing window from the user line it
+    /// just appended. A2A can also append a member line while no group loop is
+    /// active, so it supplies that already-persisted line explicitly.
+    private func run(
+        groupId: String,
+        userText: String,
+        initialMessages: [GroupMessage]?
+    ) async -> String? {
         guard let group = await GroupStore.shared.loadGroup(groupId) else { return nil }
         let members = await GroupStore.shared.members(of: group)
         guard !members.isEmpty else {
@@ -121,7 +132,13 @@ final class GroupChatOrchestrator {
         let closing: String?
         switch group.mode {
         case .freeform:
-            closing = await runFreeform(group: group, members: members, epoch: epoch)
+            closing = await runFreeform(
+                group: group,
+                members: members,
+                epoch: epoch,
+                initialMessages: initialMessages,
+                seedLatestMemberIfNeeded: trimmed.isEmpty
+            )
         case .roundtable:
             closing = await runRoundtable(group: group, members: members, epoch: epoch, topic: trimmed)
         }
@@ -137,6 +154,28 @@ final class GroupChatOrchestrator {
         return closing
     }
 
+    /// Publish an A2A line from a normal private assistant session into the
+    /// pseudo-group's shared transcript. The group has no live socket; this
+    /// transcript append is the delivery event, and the subsequent run projects
+    /// that context into the addressed members' private group-member sessions.
+    func agentDidSend(
+        group: GroupProfile,
+        sender: GroupMember,
+        members: [GroupMember],
+        canonicalText: String
+    ) async {
+        await postMemberMessage(group: group, member: sender, members: members, text: canonicalText)
+        deliverToHardware(canonicalText, group: group, members: members, from: sender)
+
+        guard !running.contains(group.id) else {
+            // The active loop re-reads the transcript at the next round.
+            pendingRerun.insert(group.id)
+            return
+        }
+        let trigger = GroupMessage.member(sender.id, canonicalText)
+        Task { _ = await self.run(groupId: group.id, userText: "", initialMessages: [trigger]) }
+    }
+
     /// Stop a room mid-turn. The member currently speaking finishes into its
     /// own session, but nothing further is posted to the room.
     func cancel(groupId: String) {
@@ -149,7 +188,9 @@ final class GroupChatOrchestrator {
     private func runFreeform(
         group: GroupProfile,
         members: [GroupMember],
-        epoch: Int
+        epoch: Int,
+        initialMessages: [GroupMessage]?,
+        seedLatestMemberIfNeeded: Bool
     ) async -> String? {
         var history = await transcript(of: group)
         // Everything up to and including the last thing a member said has
@@ -159,6 +200,13 @@ final class GroupChatOrchestrator {
         var consumed = history.lastIndex { $0.speaker.memberId != nil }.map { $0 + 1 } ?? 0
         var totalSpoken = 0
         var closing: String?
+        var seededMessages = initialMessages
+        if seededMessages == nil,
+           seedLatestMemberIfNeeded,
+           let last = history.last,
+           last.speaker.memberId != nil {
+            seededMessages = [last]
+        }
 
         for round in 0..<GroupChatLimits.maxRounds {
             guard isCurrent(group.id, epoch) else { return closing }
@@ -166,7 +214,13 @@ final class GroupChatOrchestrator {
             // Re-read so a line the user typed mid-round joins THIS turn rather
             // than stranding until they send again.
             history = await transcript(of: group)
-            let newMessages = Array(history[min(consumed, history.count)...])
+            let newMessages: [GroupMessage]
+            if let seeded = seededMessages {
+                newMessages = seeded
+                seededMessages = nil
+            } else {
+                newMessages = Array(history[min(consumed, history.count)...])
+            }
             consumed = history.count
             guard !newMessages.isEmpty else { break }
 
@@ -213,10 +267,10 @@ final class GroupChatOrchestrator {
                     peers: members.filter { $0.id != member.id },
                     allMembers: members,
                     newMessages: GroupMentionRouter.messagesSinceMemberLastSpoke(history, memberId: member.id),
-                    // Suppressed together with the relay itself: a member told
-                    // to hand off, whose handoff is then dropped, leaves an
-                    // unanswered `@` in the transcript.
-                    allowHandoff: !directedTurn
+                    // A structured A2A handoff is reliable even for a direct
+                    // user question: if none is sent, the next routing window
+                    // is quiet and the loop ends naturally.
+                    allowHandoff: true
                 )
                 guard let said = await speak(group: group, member: member, members: members, prompt: prompt) else {
                     continue
@@ -233,9 +287,9 @@ final class GroupChatOrchestrator {
             // better stop condition than any counter.
             guard spokeThisRound > 0 else { break }
 
-            // Asked-and-answered: the people this message was aimed at have
-            // spoken. The room goes quiet until the user says something else.
-            if directedTurn { break }
+            // A direct user question with no A2A call reaches a quiet next
+            // window and ends there. Do not break early: an explicit handoff
+            // from its answer must still be routed.
         }
         return closing
     }
@@ -345,6 +399,7 @@ final class GroupChatOrchestrator {
         // the mode can all have changed since this member last spoke.
         vm.groupPromptBlock = GroupChatPrompt.memberSystemBlock(
             member: member,
+            groupId: group.id,
             groupTitle: group.title,
             mode: group.mode,
             isOwner: member.id == group.ownerAgentId,
@@ -372,18 +427,24 @@ final class GroupChatOrchestrator {
 
         let countBefore = vm.messages.count
         let draft = vm.inputText
+        AgentDirectoryCoordinator.shared.discardPendingGroupMessage(callerSessionId: sessionId)
         vm.inputText = prompt
         vm.send()
         let accepted = vm.isProcessing
         vm.inputText = draft
 
         guard accepted else {
+            AgentDirectoryCoordinator.shared.discardPendingGroupMessage(callerSessionId: sessionId)
             logger.warning("\(member.name) 拒绝了群消息（上下文已满）")
             return nil
         }
         guard await AgentTurnAwaiter.awaitTurn(vm: vm, seconds: GroupChatLimits.memberTurnTimeoutSeconds) else {
+            AgentDirectoryCoordinator.shared.discardPendingGroupMessage(callerSessionId: sessionId)
             logger.warning("\(member.name) 超时未完成发言，本轮跳过")
             return nil
+        }
+        if let outbound = AgentDirectoryCoordinator.shared.consumePendingGroupMessage(callerSessionId: sessionId) {
+            return outbound
         }
         return AgentTurnAwaiter.lastAssistantText(vm: vm, after: countBefore)
     }

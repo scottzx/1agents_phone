@@ -667,7 +667,8 @@ extension AIChatViewModel {
                     toolName: tu.name,
                     input: toolArgs,
                     callerSessionId: sid,
-                    callerAgentId: agentId
+                    callerAgentId: agentId,
+                    callerGroupId: groupId
                 )
                 if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
                     messages[msgIdx].blocks[blockIdx].content = reply

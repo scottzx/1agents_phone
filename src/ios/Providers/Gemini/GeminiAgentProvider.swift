@@ -210,6 +210,9 @@ final class GeminiAgentProvider: AgentProvider {
                     "type": param.type.geminiType,
                     "description": param.description,
                 ]
+                if param.type == .stringArray {
+                    prop["items"] = ["type": "STRING"]
+                }
                 if let enumValues = param.enumValues {
                     // Gemini doesn't support enum directly in all cases, but we can add it to description
                     prop["description"] = "\(param.description) (values: \(enumValues.joined(separator: ", ")))"
@@ -261,6 +264,7 @@ extension AgentParamType {
         case .string: return "STRING"
         case .integer: return "INTEGER"
         case .boolean: return "BOOLEAN"
+        case .stringArray: return "ARRAY"
         }
     }
 }

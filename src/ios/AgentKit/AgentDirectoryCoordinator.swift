@@ -36,6 +36,12 @@ final class AgentDirectoryCoordinator {
     /// which is exactly the window in which a reply could bounce back.
     private var relayOrigin: [String: String] = [:]
 
+    /// Structured group messages emitted while a group-member model is still
+    /// inside its turn. They cannot be posted immediately: the enclosing group
+    /// orchestrator owns ordering and turn caps. `runMemberTurn` consumes the
+    /// queued canonical line and publishes it as that member's one utterance.
+    private var pendingGroupMessages: [String: [String]] = [:]
+
     /// How many agents one message may pass through. Three is enough for
     /// "ask a colleague, who asks a specialist" and short enough that a
     /// runaway relay costs a handful of turns rather than a token budget.
@@ -53,7 +59,8 @@ final class AgentDirectoryCoordinator {
         toolName: String,
         input: [String: Any],
         callerSessionId: String,
-        callerAgentId: String?
+        callerAgentId: String?,
+        callerGroupId: String? = nil
     ) async -> String {
         switch toolName {
         case "create_agent":
@@ -64,7 +71,8 @@ final class AgentDirectoryCoordinator {
             return await handleSend(
                 input: input,
                 callerSessionId: callerSessionId,
-                callerAgentId: callerAgentId
+                callerAgentId: callerAgentId,
+                callerGroupId: callerGroupId
             )
         default:
             return "Unknown agent-directory tool: \(toolName)"
@@ -107,8 +115,8 @@ final class AgentDirectoryCoordinator {
 
             It is in the user's roster now, with its own conversation — they \
             can open it from the home screen. It has no history and has not \
-            been told anything; use send_agent_message with this agent_id if \
-            it needs a first instruction from you.
+            been told anything; to give it a first instruction use \
+            send_agent_message with is_group: false and agent_id: [\(agent.id)].
 
             Tell the user it exists, in one line, in your own voice. Do not \
             list what tools it has or explain how agents work.
@@ -144,9 +152,10 @@ final class AgentDirectoryCoordinator {
         return lines.joined(separator: "\n\n") + """
 
 
-            Address one with send_agent_message. Each of them has its own \
-            memory and cannot see this conversation, so whatever you send has \
-            to carry its own context.
+            For a private message, call send_agent_message with is_group: false \
+            and agent_id as a list (even for one recipient). Each assistant has \
+            its own memory and cannot see this conversation, so whatever you \
+            send has to carry its own context.
             """
     }
 
@@ -155,16 +164,60 @@ final class AgentDirectoryCoordinator {
     private func handleSend(
         input: [String: Any],
         callerSessionId: String,
+        callerAgentId: String?,
+        callerGroupId: String?
+    ) async -> String {
+        guard let isGroup = bool(input["is_group"]) else {
+            return "Error: `is_group` is required. Use false for a private broadcast or true for a group transcript message."
+        }
+        let groupId = string(input["group_id"])
+        if isGroup {
+            guard !groupId.isEmpty else {
+                return "Error: `group_id` is required when `is_group` is true."
+            }
+            return await handleGroupSend(
+                input: input,
+                groupId: groupId,
+                callerSessionId: callerSessionId,
+                callerAgentId: callerAgentId,
+                callerGroupId: callerGroupId
+            )
+        }
+        guard groupId.isEmpty else {
+            return "Error: omit `group_id` when `is_group` is false."
+        }
+        let targetIds = stringArray(input["agent_id"])
+        guard !targetIds.isEmpty else {
+            return "Error: `agent_id` must be a non-empty list. Call list_agents to see who exists."
+        }
+        guard !targetIds.contains(GroupMentionRouter.everyoneId) else {
+            return "Error: `at_all` is valid only with `is_group: true`."
+        }
+        if let callerAgentId, targetIds.contains(callerAgentId) {
+            return "Error: `agent_id` cannot contain the sending assistant."
+        }
+
+        var results: [String] = []
+        for targetId in targetIds {
+            var one = input
+            one["agent_id"] = targetId
+            results.append(await handleDirectSend(
+                input: one,
+                callerSessionId: callerSessionId,
+                callerAgentId: callerAgentId
+            ))
+        }
+        return results.joined(separator: "\n\n")
+    }
+
+    private func handleDirectSend(
+        input: [String: Any],
+        callerSessionId: String,
         callerAgentId: String?
     ) async -> String {
         let targetId = string(input["agent_id"])
-        guard !targetId.isEmpty else {
-            return "Error: `agent_id` is required. Call list_agents to see who exists."
-        }
         let message = string(input["message"])
-        guard !message.isEmpty else {
-            return "Error: `message` is required."
-        }
+        guard !message.isEmpty else { return "Error: `message` is required." }
         guard targetId != callerAgentId else {
             return "Error: that agent_id is you. To think something through, just think it — do not message yourself."
         }
@@ -281,6 +334,100 @@ final class AgentDirectoryCoordinator {
             """
     }
 
+    // MARK: - send_agent_message (pseudo-group)
+
+    private func handleGroupSend(
+        input: [String: Any],
+        groupId: String,
+        callerSessionId: String,
+        callerAgentId: String?,
+        callerGroupId: String?
+    ) async -> String {
+        guard let senderId = callerAgentId, !senderId.isEmpty else {
+            return "Error: a group A2A message needs an assistant sender."
+        }
+        let message = string(input["message"])
+        guard !message.isEmpty else { return "Error: `message` is required." }
+        guard let group = await GroupStore.shared.loadGroup(groupId), !group.isArchived else {
+            return "Error: no active group with group_id \(groupId)."
+        }
+        // A hidden group-member session is permanently attached to one group.
+        // Requiring the explicit id to agree prevents a model from accidentally
+        // writing a line into a different shared transcript.
+        if let callerGroupId, callerGroupId != groupId {
+            return "Error: this member session belongs to group_id \(callerGroupId), not \(groupId)."
+        }
+
+        let members = await GroupStore.shared.members(of: group)
+        let requestedTargets = stringArray(input["agent_id"])
+        let atAll = requestedTargets.contains(GroupMentionRouter.everyoneId)
+        // `at_all` deliberately wins over ids. That makes a model's overly
+        // broad list deterministic and follows the public tool contract.
+        let targets = atAll ? [] : requestedTargets
+        let canonical: String
+        switch GroupMentionRouter.composeA2AMessage(
+            message: message,
+            targetAgentIds: targets,
+            mentionEveryone: atAll,
+            senderAgentId: senderId,
+            members: members,
+            ownerAgentId: group.ownerAgentId
+        ) {
+        case .success(let text):
+            canonical = text
+        case .failure(let error):
+            return groupSendError(error, group: group)
+        }
+
+        if callerGroupId == groupId {
+            pendingGroupMessages[callerSessionId, default: []].append(canonical)
+            logger.info("queued in-turn group A2A group=\(groupId.prefix(8)) sender=\(senderId.prefix(8)) targets=\(targets.count) all=\(atAll)")
+            return "Group message accepted. It will be published as your current turn in \(group.title); the shared transcript router will wake the addressed members. Do not repeat the message in your final text."
+        }
+
+        guard let sender = members.first(where: { $0.id == senderId }) else {
+            return "Error: you are not a member of \(group.title), so you cannot write to its shared transcript."
+        }
+        await GroupChatOrchestrator.shared.agentDidSend(
+            group: group,
+            sender: sender,
+            members: members,
+            canonicalText: canonical
+        )
+        logger.info("posted external group A2A group=\(groupId.prefix(8)) sender=\(senderId.prefix(8)) targets=\(targets.count) all=\(atAll)")
+        return "Message posted to group \(group.title). The group orchestrator will project the updated shared context to the addressed members."
+    }
+
+    /// Called only by GroupChatOrchestrator at the boundary of a member turn.
+    /// Multiple tool calls still become one utterance, preserving the group's
+    /// one-message-per-member turn accounting.
+    func consumePendingGroupMessage(callerSessionId: String) -> String? {
+        guard let messages = pendingGroupMessages.removeValue(forKey: callerSessionId),
+              !messages.isEmpty else { return nil }
+        return messages.joined(separator: "\n")
+    }
+
+    func discardPendingGroupMessage(callerSessionId: String) {
+        pendingGroupMessages[callerSessionId] = nil
+    }
+
+    private func groupSendError(_ error: GroupMentionRouter.A2AError, group: GroupProfile) -> String {
+        switch error {
+        case .senderNotInGroup:
+            return "Error: you are not a member of \(group.title)."
+        case .noTargets:
+            return "Error: `agent_id` needs at least one group member, or the group owner may pass [\"at_all\"]."
+        case .targetNotInGroup(let id):
+            return "Error: agent_id \(id) is not a member of \(group.title)."
+        case .cannotTargetSelf:
+            return "Error: `agent_id` cannot contain the sending assistant."
+        case .everyoneRequiresOwner:
+            return "Error: only the owner assistant of \(group.title) may pass [\"at_all\"]. Name specific members in `agent_id` instead."
+        case .messageContainsMentions:
+            return "Error: put every recipient in `agent_id` (or use [\"at_all\"] as owner); do not place @ mentions inside `message`."
+        }
+    }
+
     // MARK: - Relay bookkeeping
 
     /// Refuse a send that would close a loop, or run one too deep.
@@ -385,6 +532,24 @@ final class AgentDirectoryCoordinator {
         if let s = value as? String { return ["true", "yes", "1"].contains(s.lowercased()) }
         if let i = value as? Int { return i != 0 }
         return nil
+    }
+
+    private func stringArray(_ value: Any?) -> [String] {
+        let raw: [Any]
+        if let values = value as? [Any] {
+            raw = values
+        } else if let values = value as? [String] {
+            raw = values
+        } else {
+            return []
+        }
+        var seen = Set<String>()
+        return raw.compactMap { item in
+            guard let value = item as? String else { return nil }
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { return nil }
+            return trimmed
+        }
     }
 
     /// Accept `#RRGGBB` or a bare `RRGGBB`; reject anything else so a bad value

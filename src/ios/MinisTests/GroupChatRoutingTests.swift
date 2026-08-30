@@ -477,23 +477,71 @@ final class GroupChatRoutingTests: XCTestCase {
 
     func testMemberSystemBlockListsPeersAndOwnerRule() {
         let ownerBlock = GroupChatPrompt.memberSystemBlock(
-            member: host, groupTitle: "产品圆桌", mode: .freeform, isOwner: true,
+            member: host, groupId: "g-product", groupTitle: "产品圆桌", mode: .freeform, isOwner: true,
             peers: [market, product, tech])
-        XCTAssertTrue(ownerBlock.contains(GroupMentionRouter.everyoneToken),
-                      "群主要被告知招呼全体的确切写法")
-        // The peer list is the ONLY place a member is shown the tokens it needs
-        // in order to @ anyone, so every peer must appear there with one.
+        XCTAssertTrue(ownerBlock.contains("[\"at_all\"]"),
+                      "群主要被告知招呼全体的确切 tool 写法")
+        XCTAssertTrue(ownerBlock.contains("g-product"))
+        // The peer list is the ONLY place a member is shown the ids it needs
+        // in order to send an A2A group message, so every peer must appear.
         for peer in [market, product, tech] {
             XCTAssertTrue(ownerBlock.contains(peer.name), peer.name)
-            XCTAssertTrue(ownerBlock.contains(GroupMentionRouter.token(for: peer.id)), peer.id)
+            XCTAssertTrue(ownerBlock.contains(peer.id), peer.id)
         }
 
         let memberBlock = GroupChatPrompt.memberSystemBlock(
-            member: tech, groupTitle: "产品圆桌", mode: .freeform, isOwner: false,
+            member: tech, groupId: "g-product", groupTitle: "产品圆桌", mode: .freeform, isOwner: false,
             peers: [market, product, host])
         XCTAssertTrue(memberBlock.contains("只有群主能招呼所有人"))
-        XCTAssertFalse(memberBlock.contains(GroupMentionRouter.everyoneToken),
+        XCTAssertFalse(memberBlock.contains("[\"at_all\"]"),
                        "非群主不该被教会一个对它无效的写法")
+    }
+
+    // MARK: - Structured A2A group messages
+
+    func testA2AMessageUsesTargetsInRosterOrder() {
+        let result = GroupMentionRouter.composeA2AMessage(
+            message: "帮我们判断一下。",
+            targetAgentIds: [tech.id, market.id],
+            mentionEveryone: false,
+            senderAgentId: product.id,
+            members: cast,
+            ownerAgentId: host.id
+        )
+        XCTAssertEqual(
+            try? result.get(),
+            "\(GroupMentionRouter.token(for: market.id)) \(GroupMentionRouter.token(for: tech.id)) 帮我们判断一下。"
+        )
+    }
+
+    func testOnlyOwnerMayBuildAtAllA2AMessage() {
+        let denied = GroupMentionRouter.composeA2AMessage(
+            message: "请大家说说。", targetAgentIds: [], mentionEveryone: true,
+            senderAgentId: tech.id, members: cast, ownerAgentId: host.id
+        )
+        XCTAssertEqual(try? denied.get(), nil)
+
+        let allowed = GroupMentionRouter.composeA2AMessage(
+            message: "请大家说说。", targetAgentIds: [], mentionEveryone: true,
+            senderAgentId: host.id, members: cast, ownerAgentId: host.id
+        )
+        XCTAssertEqual(try? allowed.get(), "\(GroupMentionRouter.everyoneToken) 请大家说说。")
+    }
+
+    func testAtAllWinsOverNamedTargets() {
+        let result = GroupMentionRouter.composeA2AMessage(
+            message: "全体对齐一下。", targetAgentIds: [market.id], mentionEveryone: true,
+            senderAgentId: host.id, members: cast, ownerAgentId: host.id
+        )
+        XCTAssertEqual(try? result.get(), "\(GroupMentionRouter.everyoneToken) 全体对齐一下。")
+    }
+
+    func testA2AMessageRejectsHiddenMentionInBody() {
+        let result = GroupMentionRouter.composeA2AMessage(
+            message: "@\(tech.name) 再看看。", targetAgentIds: [market.id], mentionEveryone: false,
+            senderAgentId: product.id, members: cast, ownerAgentId: host.id
+        )
+        XCTAssertEqual(try? result.get(), nil)
     }
 }
 #endif

@@ -90,11 +90,10 @@ enum GroupChatPrompt {
     /// The `(pass)` instruction is the reason a room can go quiet on its own —
     /// GroupChatOrchestrator stops as soon as a whole round passes, so nobody
     /// has to guess when a conversation is finished.
-    /// - Parameter allowHandoff: false when this member is answering the user
-    ///   directly — named with `@`, or defaulted to as the last speaker. The
-    ///   orchestrator ends the turn after such a round, so inviting a handoff
-    ///   here would produce a line that @s a colleague who then never speaks — a
-    ///   transcript that reads as broken. See GroupChatOrchestrator.runFreeform.
+    /// - Parameter allowHandoff: retained for diagnostic prompt generation.
+    ///   Production freeform turns allow a structured A2A handoff even after a
+    ///   direct user question; the next routing window ends naturally if no
+    ///   message is posted.
     static func turnPrompt(
         member: GroupMember,
         groupTitle: String,
@@ -109,7 +108,7 @@ enum GroupChatPrompt {
                 + formatHistory(newMessages, viewerId: member.id, members: allMembers)
 
         let closing = allowHandoff
-            ? "要点名某位同事接着说，就把系统提示里列的那串 @ 写法原样抄进正文——不 @ 的话没有人会被叫醒，这一轮就结束了。"
+            ? "要点名某位同事接着说，用系统提示里说明的 send_agent_message 群聊参数发出这句话——不点名的话没有人会被叫醒，这一轮就结束了。"
             : "用户这句是冲着你来的，直接把话说完就行——这一轮到你为止，不用把话头递给别人，也不用 @ 任何人。"
 
         return """
@@ -185,11 +184,11 @@ enum GroupChatPrompt {
 
     /// Prepended to a member's own persona while it is taking a group turn.
     ///
-    /// Peers are listed by name and one line of description for a concrete
-    /// reason: a member can only hand off with `@`, and it cannot @ someone
-    /// whose name it was never told.
+    /// Peers are listed by name and id because a member hands off with the
+    /// structured A2A tool and must not guess either identifier.
     static func memberSystemBlock(
         member: GroupMember,
+        groupId: String,
         groupTitle: String,
         mode: GroupChatMode,
         isOwner: Bool,
@@ -200,36 +199,38 @@ enum GroupChatPrompt {
             "",
             "你是 \(member.name)，群聊「\(groupTitle)」的参与者之一。你的人设、记忆和说话方式都不变，"
                 + "变的只是场合：这里除了用户，还有别的同事在听。",
+            "这个伪群聊的 group_id 是 `\(groupId)`。",
         ]
 
         if peers.isEmpty {
             lines.append("目前群里只有你和用户。")
         } else {
             lines.append("")
-            lines.append("群里的其他人，以及 @ 他们时要原样写的写法：")
+            lines.append("群里的其他人，以及群聊 A2A tool 里要传的 agent_id：")
             for peer in peers {
                 let role = peer.title.isEmpty ? "" : "（\(peer.title)）"
                 let about = peer.summary.isEmpty ? "" : " — \(peer.summary)"
-                lines.append("- \(peer.name)\(role)\(about)　→　\(GroupMentionRouter.token(for: peer.id))")
+                lines.append("- \(peer.name)\(role)\(about)　→　`\(peer.id)`")
             }
         }
 
         lines.append("")
         lines.append("规矩：")
-        lines.append("- 你这一轮说出来的**最终文字**就是群里看到的全部。工具调用、思考过程、中间步骤都留在你自己这边，别人看不到，所以结论要能独立成立。")
+        lines.append("- 如果你不调用群聊 A2A tool，你这一轮的**最终文字**就是群里看到的全部。工具调用、思考过程、中间步骤都留在你自己这边，别人看不到，所以结论要能独立成立。")
         lines.append("- 说话简短、像人在聊天。不要复述别人刚说过的话，不要总结全场——那是主持人的事。")
         lines.append("- 没有新东西要补充就只回「(pass)」。在群里保持安静是合格的表现，凑话不是。")
 
         if mode == .freeform {
             lines.append(
-                "- 要让某位同事接着说，必须在正文里 @ 他，写法是上面列出的那串 "
-                    + "`\(GroupMentionRouter.token(for: "..."))`，**从上面原样复制，不要自己拼**。"
-                    + "系统靠这串字符找人，用户看到的是名字，所以你照抄不会让句子变难读。"
+                "- 要让同事接着说，调用 `send_agent_message`："
+                    + "`is_group` 传 true，`group_id` 必须原样传 `\(groupId)`，`agent_id` 以列表传上面一个或多个 id，"
+                    + "`message` 就是你要在共享记录里公开说的话。不要再把 @ 写进 message。"
             )
-            lines.append("- 没有被 @ 到的人收不到消息，也不会发言。你这一轮不 @ 任何人，讨论就到此为止——这是正常的结束方式。")
+            lines.append("- 群聊 A2A tool 成功后，`message` 已经作为你本轮的公开发言被发出；最终文字只回「(pass)」，不要重复、改写或追加另一条消息。")
+            lines.append("- 没有在 `agent_id` 列表里的人不会被叫醒。这一轮不调用群聊 A2A tool，讨论就到此为止——这是正常的结束方式。")
             if isOwner {
                 lines.append(
-                    "- 你是群主，只有你可以用 \(GroupMentionRouter.everyoneToken) 把全体叫起来。"
+                    "- 你是群主，只有你可以在群聊 A2A tool 里传 `agent_id: [\"at_all\"]` 把全体叫起来。"
                         + "用之前想清楚是不是真的每个人都该说话。"
                 )
             } else {

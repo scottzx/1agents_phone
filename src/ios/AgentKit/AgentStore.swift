@@ -50,8 +50,8 @@ final class AgentStore: ObservableObject {
                 id: AgentProfile.defaultAgentId,
                 name: (name?.isEmpty == false ? name! : "Minis"),
                 emoji: "✨",
-                title: String(localized: "全能助手"),
-                summary: String(localized: "原有的全部会话都在这里，工具齐全。"),
+                title: "",
+                summary: String(localized: "默认会话"),
                 // Migrated sessions keep the historical behavior: full toolset,
                 // no dispatching. Switching this agent to orchestrator would
                 // silently strip shell/browser from conversations the user has

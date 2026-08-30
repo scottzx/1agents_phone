@@ -25,6 +25,14 @@ enum AgentRoute: Hashable {
     case group(String)
 }
 
+enum HomeTab: String, CaseIterable, Identifiable {
+    case sessions = "会话"
+    case agents = "伙伴"
+    case groups = "群聊"
+
+    var id: String { rawValue }
+}
+
 struct AgentListView: View {
     @ObservedObject private var store = AgentStore.shared
     @ObservedObject private var activity = SessionActivityTracker.shared
@@ -33,6 +41,12 @@ struct AgentListView: View {
     /// so the roster has to be able to say "something arrived in here".
     @ObservedObject private var badges = SessionBadgeStore.shared
     @ObservedObject private var groups = GroupStore.shared
+
+    @AppStorage("home.selectedTab") private var selectedTab: HomeTab = .sessions
+    @State private var searchText = ""
+    @State private var sessions: [ChatSession] = []
+    @State private var searchResults: [ChatStore.SearchResult] = []
+    @State private var searchTask: Task<Void, Never>?
 
     @State private var path: [AgentRoute] = []
     @State private var showingCreate = false
@@ -68,16 +82,21 @@ struct AgentListView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
+                            startNewSession()
+                        } label: {
+                            Label(String(localized: "新建会话"), systemImage: "square.and.pencil")
+                        }
+                        Button {
                             showingCreate = true
                         } label: {
-                            Label(String(localized: "新建 Agent"), systemImage: "person.badge.plus")
+                            Label(String(localized: "新建伙伴"), systemImage: "person.badge.plus")
                         }
                         Button {
                             showingCreateGroup = true
                         } label: {
                             Label(String(localized: "新建群聊"), systemImage: "person.2.badge.plus")
                         }
-                        .disabled(store.agents.count < 2)
+                        .disabled(displayAgents.count < 2)
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -120,6 +139,15 @@ struct AgentListView: View {
             NotificationNavigationStore.shared.markHandled()
             openSession(sessionId)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidCreate)) { _ in
+            Task { await loadSessions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { _ in
+            Task { await loadSessions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { _ in
+            startNewSession()
+        }
         .onChange(of: groups.groups) { _ in
             // A group created or edited elsewhere in this launch changes the
             // roster, and each row's subtitle is its member list.
@@ -129,6 +157,7 @@ struct AgentListView: View {
             await store.bootstrap()
             await groups.bootstrap()
             await resolveGroupMembers()
+            await loadSessions()
             // Cold launch: the tap that started the app posted its event before
             // this view existed, so the id was buffered instead. Drain it.
             if let pending = NotificationNavigationStore.shared.takePending() {
@@ -144,6 +173,7 @@ struct AgentListView: View {
         Task {
             let row = await ChatStore.shared.getSession(sessionId)
             if let agentId = row?.agentId,
+               agentId != AgentProfile.defaultAgentId,
                let agent = await store.loadAgent(agentId),
                agent.mainSessionId == sessionId {
                 path = [.agent(agentId)]
@@ -153,35 +183,174 @@ struct AgentListView: View {
         }
     }
 
-    private var roster: some View {
-        List {
-            // Groups first: a room is a thing you check on, and it changes
-            // more often than the roster below it does.
-            if !groups.groups.isEmpty {
-                Section(String(localized: "群聊")) {
-                    ForEach(groups.groups) { group in
-                        Button {
-                            path.append(.group(group.id))
-                        } label: {
-                            AgentGroupRow(
-                                group: group,
-                                members: groupMembers[group.id] ?? [],
-                                isTalking: GroupChatOrchestrator.shared.isRunning(groupId: group.id)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                Task { await groups.archive(group.id) }
-                            } label: {
-                                Label(String(localized: "归档"), systemImage: "archivebox")
+    private var filterAndSearchBar: some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                TextField(searchPlaceholder, text: $searchText)
+                    .textFieldStyle(.plain)
+                    .autocorrectionDisabled()
+                    .onChange(of: searchText) { _ in
+                        scheduleSearch()
+                    }
+                if !searchText.isEmpty {
+                    Button {
+                        searchText = ""
+                        scheduleSearch()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 38)
+            .background(Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.secondarySystemGroupedBackground : UIColor.white }))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Menu {
+                ForEach(HomeTab.allCases) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        HStack {
+                            Text(tab.rawValue)
+                            if selectedTab == tab {
+                                Image(systemName: "checkmark")
                             }
                         }
                     }
                 }
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.primary)
+                    .frame(width: 38, height: 38)
+                    .background(Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.secondarySystemGroupedBackground : UIColor.white }))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
+            .accessibilityLabel(String(localized: "切换模式"))
+        }
+    }
 
-            ForEach(store.agents) { agent in
+    private var searchPlaceholder: String {
+        switch selectedTab {
+        case .sessions: return String(localized: "搜索会话...")
+        case .agents:   return String(localized: "搜索伙伴...")
+        case .groups:   return String(localized: "搜索群聊...")
+        }
+    }
+
+    private var roster: some View {
+        List {
+            Section {
+                switch selectedTab {
+                case .sessions:
+                    sessionsList
+                case .agents:
+                    agentsList
+                case .groups:
+                    groupsList
+                }
+            } header: {
+                filterAndSearchBar
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                    .textCase(nil)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollDismissesKeyboard(.interactively)
+        .refreshable {
+            await store.refresh()
+            await groups.refresh()
+            await resolveGroupMembers()
+            await loadSessions()
+        }
+    }
+
+    // MARK: - Tab Views
+
+    @ViewBuilder
+    private var sessionsList: some View {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            if searchResults.isEmpty {
+                Text(String(localized: "未找到匹配会话"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                ForEach(searchResults, id: \.session.id) { result in
+                    Button {
+                        path.append(.session(result.session.id))
+                    } label: {
+                        SessionRowView(
+                            session: result.session,
+                            matchSnippet: result.matchSnippet
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            deleteSession(result.session)
+                        } label: {
+                            Label(String(localized: "删除"), systemImage: "trash")
+                        }
+                    }
+                }
+            }
+        } else {
+            if sortedSessions.isEmpty {
+                Text(String(localized: "暂无会话，点击右上角 + 开始新对话"))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 24)
+            } else {
+                ForEach(sortedSessions) { session in
+                    Button {
+                        path.append(.session(session.id))
+                    } label: {
+                        SessionRowView(
+                            session: session,
+                            matchSnippet: nil
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            deleteSession(session)
+                        } label: {
+                            Label(String(localized: "删除"), systemImage: "trash")
+                        }
+                        Button {
+                            togglePin(session)
+                        } label: {
+                            Label(session.isPinned ? String(localized: "取消置顶") : String(localized: "置顶"),
+                                  systemImage: session.isPinned ? "pin.slash" : "pin")
+                        }
+                        .tint(.orange)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var agentsList: some View {
+        if filteredAgents.isEmpty {
+            Text(searchText.isEmpty ? String(localized: "暂无伙伴，点击右上角 + 创建") : String(localized: "未找到匹配伙伴"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 24)
+        } else {
+            ForEach(filteredAgents) { agent in
                 Button {
                     path.append(.agent(agent.id))
                 } label: {
@@ -193,21 +362,134 @@ struct AgentListView: View {
                 }
                 .buttonStyle(.plain)
                 .swipeActions(edge: .trailing) {
-                    if agent.id != AgentProfile.defaultAgentId {
-                        Button(role: .destructive) {
-                            Task { await store.archive(agent.id) }
-                        } label: {
-                            Label(String(localized: "归档"), systemImage: "archivebox")
-                        }
+                    Button(role: .destructive) {
+                        Task { await store.archive(agent.id) }
+                    } label: {
+                        Label(String(localized: "归档"), systemImage: "archivebox")
                     }
                 }
             }
         }
-        .listStyle(.insetGrouped)
-        .refreshable {
-            await store.refresh()
-            await groups.refresh()
-            await resolveGroupMembers()
+    }
+
+    @ViewBuilder
+    private var groupsList: some View {
+        if filteredGroups.isEmpty {
+            Text(searchText.isEmpty ? String(localized: "暂无群聊，点击右上角 + 创建") : String(localized: "未找到匹配群聊"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 24)
+        } else {
+            ForEach(filteredGroups) { group in
+                Button {
+                    path.append(.group(group.id))
+                } label: {
+                    AgentGroupRow(
+                        group: group,
+                        members: groupMembers[group.id] ?? [],
+                        isTalking: GroupChatOrchestrator.shared.isRunning(groupId: group.id)
+                    )
+                }
+                .buttonStyle(.plain)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        Task { await groups.archive(group.id) }
+                    } label: {
+                        Label(String(localized: "归档"), systemImage: "archivebox")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    private var displayAgents: [AgentProfile] {
+        store.agents.filter { $0.id != AgentProfile.defaultAgentId }
+    }
+
+    private var sortedSessions: [ChatSession] {
+        sessions.sorted { s1, s2 in
+            if s1.isPinned != s2.isPinned {
+                return s1.isPinned && !s2.isPinned
+            }
+            return s1.updatedAt > s2.updatedAt
+        }
+    }
+
+    private var filteredAgents: [AgentProfile] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return displayAgents }
+        return displayAgents.filter {
+            $0.name.localizedCaseInsensitiveContains(q)
+                || $0.title.localizedCaseInsensitiveContains(q)
+                || $0.summary.localizedCaseInsensitiveContains(q)
+        }
+    }
+
+    private var filteredGroups: [GroupProfile] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return groups.groups }
+        return groups.groups.filter {
+            $0.title.localizedCaseInsensitiveContains(q)
+                || (groupMembers[$0.id]?.contains { $0.name.localizedCaseInsensitiveContains(q) } ?? false)
+        }
+    }
+
+    private func startNewSession() {
+        selectedTab = .sessions
+        let draftId = "__new__\(UUID().uuidString)"
+        path.append(.session(draftId))
+    }
+
+    private func loadSessions() async {
+        let all = await ChatStore.shared.listSessions()
+        sessions = all.filter { s in
+            let isDefault = s.agentId == nil || s.agentId == AgentProfile.defaultAgentId
+            let isNotGroup = s.spawnRole != GroupSessionRole.group
+            return isDefault && isNotGroup
+        }
+    }
+
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            searchResults = []
+            return
+        }
+        searchTask = Task {
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            guard !Task.isCancelled else { return }
+            let results = await ChatStore.shared.searchSessions(query: query)
+            guard !Task.isCancelled else { return }
+            let validIds = Set(self.sessions.map(\.id))
+            self.searchResults = results.filter { validIds.contains($0.session.id) }
+        }
+    }
+
+    private func deleteSession(_ session: ChatSession) {
+        Task {
+            await ChatStore.shared.deleteSession(session.id)
+            deleteSessionFiles(session.id)
+            await loadSessions()
+        }
+    }
+
+    private func deleteSessionFiles(_ sessionId: String) {
+        let fm = FileManager.default
+        let base = fm.urls(for: .libraryDirectory, in: .userDomainMask).first!
+            .appendingPathComponent("MinisChat/minis", isDirectory: true)
+            .appendingPathComponent(sessionId, isDirectory: true)
+        try? fm.removeItem(at: base)
+        BrowserTabPool.deletePersistedData(for: sessionId)
+    }
+
+    private func togglePin(_ session: ChatSession) {
+        Task {
+            await ChatStore.shared.toggleSessionPin(session.id)
+            await loadSessions()
         }
     }
 
@@ -226,6 +508,87 @@ struct AgentListView: View {
         return activity.sessionToolInfo.keys.filter { sid in
             activity.activeSessions.contains(sid) && sid != main
         }.count
+    }
+}
+
+// MARK: - Session Row
+
+private struct SessionRowView: View {
+    let session: ChatSession
+    let matchSnippet: String?
+
+    @ObservedObject private var badges = SessionBadgeStore.shared
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "bubble.left.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 46, height: 46)
+                .background(Color.accentColor.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(alignment: .topTrailing) {
+                    if badges.hasUnread(for: session.id) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 9, height: 9)
+                            .offset(x: 3, y: -3)
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(session.title?.isEmpty == false ? session.title! : String(localized: "新会话"))
+                        .font(.headline)
+                        .lineLimit(1)
+                    if session.isPinned {
+                        Image(systemName: "pin.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(relativeDate(session.updatedAt))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+    }
+
+    private var subtitle: String {
+        if let matchSnippet, !matchSnippet.isEmpty {
+            return matchSnippet
+        }
+        if let last = session.lastMessage, !last.isEmpty {
+            return last
+        }
+        return String(localized: "暂无消息")
+    }
+
+    private func relativeDate(_ date: Date) -> String {
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: date)
+        } else if calendar.isDateInYesterday(date) {
+            return String(localized: "昨天")
+        } else {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "M/d"
+            return formatter.string(from: date)
+        }
     }
 }
 

@@ -144,7 +144,7 @@ struct GroupCreateView: View {
             GroupForm(
                 title: $title, emoji: $emoji, accent: $accent, mode: $mode,
                 memberIds: $memberIds, ownerAgentId: $ownerAgentId,
-                roster: store.agents
+                roster: store.agents.filter { $0.id != AgentProfile.defaultAgentId }
             )
             .navigationTitle(String(localized: "新建群聊"))
             .navigationBarTitleDisplayMode(.inline)
@@ -205,7 +205,7 @@ struct GroupEditView: View {
         GroupForm(
             title: $title, emoji: $emoji, accent: $accent, mode: $mode,
             memberIds: $memberIds, ownerAgentId: $ownerAgentId,
-            roster: store.agents
+            roster: store.agents.filter { $0.id != AgentProfile.defaultAgentId }
         )
         .navigationTitle(String(localized: "群设置"))
         .navigationBarTitleDisplayMode(.inline)

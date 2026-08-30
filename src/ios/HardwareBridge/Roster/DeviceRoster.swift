@@ -78,22 +78,127 @@ struct DeviceConversation: Equatable, Codable {
     let title: String
 }
 
+/// One row of the device's chat list.
+///
+/// `DeviceConversation` describes the *bound* conversation — the one `chat0`
+/// and `state0` are scoped to. This describes a conversation the device may
+/// *switch to*, which is why it carries an avatar and a member list: the board
+/// draws the whole list on connect, before any turn has run, and cannot ask
+/// the phone what a row looks like.
+///
+/// `memberIds` is index-significant. It is `GroupProfile.memberIds` verbatim,
+/// so the slot a member occupies here is the same slot
+/// `DeviceRoundtableState.speaking(slot:isOwner:)` lights up.
+struct DeviceConversationEntry: Equatable, Codable {
+    let id: String
+    let kind: DeviceConversationKind
+    let title: String
+    /// One or two emoji. Group avatar or the agent's own.
+    let emoji: String
+    /// `#RRGGBB` for the row's border and avatar chip.
+    let accentColor: String
+    /// The member allowed to `@所有人`, drawn as the centre node. Nil for a
+    /// direct conversation and for a group with no owner.
+    let ownerId: String?
+    /// Participant ids, resolved against the snapshot's `members`.
+    let memberIds: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case kind
+        case title
+        case emoji = "e"
+        case accentColor = "c"
+        case ownerId = "own"
+        case memberIds = "m"
+    }
+}
+
 struct DeviceRosterSnapshot: Equatable, Codable {
     /// Bumped on every change. The device caches by rev so a reconnect that
     /// replays an identical roster costs no redraw.
     let rev: UInt32
+    /// The conversation the device's next turn belongs to. Still first, and
+    /// still mandatory, because `chat0` and `state0` are scoped to it — and
+    /// because firmware that predates `conversations` reads only this.
     let conversation: DeviceConversation
+    /// Every agent referenced anywhere in `conversations`, deduplicated. The
+    /// entries hold ids only, so a member shared by four groups costs its name,
+    /// emoji and color once.
     let members: [DeviceParticipant]
+    /// The device's whole chat list — groups and one-to-one agents together, in
+    /// draw order. Empty means "no catalog", which is what a single-session
+    /// bind produces and what the device falls back to handling on its own.
+    let conversations: [DeviceConversationEntry]
 
     enum CodingKeys: String, CodingKey {
         case rev
         case conversation = "conv"
         case members
+        case conversations = "convs"
+    }
+
+    init(
+        rev: UInt32,
+        conversation: DeviceConversation,
+        members: [DeviceParticipant],
+        conversations: [DeviceConversationEntry] = []
+    ) {
+        self.rev = rev
+        self.conversation = conversation
+        self.members = members
+        self.conversations = conversations
+    }
+
+    // Hand-written so an absent `convs` decodes as empty rather than throwing,
+    // and so an empty one is left off the wire entirely — a bound-session push
+    // stays byte-identical to what it was before the catalog existed.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rev = try container.decode(UInt32.self, forKey: .rev)
+        conversation = try container.decode(DeviceConversation.self, forKey: .conversation)
+        members = try container.decode([DeviceParticipant].self, forKey: .members)
+        conversations = try container.decodeIfPresent(
+            [DeviceConversationEntry].self, forKey: .conversations
+        ) ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(rev, forKey: .rev)
+        try container.encode(conversation, forKey: .conversation)
+        try container.encode(members, forKey: .members)
+        if !conversations.isEmpty {
+            try container.encode(conversations, forKey: .conversations)
+        }
     }
 
     /// Sender lookup the chat payload relies on.
     func member(_ id: String) -> DeviceParticipant? {
         members.first { $0.id == id }
+    }
+
+    /// Resolves what the device reported it opened. The board echoes back the
+    /// entry id it was given, so this is an exact match, not a heuristic.
+    func entry(_ id: String) -> DeviceConversationEntry? {
+        conversations.first { $0.id == id }
+    }
+
+    /// Whether the device would draw exactly what it is already drawing.
+    ///
+    /// `rev` and the bound conversation are excluded on purpose: with a catalog
+    /// present the board builds its chat list from `convs` alone and never
+    /// reads `conv`, so a selection — which the device itself initiated — would
+    /// otherwise cost a multi-fragment resend of the entire roster, in the same
+    /// window as the audio round trip that the board has the least RAM for.
+    ///
+    /// Without a catalog the board *does* build its list from `conv`, so there
+    /// a binding change is a real redraw and still has to go down.
+    func rendersSameAs(_ other: DeviceRosterSnapshot?) -> Bool {
+        guard let other,
+              members == other.members,
+              conversations == other.conversations else { return false }
+        return !conversations.isEmpty || conversation == other.conversation
     }
 }
 

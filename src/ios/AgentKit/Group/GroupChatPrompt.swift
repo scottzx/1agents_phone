@@ -90,24 +90,34 @@ enum GroupChatPrompt {
     /// The `(pass)` instruction is the reason a room can go quiet on its own —
     /// GroupChatOrchestrator stops as soon as a whole round passes, so nobody
     /// has to guess when a conversation is finished.
+    /// - Parameter allowHandoff: false when this member is answering the user
+    ///   directly — named with `@`, or defaulted to as the last speaker. The
+    ///   orchestrator ends the turn after such a round, so inviting a handoff
+    ///   here would produce a line that @s a colleague who then never speaks — a
+    ///   transcript that reads as broken. See GroupChatOrchestrator.runFreeform.
     static func turnPrompt(
         member: GroupMember,
         groupTitle: String,
         peers: [GroupMember],
         allMembers: [GroupMember],
-        newMessages: [GroupMessage]
+        newMessages: [GroupMessage],
+        allowHandoff: Bool = true
     ) -> String {
         let body = newMessages.isEmpty
             ? "自你上次发言以来，房间里没有新消息。"
             : "房间里的新消息（从旧到新）：\n"
                 + formatHistory(newMessages, viewerId: member.id, members: allMembers)
 
+        let closing = allowHandoff
+            ? "要点名某位同事接着说，就把系统提示里列的那串 @ 写法原样抄进正文——不 @ 的话没有人会被叫醒，这一轮就结束了。"
+            : "用户这句是冲着你来的，直接把话说完就行——这一轮到你为止，不用把话头递给别人，也不用 @ 任何人。"
+
         return """
             \(tagLine(title: groupTitle, peers: peers))
             \(body)
 
             轮到你说话了，\(member.name)。有值得补充的就用你自己的口吻说；没有新东西要说就只回「(pass)」，不要客套。
-            要点名某位同事接着说，就把系统提示里列的那串 @ 写法原样抄进正文——不 @ 的话没有人会被叫醒，这一轮就结束了。
+            \(closing)
             """
     }
 

@@ -38,6 +38,13 @@ actor AgentLinkAudioBuffer {
 final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
     static let psm: UInt16 = 0x0081
 
+    enum WriteSideState: Equatable {
+        case detached
+        case opening
+        case writable
+        case failed
+    }
+
     let buffer = AgentLinkAudioBuffer()
 
     private var channel: CBL2CAPChannel?
@@ -45,8 +52,16 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
     private var outputStream: OutputStream?
     private let readChunkSize = 4096
     private let writeChunkSize = 512
-    private let playbackBytesPerSecond = 16_000 * MemoryLayout<Int16>.size
-    private let playbackLeadBytes = 8_000 // 250 ms at 16 kHz PCM16 mono
+    /// Derived from the one rate the device actually plays at, never hardcoded.
+    ///
+    /// This was pinned at 16 kHz while the pipeline moved to 24 kHz, so the
+    /// phone fed 32 KB/s to a speaker consuming 48 KB/s: the board's queue ran
+    /// dry over and over and a sentence came out a word at a time. Pacing is
+    /// still needed — the board's playback queue is bounded and drops chunks
+    /// when overrun — it just has to match what is really being consumed.
+    private let playbackBytesPerSecond = MossSpeechClient.deviceSampleRate * MemoryLayout<Int16>.size
+    /// 250 ms of audio delivered ahead of playback, to absorb BLE jitter.
+    private let playbackLeadBytes = MossSpeechClient.deviceSampleRate * MemoryLayout<Int16>.size / 4
     private var pacedWriteStartedAt: Date?
     private var pacedWriteBytes = 0
 
@@ -58,21 +73,49 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
         output.delegate = self
         input.schedule(in: .main, forMode: .common)
         output.schedule(in: .main, forMode: .common)
-        input.open()
-        output.open()
         inputStream = input
         outputStream = output
+        input.open()
+        output.open()
     }
 
     /// True once the CoC is attached and its write side is usable. The audio
     /// route checks this before choosing the device over the phone speaker —
     /// a link whose GATT control channel is ready can still be missing this
     /// channel, and discovering that only at write time costs a whole turn.
+    /// Whether an L2CAP channel is currently bound. Read-side health: with no
+    /// channel the audio bytes have nowhere to land, however healthy the
+    /// control events look.
+    var isAttached: Bool { channel != nil && inputStream != nil }
+
     var isWritable: Bool {
-        guard let outputStream else { return false }
-        switch outputStream.streamStatus {
-        case .notOpen, .closed, .error: return false
-        default: return true
+        writeSideState == .writable
+    }
+
+    /// `CBL2CAPChannel` delivery and Foundation stream opening are two
+    /// different asynchronous steps. In particular, `.opening` is not safe to
+    /// write even though the channel object already exists.
+    var writeSideState: WriteSideState {
+        Self.writeSideState(
+            hasOutputStream: outputStream != nil,
+            status: outputStream?.streamStatus ?? .notOpen
+        )
+    }
+
+    static func writeSideState(
+        hasOutputStream: Bool,
+        status: Stream.Status
+    ) -> WriteSideState {
+        guard hasOutputStream else { return .detached }
+        switch status {
+        case .notOpen, .opening:
+            return .opening
+        case .open, .writing:
+            return .writable
+        case .reading, .atEnd, .closed, .error:
+            return .failed
+        @unknown default:
+            return .failed
         }
     }
 
@@ -135,6 +178,7 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
     func writePCM16Chunk(_ data: Data, timeout: TimeInterval = 60) async throws {
         guard !data.isEmpty else { throw ChannelError.emptyAudio }
         guard let outputStream else { throw ChannelError.notOpen }
+        guard writeSideState == .writable else { throw ChannelError.notOpen }
 
         if pacedWriteStartedAt == nil { beginPacedWrite() }
 
@@ -144,8 +188,10 @@ final class AgentLinkL2CAPReceiver: NSObject, StreamDelegate {
             try Task.checkCancellation()
             guard Date() < deadline else { throw ChannelError.writeTimedOut }
             if let error = outputStream.streamError { throw ChannelError.stream(error.localizedDescription) }
-            guard outputStream.streamStatus != .closed,
-                  outputStream.streamStatus != .error else {
+            guard Self.writeSideState(
+                hasOutputStream: true,
+                status: outputStream.streamStatus
+            ) == .writable else {
                 throw ChannelError.notOpen
             }
             guard outputStream.hasSpaceAvailable else {

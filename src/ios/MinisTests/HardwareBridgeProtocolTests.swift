@@ -260,6 +260,79 @@ final class HardwareBridgeProtocolTests: XCTestCase {
         XCTAssertEqual(try DeviceRosterJSON.decode(DeviceRosterSnapshot.self, from: json), snapshot)
     }
 
+    func testRosterWithoutACatalogLeavesConvsOffTheWire() throws {
+        // A bound single-agent push has no chat list to send, and the bytes it
+        // puts on the link must not grow just because the catalog exists.
+        let snapshot = DeviceRosterSnapshot(
+            rev: 1,
+            conversation: DeviceConversation(id: "a1", kind: .direct, title: "教练"),
+            members: [
+                DeviceParticipant(id: "a1", kind: .agent, name: "教练", emoji: "💪",
+                                  accentColor: "#5B8DEF", title: "健身教练"),
+            ]
+        )
+        let text = try XCTUnwrap(String(data: try DeviceRosterJSON.encode(snapshot), encoding: .utf8))
+        XCTAssertFalse(text.contains(#""convs""#))
+    }
+
+    func testCatalogCarriesGroupsAndOneToOneRowsInOnePayload() throws {
+        // What goes down the moment the link comes up: every group and every
+        // agent, so the board can draw its chat list before any turn has run.
+        let snapshot = DeviceRosterSnapshot(
+            rev: 3,
+            conversation: DeviceConversation(id: "g1", kind: .group, title: "研讨群"),
+            members: [
+                DeviceParticipant(id: "a1", kind: .agent, name: "小翠", emoji: "✨",
+                                  accentColor: "#00B8A9", title: "总管"),
+                DeviceParticipant(id: "a2", kind: .agent, name: "市场", emoji: "📈",
+                                  accentColor: "#F5A623", title: "市场专家"),
+            ],
+            conversations: [
+                DeviceConversationEntry(id: "g1", kind: .group, title: "研讨群", emoji: "👥",
+                                        accentColor: "#5B8DEF", ownerId: "a1",
+                                        memberIds: ["a1", "a2"]),
+                DeviceConversationEntry(id: "a1", kind: .direct, title: "小翠", emoji: "✨",
+                                        accentColor: "#00B8A9", ownerId: nil, memberIds: ["a1"]),
+                DeviceConversationEntry(id: "a2", kind: .direct, title: "市场", emoji: "📈",
+                                        accentColor: "#F5A623", ownerId: nil, memberIds: ["a2"]),
+            ]
+        )
+
+        let json = try DeviceRosterJSON.encode(snapshot)
+        let text = try XCTUnwrap(String(data: json, encoding: .utf8))
+        XCTAssertTrue(text.contains(#""convs""#))
+        XCTAssertTrue(text.contains(#""own":"a1""#))
+        XCTAssertTrue(text.contains(#""m":["a1","a2"]"#), "member ids ride as a list of ids, not copies")
+        // A member in two rows is still one record: the catalog references
+        // members by id precisely so it stays inside the board's 8 KiB buffer.
+        XCTAssertEqual(text.components(separatedBy: #""n":"小翠""#).count - 1, 1)
+        XCTAssertEqual(try DeviceRosterJSON.decode(DeviceRosterSnapshot.self, from: json), snapshot)
+    }
+
+    func testRosterFromPreCatalogFirmwareDecodesWithAnEmptyCatalog() throws {
+        let json = Data(#"{"conv":{"id":"s-1","kind":"direct","title":"教练"},"members":[],"rev":2}"#.utf8)
+        let snapshot = try DeviceRosterJSON.decode(DeviceRosterSnapshot.self, from: json)
+        XCTAssertTrue(snapshot.conversations.isEmpty)
+    }
+
+    func testCatalogEntryLookupResolvesWhatTheDeviceEchoesBack() throws {
+        // The board reports the row it opened by id (0x16); the phone has to be
+        // able to turn that back into the conversation it pushed.
+        let entry = DeviceConversationEntry(id: "g1", kind: .group, title: "研讨群", emoji: "👥",
+                                            accentColor: "#5B8DEF", ownerId: nil, memberIds: ["a1"])
+        let snapshot = DeviceRosterSnapshot(
+            rev: 1,
+            conversation: DeviceConversation(id: "g1", kind: .group, title: "研讨群"),
+            members: [
+                DeviceParticipant(id: "a1", kind: .agent, name: "小翠", emoji: "✨",
+                                  accentColor: "#00B8A9", title: "总管"),
+            ],
+            conversations: [entry]
+        )
+        XCTAssertEqual(snapshot.entry("g1"), entry)
+        XCTAssertNil(snapshot.entry("nope"))
+    }
+
     func testChatMessageCarriesSenderSoGroupChatNeedsNoFirmwareChange() throws {
         let message = DeviceChatMessage(conversationId: "s-1", from: "a1", sequence: 12, text: "你好")
         let text = try XCTUnwrap(String(data: try DeviceRosterJSON.encode(message), encoding: .utf8))

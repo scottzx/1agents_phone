@@ -72,7 +72,7 @@ struct HardwareBridgeSettingsView: View {
             } header: {
                 Text("下发通道")
             } footer: {
-                Text("名册把 Agent 的名称、emoji 与主题色推给设备。0x33 路线只需板子注册 roster0/chat0 两个 I/O 端点，agent_link SDK 无需改动；0x37 分片路线不受单帧 470 字节限制，但需要固件实现该命令。")
+                Text("连接成功即下发完整会话列表：全部群聊 + 每个 Agent 的单聊，含名称、emoji 与主题色。0x33 单帧上限约 470 字节，装不下整份列表；0x37 分片路线没有该限制（板子已实现）。默认「自动」按体积二选一。")
             }
 
             if let roster = coordinator.pushedRoster {
@@ -152,13 +152,27 @@ struct HardwareBridgeSettingsView: View {
             }
 
             Section("日志") {
-                ForEach(Array((coordinator.bridgeLog + bluetooth.logLines).suffix(60).enumerated()), id: \.offset) { _, line in
+                // Merged by timestamp, not concatenated. Appending one list to
+                // the other and taking the last 60 showed only the tail of the
+                // second one: the BLE log alone runs to its own 80-line cap
+                // during a single turn, so every coordinator line — the roster
+                // pushes, the prompts, the playback results — was cut off and
+                // had never once been visible here.
+                ForEach(Array(mergedLog.enumerated()), id: \.offset) { _, line in
                     Text(line)
                         .font(.system(.caption, design: .monospaced))
                 }
             }
         }
         .navigationTitle("硬件设备")
+    }
+
+    /// Both logs in one chronological view. Each line already starts with
+    /// "HH:mm:ss", which sorts correctly as text within a session.
+    private var mergedLog: [String] {
+        (coordinator.bridgeLog + bluetooth.logLines)
+            .sorted { $0.prefix(8) < $1.prefix(8) }
+            .suffix(60)
     }
 
     private func capabilityText(_ manifest: IoManifestAssembler.Manifest) -> String {

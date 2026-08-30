@@ -230,7 +230,7 @@ extension AIChatViewModel {
             // keystroke while typing the query. Intentionally NOT logging
             // here to avoid log spam; the open-time trigger event already
             // captured the entry, and dismiss/select cover the exit.
-            let count = filteredMentionEntries.count
+            let count = activeMentionRowCount
             if count == 0 {
                 mentionSelectedIndex = -1
             } else if mentionSelectedIndex < 0 || mentionSelectedIndex >= count {
@@ -250,8 +250,16 @@ extension AIChatViewModel {
         }
     }
 
+    /// How many rows the popup is currently showing — group members when the
+    /// room has any, files otherwise. Arrow keys walk this list, so it has to be
+    /// the same list `executeSelectedMention` commits from.
+    var activeMentionRowCount: Int {
+        let groupRows = filteredGroupMentions.count
+        return groupRows > 0 ? groupRows : filteredMentionEntries.count
+    }
+
     func mentionMenuUp() {
-        let count = filteredMentionEntries.count
+        let count = activeMentionRowCount
         guard count > 0 else { return }
         if mentionSelectedIndex <= 0 {
             mentionSelectedIndex = count - 1
@@ -261,7 +269,7 @@ extension AIChatViewModel {
     }
 
     func mentionMenuDown() {
-        let count = filteredMentionEntries.count
+        let count = activeMentionRowCount
         guard count > 0 else { return }
         if mentionSelectedIndex >= count - 1 {
             mentionSelectedIndex = 0
@@ -272,8 +280,19 @@ extension AIChatViewModel {
 
     /// Commit the highlighted mention (or the first match) into the input.
     /// Returns true if a selection was applied.
+    ///
+    /// Group rows first, matching what the popup actually renders: when a room
+    /// has members the file rows are not on screen at all, so committing one
+    /// from the keyboard would insert a path the user never saw.
     @discardableResult
     func executeSelectedMention() -> Bool {
+        let groupRows = filteredGroupMentions
+        if !groupRows.isEmpty {
+            let idx = (mentionSelectedIndex >= 0 && mentionSelectedIndex < groupRows.count)
+                ? mentionSelectedIndex : 0
+            selectGroupMention(groupRows[idx])
+            return true
+        }
         let entries = filteredMentionEntries
         guard !entries.isEmpty else { return false }
         let idx = (mentionSelectedIndex >= 0 && mentionSelectedIndex < entries.count)

@@ -71,6 +71,9 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     private var eventChannel: CBCharacteristic?
     private var scanRequested = false
     private var l2capChannelRequested = false
+    private var l2capOpenAttempt = 0
+    private var l2capLastError: String?
+    private var l2capRetryTask: Task<Void, Never>?
     private var manifestAssembler = IoManifestAssembler()
     /// Sequence counter for frames this class originates (manifest re-fetches,
     /// roster fragments). Kept separate from the coordinator's counter, which
@@ -79,6 +82,8 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     private var localSequence: UInt8 = 0x80
 
     let l2capReceiver = AgentLinkL2CAPReceiver()
+    /// Fires when a record stream opens and no StreamEnd follows.
+    private var recordStreamWatchdog: Task<Void, Never>?
 
     override init() {
         super.init()
@@ -145,6 +150,13 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     /// still moving; route B needs an SDK command handler but carries a roster
     /// of any size.
     enum RosterTransport: String, CaseIterable, Identifiable {
+        /// Take 0x33 when the payload fits one write and 0x37 when it doesn't.
+        ///
+        /// The default, and the only setting that works for a full chat-list
+        /// catalog: a handful of groups plus a dozen agents runs to a few KB,
+        /// which no single GATT write can carry, while a bound single-agent
+        /// roster is ~200 bytes and has no reason to pay for fragmentation.
+        case auto
         /// 0x33 IoActuate to the `roster0` endpoint. One frame, so the JSON
         /// must fit the ATT write budget (~470 bytes ≈ 5 members).
         case ioEndpoint
@@ -156,6 +168,7 @@ final class HardwareBLECentral: NSObject, ObservableObject {
 
         var displayName: String {
             switch self {
+            case .auto: return "自动（超一帧转 0x37）"
             case .ioEndpoint: return "通用 I/O（0x33，零固件改动）"
             case .fragmentedCommand: return "分片命令（0x37，需固件支持）"
             }
@@ -172,6 +185,17 @@ final class HardwareBLECentral: NSObject, ObservableObject {
         let json = try DeviceRosterJSON.encode(snapshot)
 
         switch transport {
+        case .auto:
+            let frame = AgentLinkCodec.ioActuateCommand(
+                endpointId: DeviceEndpoint.roster,
+                args: json,
+                sequence: nextLocalSequence(advancing: 0)
+            )
+            return try sendRoster(
+                snapshot,
+                transport: frame.count <= writeBudget ? .ioEndpoint : .fragmentedCommand
+            )
+
         case .ioEndpoint:
             let frame = AgentLinkCodec.ioActuateCommand(
                 endpointId: DeviceEndpoint.roster,
@@ -182,7 +206,7 @@ final class HardwareBLECentral: NSObject, ObservableObject {
                 throw BLEError.rosterTooLarge(bytes: json.count, budget: rosterJSONBudget)
             }
             try sendCommand(frame)
-            appendLog("下发 roster0：rev=\(snapshot.rev)，\(snapshot.members.count) 名成员，\(json.count) 字节")
+            appendLog("下发 roster0：rev=\(snapshot.rev)，\(snapshot.members.count) 名成员，\(snapshot.conversations.count) 个会话，\(json.count) 字节")
             return 1
 
         case .fragmentedCommand:
@@ -193,7 +217,7 @@ final class HardwareBLECentral: NSObject, ObservableObject {
             )
             for frame in frames { try sendCommand(frame) }
             localSequence = localSequence &+ UInt8(truncatingIfNeeded: frames.count)
-            appendLog("下发 0x37 roster：rev=\(snapshot.rev)，\(json.count) 字节分 \(frames.count) 片")
+            appendLog("下发 0x37 roster：rev=\(snapshot.rev)，\(snapshot.conversations.count) 个会话，\(json.count) 字节分 \(frames.count) 片")
             return frames.count
         }
     }
@@ -287,6 +311,7 @@ final class HardwareBLECentral: NSObject, ObservableObject {
 
     /// Opens one logical TTS reply while keeping the underlying CoC persistent.
     func beginVoicePCM16(sessionID: UInt32, sequence: UInt8) async throws {
+        try await ensureAudioChannelReady()
         let start = AgentLinkCodec.voiceReplyCommand(
             sessionID: sessionID,
             status: 2,
@@ -316,6 +341,42 @@ final class HardwareBLECentral: NSObject, ObservableObject {
         appendLog("TTS 流式下行完成")
     }
 
+    /// Waits for the actual L2CAP output stream, retrying a transient CoC
+    /// handshake failure while the GATT connection remains alive. GATT ready
+    /// alone is not enough: CoreBluetooth delivers the channel first and opens
+    /// its Foundation streams asynchronously afterwards.
+    func ensureAudioChannelReady(timeout: TimeInterval = 6) async throws {
+        guard state.isReady, let peripheral = connectedPeripheral else {
+            throw BLEError.notReady
+        }
+        if l2capReceiver.isWritable { return }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            try Task.checkCancellation()
+            guard state.isReady, connectedPeripheral === peripheral else {
+                throw BLEError.notReady
+            }
+
+            if l2capReceiver.isWritable {
+                l2capOpenAttempt = 0
+                l2capLastError = nil
+                return
+            }
+
+            if l2capReceiver.writeSideState == .failed {
+                l2capReceiver.detach()
+                l2capChannelRequested = false
+            }
+            openL2CAPChannelIfNeeded(for: peripheral)
+            try await Task.sleep(for: .milliseconds(75))
+        }
+
+        throw BLEError.audioChannelUnavailable(
+            l2capLastError ?? "L2CAP 输出流在 \(timeout.formatted()) 秒内未就绪"
+        )
+    }
+
     private func sendCommand(_ data: Data) throws {
         guard let peripheral = connectedPeripheral,
               let commandChannel,
@@ -329,10 +390,14 @@ final class HardwareBLECentral: NSObject, ObservableObject {
     }
 
     private func resetConnection() {
+        l2capRetryTask?.cancel()
+        l2capRetryTask = nil
         connectedPeripheral = nil
         commandChannel = nil
         eventChannel = nil
         l2capChannelRequested = false
+        l2capOpenAttempt = 0
+        l2capLastError = nil
         l2capReceiver.detach()
         // A reconnect renegotiates the MTU and replays the manifest from
         // fragment 0, so nothing from the old link may survive into the new one.
@@ -355,6 +420,7 @@ final class HardwareBLECentral: NSObject, ObservableObject {
 
     enum BLEError: LocalizedError {
         case notReady
+        case audioChannelUnavailable(String)
         case messageTooLarge(Int)
         /// Route A (0x33 to `roster0`) can only carry one frame. Refusing beats
         /// truncating, which would leave the device showing a partial roster.
@@ -363,6 +429,8 @@ final class HardwareBLECentral: NSObject, ObservableObject {
         var errorDescription: String? {
             switch self {
             case .notReady: return "BLE 设备尚未就绪"
+            case .audioChannelUnavailable(let detail):
+                return "L2CAP 音频通道未就绪：\(detail)"
             case .messageTooLarge(let bytes): return "BLE 消息过长（\(bytes) 字节）"
             case .rosterTooLarge(let bytes, let budget):
                 return "roster \(bytes) 字节超出单帧上限 \(budget) 字节，请改用 0x37 分片路线"
@@ -540,13 +608,22 @@ extension HardwareBLECentral: @preconcurrency CBPeripheralDelegate {
 
     func peripheral(_ peripheral: CBPeripheral, didOpen channel: CBL2CAPChannel?, error: Error?) {
         if let error {
-            appendLog("L2CAP 通道打开失败：\(error.localizedDescription)")
+            l2capLastError = error.localizedDescription
+            appendLog("L2CAP 通道打开失败（第 \(l2capOpenAttempt) 次）：\(error.localizedDescription)")
             l2capChannelRequested = false
+            scheduleL2CAPRetry(for: peripheral)
             return
         }
-        guard let channel else { return }
+        guard let channel else {
+            l2capLastError = "CoreBluetooth 返回了空通道"
+            appendLog("L2CAP 打开回调没有通道，准备重试")
+            l2capChannelRequested = false
+            scheduleL2CAPRetry(for: peripheral)
+            return
+        }
         l2capReceiver.attach(channel)
-        appendLog("L2CAP 音频通道已打开 (PSM 0x\(String(AgentLinkL2CAPReceiver.psm, radix: 16)))")
+        appendLog("L2CAP CoC 已建立，等待音频输出流可写")
+        scheduleL2CAPRetry(for: peripheral, delay: 1.5)
     }
 
     /// Routes one device→App event.
@@ -557,6 +634,24 @@ extension HardwareBLECentral: @preconcurrency CBPeripheralDelegate {
     /// Now every event decodes into a typed case and reaches `onEvent`, with
     /// the three that drive existing machinery still getting their dedicated
     /// callbacks.
+    /// Finalises a record stream that never got its StreamEnd, so the audio is
+    /// transcribed instead of discarded. 30 s is past the board's own capture
+    /// ceiling, so this can only fire on a genuinely lost frame.
+    private func armRecordStreamWatchdog() {
+        recordStreamWatchdog?.cancel()
+        recordStreamWatchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 32 * 1_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            guard let audio = await self.l2capReceiver.streamEnded(validBytes: .max),
+                  !audio.isEmpty else {
+                self.appendLog("录音流超时，且没有收到任何音频")
+                return
+            }
+            self.appendLog("录音流超时未收到 0x53，按已收到的 \(audio.count) 字节继续")
+            self.onAudioStreamFinished?(audio, true)
+        }
+    }
+
     private func handleEvent(_ data: Data) {
         let event: AgentLinkEvent
         do {
@@ -575,13 +670,40 @@ extension HardwareBLECentral: @preconcurrency CBPeripheralDelegate {
             onPrompt?(text)
 
         case .recordStreamStart:
+            appendLog("录音流开始（0x52），L2CAP \(l2capReceiver.isAttached ? "已附着" : "未附着")")
             l2capReceiver.streamStarted()
+            // A dropped StreamEnd used to strand the utterance here forever:
+            // the audio sat in the buffer, ASR never ran, and nothing said so.
+            // The board retries that frame now, but losing a turn should not be
+            // the failure mode if it ever goes missing again.
+            armRecordStreamWatchdog()
 
         case .recordStreamEnd(let payload):
+            recordStreamWatchdog?.cancel()
+            recordStreamWatchdog = nil
             Task { [weak self] in
                 guard let self else { return }
-                guard let audio = await self.l2capReceiver.streamEnded(validBytes: payload.validBytes) else { return }
+                let audio = await self.l2capReceiver.streamEnded(validBytes: payload.validBytes)
                 await MainActor.run {
+                    // Every one of these was silent before. The board would
+                    // report a few hundred KB sent while the phone did nothing
+                    // at all, and the log could not tell "no StreamStart" from
+                    // "no bytes arrived" from "nobody is listening".
+                    guard let audio else {
+                        self.appendLog("录音流结束（0x53）但没有对应的 0x52，丢弃 \(payload.validBytes) 字节")
+                        return
+                    }
+                    guard audio.count > 0 else {
+                        self.appendLog("录音流结束但 L2CAP 一个字节都没收到（设备称 \(payload.validBytes)）")
+                        return
+                    }
+                    if audio.count < Int(payload.validBytes) {
+                        self.appendLog("录音流不完整：收到 \(audio.count) / 设备发出 \(payload.validBytes) 字节")
+                    }
+                    guard self.onAudioStreamFinished != nil else {
+                        self.appendLog("录音流已就绪但没有接收方（onAudioStreamFinished 未设置）")
+                        return
+                    }
                     self.onAudioStreamFinished?(audio, payload.isTruncated)
                 }
             }
@@ -644,8 +766,40 @@ extension HardwareBLECentral: @preconcurrency CBPeripheralDelegate {
 
     private func openL2CAPChannelIfNeeded(for peripheral: CBPeripheral) {
         guard !l2capChannelRequested else { return }
+        l2capRetryTask?.cancel()
+        l2capRetryTask = nil
         l2capChannelRequested = true
-        appendLog("请求打开 L2CAP 通道 PSM 0x\(String(AgentLinkL2CAPReceiver.psm, radix: 16))")
+        l2capOpenAttempt += 1
+        appendLog("请求打开 L2CAP 通道 PSM 0x\(String(AgentLinkL2CAPReceiver.psm, radix: 16))（第 \(l2capOpenAttempt) 次）")
         peripheral.openL2CAPChannel(CBL2CAPPSM(AgentLinkL2CAPReceiver.psm))
+    }
+
+    private func scheduleL2CAPRetry(
+        for peripheral: CBPeripheral,
+        delay: TimeInterval? = nil
+    ) {
+        l2capRetryTask?.cancel()
+        let retryDelay = delay ?? min(2.0, 0.25 * pow(2.0, Double(max(0, l2capOpenAttempt - 1))))
+        l2capRetryTask = Task { [weak self, weak peripheral] in
+            do {
+                try await Task.sleep(for: .seconds(retryDelay))
+            } catch {
+                return
+            }
+            guard let self, let peripheral,
+                  self.state.isReady,
+                  self.connectedPeripheral === peripheral else { return }
+            if self.l2capReceiver.isWritable {
+                self.l2capOpenAttempt = 0
+                self.l2capLastError = nil
+                self.appendLog("L2CAP 音频输出流已就绪")
+                return
+            }
+
+            self.l2capLastError = "L2CAP 输出流打开超时"
+            self.l2capReceiver.detach()
+            self.l2capChannelRequested = false
+            self.openL2CAPChannelIfNeeded(for: peripheral)
+        }
     }
 }

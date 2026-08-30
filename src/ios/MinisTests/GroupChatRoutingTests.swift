@@ -414,6 +414,53 @@ final class GroupChatRoutingTests: XCTestCase {
         XCTAssertTrue(GroupChatPrompt.isGroupTurnPrompt(prompt))
     }
 
+    func testTurnPromptDropsTheHandoffInvitationWhenAnsweringTheUserDirectly() {
+        let addressed = GroupChatPrompt.turnPrompt(
+            member: tech,
+            groupTitle: "产品圆桌",
+            peers: [market, product, host],
+            allMembers: cast,
+            newMessages: [.user("\(GroupMentionRouter.token(for: tech.id)) 延迟能压到多少？")],
+            allowHandoff: false
+        )
+        XCTAssertFalse(addressed.contains("要点名某位同事接着说"),
+                       "话是冲着一个人来的，就不该再教它把话头递出去——递了也不会有人接")
+        XCTAssertTrue(addressed.contains("这一轮到你为止"))
+
+        // `@所有人` is the one case that still relays: the user picked nobody.
+        let broadcast = GroupChatPrompt.turnPrompt(
+            member: tech,
+            groupTitle: "产品圆桌",
+            peers: [market, product, host],
+            allMembers: cast,
+            newMessages: [.user("\(GroupMentionRouter.everyoneToken) 大家怎么看？")]
+        )
+        XCTAssertTrue(broadcast.contains("要点名某位同事接着说"),
+                      "@所有人 的场合仍然靠成员之间的 @ 接力往下走")
+    }
+
+    /// The default target of an unaddressed user message: the member who spoke
+    /// last, and only that member. This is the routing half of the same rule the
+    /// prompt test above covers — the orchestrator ends the turn after this
+    /// single responder rather than letting them hand off.
+    func testUnaddressedUserMessageResolvesToExactlyOneResponder() {
+        let history: [GroupMessage] = [
+            .user("语音转文字 App 还值得做吗？"),
+            .member(market.id, "赛道饱和。"),
+            .member(tech.id, "延迟才是关键。"),
+            .user("再展开说说"),
+        ]
+        let result = GroupMentionRouter.resolveResponders(
+            members: cast,
+            newMessages: [history[3]],
+            history: history,
+            ownerAgentId: host.id
+        )
+        XCTAssertEqual(result.reason, .lastSpeaker)
+        XCTAssertEqual(result.responderIds, [tech.id],
+                       "不 @ 的时候只有最近发言的那一位接话，不是全场")
+    }
+
     func testHistoryIsTruncatedToTheProjectionWindow() {
         let history = (0..<40).map { GroupMessage.member(market.id, "第 \($0) 条") }
         let text = GroupChatPrompt.formatHistory(history, viewerId: tech.id, members: cast)

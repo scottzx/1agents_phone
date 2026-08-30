@@ -120,6 +120,10 @@ final class GroupStore: ObservableObject {
         await ChatStore.shared.upsertGroup(group)
 
         vm.groupId = group.id
+        // Seeded before the vm is cached: this draft never runs loadSession(),
+        // and without the roster the `@` picker in a just-created room falls
+        // through to the file list — no members to pick at all.
+        vm.groupMembers = await members(of: group)
         ViewModelCache.shared.cacheDraft(vm, sessionId: sessionId)
 
         await refresh()

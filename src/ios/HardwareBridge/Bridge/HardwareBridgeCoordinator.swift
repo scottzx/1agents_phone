@@ -41,10 +41,10 @@ final class HardwareBridgeCoordinator: ObservableObject {
     /// The roster last pushed to the device, for the settings screen to show.
     @Published private(set) var pushedRoster: DeviceRosterSnapshot?
 
-    /// How the roster reaches the device. Defaults to the route that needs no
-    /// firmware change, so the bridge is usable before the SDK grows a 0x37
-    /// handler.
-    @Published var rosterTransport: HardwareBLECentral.RosterTransport = .ioEndpoint
+    /// How the roster reaches the device. Defaults to picking per payload: the
+    /// chat-list catalog is kilobytes and has to fragment, while a bound
+    /// single-agent roster still goes out in the one write it always did.
+    @Published var rosterTransport: HardwareBLECentral.RosterTransport = .auto
     /// Where reply audio comes out. Defaults to Plan A with Plan B standing by
     /// (DEMO_PRD.md §6).
     @Published var voiceRoute: HardwareVoiceOutput.Route = .auto
@@ -72,6 +72,11 @@ final class HardwareBridgeCoordinator: ObservableObject {
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
         bluetooth.$state
+            // `@Published` publishes in `willSet`, so inside this sink
+            // `bluetooth.state` is still the previous value — and everything
+            // below reaches code that guards on it (`sendCommand`, `pushRoster`).
+            // A hop to the next runloop turn means "ready" really means ready.
+            .receive(on: RunLoop.main)
             .sink { [weak self] state in
                 guard let self else { return }
                 if state == .idle {
@@ -87,7 +92,25 @@ final class HardwareBridgeCoordinator: ObservableObject {
                     // subscribe to 0xFFC4, but a re-subscribe on reconnect can
                     // race that; a 0x34 fetch makes it deterministic.
                     self.bluetooth.requestIoManifest()
-                    self.pushRosterIfNeeded()
+                    // The device draws its whole chat list — every group and
+                    // every one-to-one agent — from this snapshot, so it goes
+                    // out on connect rather than waiting for a first turn to
+                    // create a session. Each of these binds *and* rebuilds, and
+                    // the `$snapshot` sink below is what puts it on the wire, so
+                    // only a real change costs a push.
+                    if let groupId = self.activeGroupId {
+                        Task {
+                            await self.rebind(groupId: groupId)
+                            self.deliverCurrentRoster()
+                        }
+                    } else {
+                        self.pushRosterIfNeeded()
+                        // Covers a link that comes up before AgentStore has
+                        // finished bootstrapping, when there is no agent to
+                        // bind but there may already be groups to list.
+                        DeviceRosterService.shared.rebuild()
+                        self.deliverCurrentRoster()
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -111,10 +134,9 @@ final class HardwareBridgeCoordinator: ObservableObject {
             // roster it couldn't have rendered before.
             self?.pushRosterIfNeeded()
         }
-        bluetooth.onSelectedAgent = { [weak self] _, agentId in
+        bluetooth.onSelectedAgent = { [weak self] index, entryId in
             guard let self else { return }
-            self.appendLog("设备选择了 Agent \(agentId)，重新绑定会话名册")
-            self.pushRosterIfNeeded(preferredAgentId: agentId)
+            Task { await self.selectConversation(entryId: entryId, index: index) }
         }
 
         // Keep a connected device's roster current when an agent is renamed or
@@ -201,15 +223,13 @@ final class HardwareBridgeCoordinator: ObservableObject {
 
         let replyText = SendPromptIntent.extractResponseText(from: vm)
         lastReply = replyText
+        // The text is delivered by `speak`, one line at a time as each is
+        // spoken. Sending the whole reply up front instead left the board's
+        // fixed-size label showing only the first line for the entire minute of
+        // audio, and pushed replies past the single-frame chat0 budget so they
+        // fell back to bare screen0 text with no sender attached.
         let sender = DeviceRosterService.shared.sender(preferring: vm.agentId)
-        do {
-            try deliverText(replyText, from: sender)
-        } catch {
-            await failAndReleaseDevice(error.localizedDescription)
-            return
-        }
-
-        await speak(replyText)
+        await speak(replyText, narrating: sender)
     }
 
     /// Sends the reply text to the device with its sender attached, falling
@@ -248,33 +268,31 @@ final class HardwareBridgeCoordinator: ObservableObject {
 
     /// Speaks the reply, on the device when it can and on the phone when it
     /// can't. Never fails the turn: the text has already been delivered.
-    private func speak(_ text: String) async {
+    private func speak(_ text: String, narrating sender: DeviceParticipant? = nil) async {
+        // Whenever the reply will not be spoken segment by segment, the device
+        // still has to receive it, so each early exit below delivers it whole.
+        func deliverWhole() {
+            guard let sender else { return }
+            try? deliverText(text, from: sender)
+        }
+
         guard let apiKey = activeMossAPIKey() else {
+            deliverWhole()
             activity = .failed("缺少 MOSS_API_KEY，文字已发送但无法合成语音")
             appendLog("错误：缺少 MOSS_API_KEY，跳过 TTS")
             return
         }
 
         if voiceRoute == .phone {
+            deliverWhole()
             await speakOnPhone(text, reason: nil)
-            return
-        }
-
-        let deviceReady = bluetooth.state.isReady && bluetooth.l2capReceiver.isWritable
-        guard deviceReady else {
-            let reason = "设备音频通道未就绪"
-            if voiceRoute == .auto {
-                await speakOnPhone(text, reason: reason)
-            } else {
-                activity = .failed(reason)
-                appendLog("错误：\(reason)")
-            }
             return
         }
 
         let sanitized = VoiceTextSanitizer.sanitize(text)
         let segments = AIChatViewModel.splitIntoSpeechSegments(sanitized)
         guard !segments.isEmpty else {
+            deliverWhole()
             activity = .failed("回复没有可朗读内容")
             return
         }
@@ -293,24 +311,47 @@ final class HardwareBridgeCoordinator: ObservableObject {
             try await bluetooth.beginVoicePCM16(sessionID: sessionID, sequence: startSequence)
             streamStarted = true
 
+            // Synthesise the next clause while the current one is still being
+            // delivered. Each clause costs two round trips (ask for a URL, then
+            // download it), and doing that between clauses left an audible hole
+            // in every sentence boundary. Overlapping hides it behind playback.
+            func synthesize(_ clause: String) -> Task<Data, Error> {
+                Task { try await self.speechClient.synthesizePCM16(text: clause, apiKey: apiKey) }
+            }
+            var inFlight = segments.isEmpty ? nil : synthesize(segments[0])
+
             for (index, segment) in segments.enumerated() {
                 try Task.checkCancellation()
-                appendLog("流式 TTS 第 \(index + 1)/\(segments.count) 段：\(segment)")
-                deliveredBytes += try await speechClient.streamSynthesizePCM16(
-                    text: segment,
-                    apiKey: apiKey,
-                    onChunk: { [weak self] pcm16 in
-                        guard let self else { return }
-                        await MainActor.run { self.activity = .deliveringAudio }
-                        try await self.bluetooth.appendVoicePCM16(pcm16)
-                    }
-                )
+                // The whole clause is in hand before any of it goes out, so a
+                // network hiccup cannot empty the board's playback queue
+                // mid-word.
+                activity = .synthesizing
+                guard let current = inFlight else { break }
+                let pcm16 = try await current.value
+                inFlight = index + 1 < segments.count ? synthesize(segments[index + 1]) : nil
+                // On screen just before it is heard, so the text tracks the voice.
+                if let sender { try? deliverText(segment, from: sender) }
+                appendLog(String(format: "TTS 第 %d/%d 段（%d 字节，%.1f 秒）：%@",
+                                 index + 1, segments.count, pcm16.count,
+                                 Double(pcm16.count) / 2 / Double(MossSpeechClient.deviceSampleRate),
+                                 segment))
+                activity = .deliveringAudio
+                try await bluetooth.appendVoicePCM16(pcm16)
+                deliveredBytes += pcm16.count
             }
 
             try bluetooth.endVoicePCM16(sessionID: sessionID, sequence: endSequence)
             streamStarted = false
             activity = .delivered
-            appendLog("设备流式播报 \(segments.count) 段，\(deliveredBytes) 字节")
+            // If the board takes noticeably more or less time than this to play
+            // it back, the stream's sample rate is not what
+            // MossSpeechClient.sourceValuesPerDeviceSample assumes.
+            let seconds = Double(deliveredBytes) / 2 / Double(MossSpeechClient.deviceSampleRate)
+            appendLog(String(format: "设备播报 %d 段，%d 字节，应为 %.1f 秒",
+                             segments.count, deliveredBytes, seconds))
+            // The one line that settles the sample-rate question, in the app
+            // rather than on a console that keeps detaching.
+            appendLog("TTS 源：\(MossSpeechClient.lastStreamDescription)")
         } catch {
             if streamStarted {
                 try? bluetooth.endVoicePCM16(sessionID: sessionID, sequence: endSequence)
@@ -401,26 +442,104 @@ final class HardwareBridgeCoordinator: ObservableObject {
     /// snapshot is byte-identical to the one the device already has, so a
     /// repeat call costs no BLE traffic and no redraw on the device.
     func pushRosterIfNeeded(preferredAgentId: String? = nil) {
-        guard let conversationId = activeSessionId else { return }
-        let agentId = preferredAgentId
-            ?? pushedRoster?.members.first?.id
-            ?? AgentProfile.defaultAgentId
+        // A bound group belongs to GroupChatOrchestrator; rebinding it to a
+        // single agent here would point the screen at the wrong room.
+        guard activeGroupId == nil else { return }
+        let agentId = preferredAgentId ?? boundDirectAgentId ?? AgentProfile.defaultAgentId
         guard let profile = AgentStore.shared.agent(agentId) else { return }
 
-        // One member today. The roundtable passes four ids here and everything
-        // downstream — snapshot, wire format, device rendering — is unchanged.
-        // The push itself is driven by the `$snapshot` subscription in `init`,
-        // which is the single place a roster reaches the wire — binding here as
-        // well would send every roster twice.
+        // The bound conversation is keyed by agent id, matching the catalog
+        // entry the device echoes back when it opens that row. The push itself
+        // is driven by the `$snapshot` subscription in `init`, which is the
+        // single place a roster reaches the wire — sending here as well would
+        // put every roster on the link twice.
         DeviceRosterService.shared.bind(
-            conversationId: conversationId,
+            conversationId: profile.id,
             title: profile.name,
             agentIds: [profile.id]
         )
     }
 
+    /// The agent the device is currently pointed at, when it is a one-to-one
+    /// row. Nil for a group and before anything has been pushed.
+    private var boundDirectAgentId: String? {
+        guard let pushedRoster,
+              let entry = pushedRoster.entry(pushedRoster.conversation.id),
+              entry.kind == .direct else { return nil }
+        return entry.id
+    }
+
+    /// The device opened a row in its chat list (0x16, carrying the catalog
+    /// entry id it was given). Point the phone at the same conversation so the
+    /// next thing said into the board lands in the room the user is looking at.
+    private func selectConversation(entryId: String, index: UInt8) async {
+        if let group = await resolveGroup(entryId) {
+            let count = await bind(group: group)
+            appendLog("设备打开群聊「\(group.title)」（#\(index)，\(count) 位成员）")
+            return
+        }
+
+        if let profile = AgentStore.shared.agent(entryId) {
+            activeGroupId = nil
+            chatSequence = 0
+            activeSessionId = await AgentStore.shared.openMainSession(for: profile.id)
+            appendLog("设备打开单聊「\(profile.name)」（#\(index)）")
+            DeviceRosterService.shared.bind(
+                conversationId: profile.id,
+                title: profile.name,
+                agentIds: [profile.id]
+            )
+            return
+        }
+
+        appendLog("设备选择了未知会话 \(entryId)（#\(index)），已忽略")
+    }
+
+    /// Re-points a reconnecting device at the group it was already bound to,
+    /// rather than letting the first catalog row take over.
+    private func rebind(groupId: String) async {
+        guard let group = await resolveGroup(groupId) else {
+            pushRosterIfNeeded()
+            return
+        }
+        _ = await bind(group: group)
+    }
+
+    /// Reads through to the store, so a group created or edited elsewhere this
+    /// launch resolves without waiting for `GroupStore` to refresh.
+    private func resolveGroup(_ id: String) async -> GroupProfile? {
+        if let cached = GroupStore.shared.group(id) { return cached }
+        return await GroupStore.shared.loadGroup(id)
+    }
+
+    /// Points the phone at one group. Returns its resolved member count.
+    @discardableResult
+    private func bind(group: GroupProfile) async -> Int {
+        activeGroupId = group.id
+        activeSessionId = group.sessionId
+        chatSequence = 0
+        let members = await GroupStore.shared.members(of: group)
+        DeviceRosterService.shared.bind(
+            conversationId: group.id,
+            title: group.title,
+            agentIds: members.map(\.id)
+        )
+        return members.count
+    }
+
+    /// Sends whatever the roster currently is, unless the device already has it.
+    ///
+    /// The `$snapshot` subscription only fires on *change*, and the catalog is
+    /// normally built at launch — long before a board connects. Without this, a
+    /// link coming up against an unchanged roster publishes nothing and the
+    /// device sits on an empty chat list for the whole session.
+    private func deliverCurrentRoster() {
+        guard let snapshot = DeviceRosterService.shared.snapshot else { return }
+        pushRoster(snapshot)
+    }
+
     private func pushRoster(_ snapshot: DeviceRosterSnapshot) {
-        guard bluetooth.state.isReady else { return }
+        guard bluetooth.state.isReady, !snapshot.rendersSameAs(pushedRoster) else { return }
         do {
             let frames = try bluetooth.sendRoster(snapshot, transport: rosterTransport)
             pushedRoster = snapshot

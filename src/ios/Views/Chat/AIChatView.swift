@@ -3756,14 +3756,15 @@ struct AIChatView: View {
                 if !groupRows.isEmpty {
                     ScrollView {
                         LazyVStack(spacing: 0) {
-                            ForEach(groupRows) { candidate in
+                            ForEach(Array(groupRows.enumerated()), id: \.element.id) { index, candidate in
+                                let isSelected = index == vm.mentionSelectedIndex
                                 Button {
                                     vm.selectGroupMention(candidate)
                                 } label: {
-                                    GroupMentionRow(candidate: candidate)
+                                    GroupMentionRow(candidate: candidate, isSelected: isSelected)
                                         .contentShape(Rectangle())
                                 }
-                                .buttonStyle(SlashMenuButtonStyle(isSelected: false))
+                                .buttonStyle(SlashMenuButtonStyle(isSelected: isSelected))
                             }
                         }
                     }
@@ -3889,6 +3890,8 @@ struct AIChatView: View {
     /// you are addressing, not a path you are pasting.
     private struct GroupMentionRow: View {
         let candidate: GroupMentionCandidate
+        /// Highlighted by the arrow keys — the row Return would commit.
+        let isSelected: Bool
 
         var body: some View {
             HStack(spacing: 10) {
@@ -3900,12 +3903,12 @@ struct AIChatView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(candidate.display)
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(ChatColors.primaryText)
+                        .foregroundStyle(isSelected ? Color.white : ChatColors.primaryText)
                         .lineLimit(1)
                     if !candidate.subtitle.isEmpty {
                         Text(candidate.subtitle)
                             .font(.system(size: 11))
-                            .foregroundStyle(ChatColors.secondaryText)
+                            .foregroundStyle(isSelected ? Color.white.opacity(0.8) : ChatColors.secondaryText)
                             .lineLimit(1)
                     }
                 }

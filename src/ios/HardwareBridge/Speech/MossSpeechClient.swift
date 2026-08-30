@@ -116,95 +116,24 @@ actor MossSpeechClient {
         return try Self.convertToDevicePCM16(encodedAudio, fileExtension: "mp3")
     }
 
-    /// Streams Moss's raw 48 kHz PCM response, downsamples it to the device's
-    /// 16 kHz PCM16 format, and hands bounded chunks to the BLE sender. Waiting
-    /// for `onChunk` provides real backpressure all the way to URLSession.
-    @discardableResult
-    func streamSynthesizePCM16(
-        text: String,
-        apiKey: String,
-        onChunk: @Sendable (Data) async throws -> Void
-    ) async throws -> Int {
-        let payload: [String: Any] = [
-            "model": Self.speechModel,
-            "input": text,
-            "voice_id": Self.voiceID,
-            "stream": true,
-            "response_format": "pcm",
-        ]
+    /// The rate the board's codec runs at (AUDIO_OUTPUT_SAMPLE_RATE on the
+    /// CuiCan board). Everything sent to the device is converted to exactly
+    /// this, so the board never resamples — its own resampler reported one
+    /// output size and wrote a much larger one, overrunning the buffer and
+    /// panicking playback.
+    static let deviceSampleRate = 24_000
 
-        var request = URLRequest(url: Self.baseURL.appending(path: "/v1/audio/speech"))
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+    /// What the last synthesis actually decoded, surfaced in the bridge log.
+    ///
+    /// This used to be a guess, and an unresolvable one: the streaming endpoint
+    /// answers `audio/pcm` with no rate and no channel count, so the reduction
+    /// ratio had to be picked by ear, and it oscillated between clearly too slow
+    /// (2:1) and clearly too fast (4:1) with no whole number in between that
+    /// fit. An MP3 carries its own format, so AVAudioFile reports the truth and
+    /// AVAudioConverter resamples from it exactly. There is nothing left to
+    /// tune, and this line says what was found.
+    static private(set) var lastStreamDescription = "(尚未合成)"
 
-        let (bytes, response) = try await Self.session.bytes(for: request)
-        guard let http = response as? HTTPURLResponse else { throw ClientError.invalidResponse }
-        guard (200..<300).contains(http.statusCode) else {
-            var errorBody = Data()
-            for try await byte in bytes.prefix(64 * 1024) { errorBody.append(byte) }
-            throw ClientError.http(http.statusCode, Self.serverMessage(from: errorBody))
-        }
-
-        // 12 KB at 48 kHz is 125 ms of audio and becomes a 4 KB device chunk.
-        // This is large enough to avoid per-byte BLE overhead and small enough
-        // for low first-audio latency.
-        let sourceBatchBytes = 12 * 1024
-        var source = Data()
-        source.reserveCapacity(sourceBatchBytes + 6)
-        var delivered = 0
-
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            source.append(byte)
-            if source.count >= sourceBatchBytes {
-                let consumable = source.count - source.count % 6
-                guard consumable > 0 else { continue }
-                let pcm16 = Self.downsamplePCM48kTo16k(source.prefix(consumable))
-                source.removeFirst(consumable)
-                if !pcm16.isEmpty {
-                    try await onChunk(pcm16)
-                    delivered += pcm16.count
-                }
-            }
-        }
-
-        let consumable = source.count - source.count % 6
-        if consumable > 0 {
-            let pcm16 = Self.downsamplePCM48kTo16k(source.prefix(consumable))
-            if !pcm16.isEmpty {
-                try await onChunk(pcm16)
-                delivered += pcm16.count
-            }
-        }
-        guard delivered > 0 else { throw ClientError.invalidResponse }
-        return delivered
-    }
-
-    /// 48 kHz → 16 kHz mono decimator with a three-sample box filter. Moss
-    /// returns signed little-endian PCM16, so every six source bytes produce
-    /// one signed little-endian output sample.
-    static func downsamplePCM48kTo16k(_ source: Data.SubSequence) -> Data {
-        let sampleGroups = source.count / 6
-        guard sampleGroups > 0 else { return Data() }
-        let bytes = [UInt8](source)
-        var output = Data(capacity: sampleGroups * 2)
-        for group in 0..<sampleGroups {
-            let base = group * 6
-            var sum = 0
-            for sample in 0..<3 {
-                let offset = base + sample * 2
-                let raw = UInt16(bytes[offset]) | (UInt16(bytes[offset + 1]) << 8)
-                sum += Int(Int16(bitPattern: raw))
-            }
-            let averaged = Int16(clamping: sum / 3)
-            let little = UInt16(bitPattern: averaged).littleEndian
-            output.append(UInt8(truncatingIfNeeded: little))
-            output.append(UInt8(truncatingIfNeeded: little >> 8))
-        }
-        return output
-    }
 
     private func execute(_ request: URLRequest) async throws -> Data {
         let (data, response) = try await Self.session.data(for: request)
@@ -247,15 +176,21 @@ actor MossSpeechClient {
         do {
             let inputFile = try AVAudioFile(forReading: temporaryURL)
             let inputFormat = inputFile.processingFormat
+            Self.lastStreamDescription = String(
+                format: "mp3 %.0fHz×%dch %.2f 秒 → %d Hz 单声道",
+                inputFormat.sampleRate, Int(inputFormat.channelCount),
+                Double(inputFile.length) / max(inputFormat.sampleRate, 1),
+                Self.deviceSampleRate
+            )
             guard inputFormat.sampleRate > 0,
                   let outputFormat = AVAudioFormat(
                     commonFormat: .pcmFormatInt16,
-                    sampleRate: 16_000,
+                    sampleRate: Double(Self.deviceSampleRate),
                     channels: 1,
                     interleaved: true
                   ),
                   let converter = AVAudioConverter(from: inputFormat, to: outputFormat) else {
-                throw ClientError.audioConversion("无法创建 16 kHz 单声道转换器")
+                throw ClientError.audioConversion("无法创建 \(Self.deviceSampleRate) Hz 单声道转换器")
             }
 
             let inputCapacity = AVAudioFrameCount(min(inputFile.length, Int64(UInt32.max)))
@@ -267,7 +202,9 @@ actor MossSpeechClient {
             }
             try inputFile.read(into: inputBuffer)
 
-            let estimatedFrames = ceil(Double(inputBuffer.frameLength) * 16_000 / inputFormat.sampleRate)
+            let estimatedFrames = ceil(
+                Double(inputBuffer.frameLength) * Double(Self.deviceSampleRate) / inputFormat.sampleRate
+            )
             let outputCapacity = AVAudioFrameCount(min(estimatedFrames + 4_096, Double(UInt32.max)))
             guard let outputBuffer = AVAudioPCMBuffer(
                 pcmFormat: outputFormat,

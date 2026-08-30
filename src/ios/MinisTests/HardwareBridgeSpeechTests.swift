@@ -1,4 +1,5 @@
 #if DEBUG
+import Foundation
 import XCTest
 
 final class HardwareBridgeSpeechTests: XCTestCase {
@@ -60,21 +61,31 @@ final class HardwareBridgeSpeechTests: XCTestCase {
         )
     }
 
-    func testMossPCMDownsamplerAveragesEachThreeSamples() {
-        func pcm(_ samples: [Int16]) -> Data {
-            var data = Data()
-            for sample in samples {
-                let value = UInt16(bitPattern: sample).littleEndian
-                data.append(UInt8(truncatingIfNeeded: value))
-                data.append(UInt8(truncatingIfNeeded: value >> 8))
-            }
-            return data
-        }
+    func testDeviceSampleRateMatchesTheBoardCodec() {
+        // Everything handed to the board is converted to exactly this, so its
+        // own resampler never runs — that resampler reported one output size
+        // and wrote a much larger one, overrunning the buffer and panicking
+        // playback a second in. The board's AUDIO_OUTPUT_SAMPLE_RATE is 24000.
+        XCTAssertEqual(MossSpeechClient.deviceSampleRate, 24_000)
+    }
 
-        let source = pcm([300, 600, 900, -300, -600, -900])
-        let result = MossSpeechClient.downsamplePCM48kTo16k(source[...])
-
-        XCTAssertEqual(result, pcm([600, -600]))
+    func testL2CAPOutputIsWritableOnlyAfterStreamFinishesOpening() {
+        XCTAssertEqual(
+            AgentLinkL2CAPReceiver.writeSideState(hasOutputStream: false, status: .notOpen),
+            .detached
+        )
+        XCTAssertEqual(
+            AgentLinkL2CAPReceiver.writeSideState(hasOutputStream: true, status: .opening),
+            .opening
+        )
+        XCTAssertEqual(
+            AgentLinkL2CAPReceiver.writeSideState(hasOutputStream: true, status: .open),
+            .writable
+        )
+        XCTAssertEqual(
+            AgentLinkL2CAPReceiver.writeSideState(hasOutputStream: true, status: .error),
+            .failed
+        )
     }
 }
 #endif

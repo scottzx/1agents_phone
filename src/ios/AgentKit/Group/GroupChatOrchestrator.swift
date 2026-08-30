@@ -84,7 +84,15 @@ final class GroupChatOrchestrator {
             return nil
         }
 
-        let trimmed = userText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Encoded here rather than only in the composer, so every entry point
+        // stores canonical `<@id>` text — the hardware bridge hands over raw
+        // speech-to-text, and `debug.group.run` hands over whatever was typed at
+        // the RPC. `encode` is idempotent, so the composer having already done
+        // it is a no-op.
+        let trimmed = GroupMentionRouter.encode(
+            userText.trimmingCharacters(in: .whitespacesAndNewlines),
+            members: members
+        )
         if !trimmed.isEmpty {
             await postUserMessage(group: group, members: members, text: trimmed)
         }
@@ -177,7 +185,18 @@ final class GroupChatOrchestrator {
                 logger.info("group \(group.id.prefix(8)): \(name) 用名字而不是 <@id> 做的 @，这次按名字兜底了；改名后会失效")
             }
             guard !resolution.responderIds.isEmpty else { break }
-            logger.info("group \(group.id.prefix(8)) round \(round) responders=\(resolution.responderIds.count) reason=\(resolution.reason.rawValue)")
+
+            // A user message that lands on specific people — named with `@`, or
+            // defaulted to whoever spoke last — is an instruction about who
+            // answers, not the opening of a relay. Without this the addressed
+            // member follows its own turn prompt, @s a colleague, and the room
+            // works its way through the whole roster, which reads exactly like
+            // the `@` having been ignored (and like an unaddressed line waking
+            // everybody). Only `@所有人` still carries on: there the user picked
+            // nobody and asked the room as a whole.
+            let directedTurn = resolution.reason != .everyone
+                && newMessages.contains { $0.speaker.isUser }
+            logger.info("group \(group.id.prefix(8)) round \(round) responders=\(resolution.responderIds.count) reason=\(resolution.reason.rawValue) directed=\(directedTurn)")
 
             var spokeThisRound = 0
             for memberId in GroupMentionRouter.orderRoundSpeakers(resolution.responderIds, round: round) {
@@ -193,7 +212,11 @@ final class GroupChatOrchestrator {
                     groupTitle: group.title,
                     peers: members.filter { $0.id != member.id },
                     allMembers: members,
-                    newMessages: GroupMentionRouter.messagesSinceMemberLastSpoke(history, memberId: member.id)
+                    newMessages: GroupMentionRouter.messagesSinceMemberLastSpoke(history, memberId: member.id),
+                    // Suppressed together with the relay itself: a member told
+                    // to hand off, whose handoff is then dropped, leaves an
+                    // unanswered `@` in the transcript.
+                    allowHandoff: !directedTurn
                 )
                 guard let said = await speak(group: group, member: member, members: members, prompt: prompt) else {
                     continue
@@ -209,6 +232,10 @@ final class GroupChatOrchestrator {
             // Everybody passed. The room is out of things to say, which is a
             // better stop condition than any counter.
             guard spokeThisRound > 0 else { break }
+
+            // Asked-and-answered: the people this message was aimed at have
+            // spoken. The room goes quiet until the user says something else.
+            if directedTurn { break }
         }
         return closing
     }
@@ -475,8 +502,11 @@ final class GroupChatOrchestrator {
 
     private func bindHardware(group: GroupProfile, members: [GroupMember]) {
         guard HardwareBridgeCoordinator.shared.activeGroupId == group.id else { return }
+        // Keyed by `group.id`, not by the session: that is the id this group
+        // occupies in the chat-list catalog, and the id the board echoes back
+        // when the user opens the room on the device.
         DeviceRosterService.shared.bind(
-            conversationId: group.sessionId,
+            conversationId: group.id,
             title: group.title,
             agentIds: members.map(\.id)
         )

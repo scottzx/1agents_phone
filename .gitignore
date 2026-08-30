@@ -138,5 +138,10 @@ deps/lame-3.100/**/.deps/
 tmp/
 output/
 
+# On-device speech model — too large for GitHub (240MB, exceeds the 100MB
+# limit and LFS uploads are blocked on this public fork). Fetch separately
+# and place at src/ios/HardwareBridge/ModelResources/ before building.
+src/ios/HardwareBridge/ModelResources/*.gguf
+
 # ish submodule build artifacts
 deps/ish/build-ios/

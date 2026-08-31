@@ -43,6 +43,14 @@ final class GroupChatOrchestrator {
 
     func isRunning(groupId: String) -> Bool { engineRunning.contains(groupId) }
 
+    /// Debug/inspection projection of the persisted shared transcript. Keep
+    /// this adapter on the orchestrator so callers do not reach into the
+    /// repository actor or duplicate its filtering of tool-only audit rows.
+    func transcript(of group: GroupProfile) async -> [GroupMessage] {
+        guard let room = await repository.room(id: group.id) else { return [] }
+        return await repository.transcript(room: room)
+    }
+
     // MARK: - Entry points
 
     /// Fire-and-forget entry used by the chat UI: persist the user's line, then
@@ -235,7 +243,7 @@ private actor IOSGroupChatRepository: GroupChatRepository {
             source: "group",
             systemPromptBlock: system,
             thinkingLevel: ThinkingLevel.off.rawValue,
-            timeoutSeconds: GroupChatLimits.memberTurnTimeoutSeconds
+            timeoutSeconds: TimeInterval(GroupChatLimits.memberTurnTimeoutSeconds)
         ))
         return GroupChatMemberTurnResult(text: result.text, accepted: result.accepted, timedOut: result.timedOut, cancelled: result.cancelled)
     }

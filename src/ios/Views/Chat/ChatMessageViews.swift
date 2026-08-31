@@ -281,6 +281,30 @@ struct ChatMessageRow: View {
         return text
     }
 
+    /// Group-turn prompts and direct A2A envelopes are stored as user-role
+    /// rows so the recipient model's history still alternates correctly. They
+    /// are not human-authored bubbles, though, and may contain Markdown written
+    /// by another assistant. Route only these synthetic rows through the same
+    /// renderer used by ordinary assistant text.
+    private var userMessageUsesMarkdown: Bool {
+        AgentInboundMessageClassifier.shouldRenderMarkdown(userDisplayText)
+    }
+
+    @ViewBuilder
+    private var userMessageContent: some View {
+        if userMessageUsesMarkdown {
+            SelectableMarkdownView(
+                markdown: userDisplayText,
+                messageId: message.id
+            )
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
+            Text(userDisplayText)
+                .font(.system(size: FontSettings.shared.scaledMessage(16.5)))
+                .foregroundStyle(message.isQueued ? ChatColors.secondaryText : ChatColors.primaryText)
+        }
+    }
+
     private var userRow: some View {
         HStack {
             Spacer(minLength: 60)
@@ -296,9 +320,7 @@ struct ChatMessageRow: View {
 
                 if !userDisplayText.isEmpty {
                     HStack(spacing: 6) {
-                        Text(userDisplayText)
-                            .font(.system(size: FontSettings.shared.scaledMessage(16.5)))
-                            .foregroundStyle(message.isQueued ? ChatColors.secondaryText : ChatColors.primaryText)
+                        userMessageContent
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .background(
@@ -708,5 +730,4 @@ struct ChatMessageRow: View {
     }
 
 }
-
 

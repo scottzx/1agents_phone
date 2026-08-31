@@ -23,8 +23,8 @@ enum AgentTurnAwaiter {
     /// One-second granularity on purpose: the caller is suspended inside a tool
     /// call or an orchestration step for the whole wait, so a tighter poll buys
     /// nothing and a looser one adds latency to short turns.
-    static func awaitTurn(vm: AIChatViewModel, seconds: Int) async -> Bool {
-        let deadline = Date().addingTimeInterval(TimeInterval(max(0, seconds)))
+    static func awaitTurn(vm: AIChatViewModel, seconds: TimeInterval) async -> Bool {
+        let deadline = Date().addingTimeInterval(max(0, seconds))
         while vm.isProcessing && Date() < deadline {
             if Task.isCancelled { return false }
             do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return false }

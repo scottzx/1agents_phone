@@ -36,9 +36,10 @@ struct MinisMacApp: App {
     var body: some Scene {
         WindowGroup("Minis") {
             DesktopRootView(model: model)
-                .frame(minWidth: 1080, minHeight: 680)
+                .frame(minWidth: 1160, minHeight: 720)
                 .task { await model.start() }
         }
+        .defaultSize(width: 1320, height: 820)
         .commands {
             CommandGroup(replacing: .newItem) {
                 Button("New Conversation") { Task { await model.createConversation() } }

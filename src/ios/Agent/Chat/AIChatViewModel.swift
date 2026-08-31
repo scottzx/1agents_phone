@@ -2653,15 +2653,16 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // doesn't mistake our own persisted messages for remote ones.
             // The in-memory += 1 tracking can drift if messages are batched or retried.
             if let sid = self.sessionId {
-                let dbMessages = await ChatStore.shared.loadMessages(sessionId: sid)
-                self.lastKnownDbSortOrder = dbMessages.last?.sortOrder ?? self.lastKnownDbSortOrder
-                self.lastKnownDbCount = dbMessages.count
-                // T-baseline-hash-drift: also refresh lastKnownDbOrderHash —
-                // otherwise reloadMessagesFromDB's hasReorderedMessages check
-                // sees the old (pre-INSERT) hash vs the new (post-INSERT)
-                // row set, flags a fake reorder, and fires loadSession()
-                // (spinner ON ~460ms) on the next iCloud fetch notification.
-                self.lastKnownDbOrderHash = Self.computeOrderHash(of: dbMessages)
+                if let fingerprint = await ChatStore.shared.sessionMessageFingerprint(sessionId: sid) {
+                    self.lastKnownDbSortOrder = fingerprint.maxSortOrder
+                    self.lastKnownDbCount = fingerprint.count
+                    // T-baseline-hash-drift: also refresh the order hash so
+                    // the next iCloud notification does not mistake our own
+                    // INSERT for a remote reorder. This path deliberately reads
+                    // no parts_json; a long conversation should not be decoded
+                    // again merely to update its cache baseline.
+                    self.lastKnownDbOrderHash = fingerprint.orderHash
+                }
             }
 
             logger.info("🔄SESSION [vm=\(self.vmInstanceId)] send DONE session=\(self.sessionId ?? "nil")")
@@ -3690,12 +3691,13 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             }
 
             if let sid = self.sessionId {
-                let dbMessages = await ChatStore.shared.loadMessages(sessionId: sid)
-                self.lastKnownDbSortOrder = dbMessages.last?.sortOrder ?? self.lastKnownDbSortOrder
-                self.lastKnownDbCount = dbMessages.count
-                // T-baseline-hash-drift: see send DONE path for why hash
-                // must be refreshed alongside count/sortOrder.
-                self.lastKnownDbOrderHash = Self.computeOrderHash(of: dbMessages)
+                if let fingerprint = await ChatStore.shared.sessionMessageFingerprint(sessionId: sid) {
+                    self.lastKnownDbSortOrder = fingerprint.maxSortOrder
+                    self.lastKnownDbCount = fingerprint.count
+                    // T-baseline-hash-drift: see send DONE path for why hash
+                    // must be refreshed alongside count/sortOrder.
+                    self.lastKnownDbOrderHash = fingerprint.orderHash
+                }
             }
             self.isProcessing = false
             self.endBackgroundProcessing()

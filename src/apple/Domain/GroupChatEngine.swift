@@ -185,37 +185,42 @@ public actor GroupChatEngine {
     private func runFreeform(room: GroupChatRoom, epoch: Int, seededMessages: [GroupMessage]) async -> String? {
         let members = room.members.map(\.member)
         var history = await repository.transcript(room: room)
-        var consumed = history.lastIndex { $0.speaker.memberId != nil }.map { $0 + 1 } ?? 0
+        var newMessages: [GroupMessage]
+        if seededMessages.isEmpty {
+            let start = history.lastIndex { $0.speaker.memberId != nil }.map { $0 + 1 } ?? 0
+            newMessages = Array(history[min(start, history.count)...])
+        } else {
+            newMessages = seededMessages
+        }
         var totalTurns = 0
         var closing: String?
-        var seed: [GroupMessage]? = seededMessages.isEmpty ? nil : seededMessages
         for round in 0..<GroupChatLimits.maxRounds {
             guard isCurrent(room.id, epoch) else { return closing }
-            history = await repository.transcript(room: room)
-            let newMessages: [GroupMessage]
-            if let seeded = seed {
-                newMessages = seeded
-                seed = nil
-            } else {
-                newMessages = Array(history[min(consumed, history.count)...])
-            }
-            consumed = history.count
             guard !newMessages.isEmpty else { break }
             let resolution = GroupMentionRouter.resolveResponders(members: members, newMessages: newMessages, history: history, ownerAgentId: room.ownerMemberID)
             guard !resolution.responderIds.isEmpty else { break }
             var spoken = 0
+            var nextRoundMessages: [GroupMessage] = []
             for memberID in GroupMentionRouter.orderRoundSpeakers(resolution.responderIds, round: round) {
                 guard isCurrent(room.id, epoch), totalTurns < GroupChatLimits.maxMemberTurns,
                       let participant = room.members.first(where: { $0.id == memberID }) else { continue }
                 let member = participant.member
                 let prompt = GroupChatPrompt.turnPrompt(member: member, groupTitle: room.title, peers: members.filter { $0.id != memberID }, allMembers: members, newMessages: GroupMentionRouter.messagesSinceMemberLastSpoke(history, memberId: memberID))
                 guard let answer = await speak(room: room, participant: participant, prompt: prompt, round: round), isCurrent(room.id, epoch) else { continue }
-                history.append(.member(memberID, answer))
+                let published = GroupMessage.member(memberID, answer)
+                history.append(published)
+                nextRoundMessages.append(published)
                 totalTurns += 1
                 spoken += 1
                 closing = answer
             }
             guard spoken > 0 else { break }
+            // The engine actor serializes a room run, and speak() persists every
+            // accepted answer before returning. Keep the authoritative in-run
+            // projection above instead of re-reading and JSON-decoding the full
+            // transcript once per round. Concurrent sends are already captured
+            // by pendingSeeds/pendingRerun and begin a fresh run afterwards.
+            newMessages = nextRoundMessages
         }
         return closing
     }

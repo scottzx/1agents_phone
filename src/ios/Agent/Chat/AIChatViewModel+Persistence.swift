@@ -13,6 +13,7 @@ extension AIChatViewModel {
     /// implementation, the two writers can disagree and the reorder
     /// detector trips on every iCloud fetch after a send.
     static func computeOrderHash(of messages: [RawMessage]) -> Int {
+        guard !messages.isEmpty else { return 0 }
         var hasher = Hasher()
         for m in messages {
             hasher.combine(m.id)
@@ -68,9 +69,12 @@ extension AIChatViewModel {
             logger.info("[ReloadTrace] DEFER reason=\(reason) sid=\(sessionId.prefix(8)) — canResume with unpersisted candidate (blocks=\(candidate.blocks.count) > committed=\(self.committedBlockCount)); not overwriting in-memory interrupted content")
             return
         }
-        let dbMessages = await ChatStore.shared.loadMessages(sessionId: sessionId)
+        guard let fingerprint = await ChatStore.shared.sessionMessageFingerprint(sessionId: sessionId) else {
+            logger.error("[ReloadTrace] fingerprint failed reason=\(reason) sid=\(sessionId.prefix(8))")
+            return
+        }
         // [T-stream-empty-banner-trace race fix] Re-check after the
-        // `await loadMessages` suspension: a `send()` invocation
+        // `await sessionMessageFingerprint` suspension: a `send()` invocation
         // queued just behind us on the main thread can have flipped
         // `isProcessing` to true and appended a placeholder assistant
         // message while we were waiting on disk I/O. If we proceed
@@ -84,18 +88,18 @@ extension AIChatViewModel {
         // pick this up after `isProcessing` returns to false.
         if isProcessing || isCompacting {
             self.pendingSyncReloadOnIdle = true
-            logger.info("[ReloadTrace] DEFER-AFTER-AWAIT reason=\(reason) sid=\(sessionId.prefix(8)) isProcessing=\(self.isProcessing) isCompacting=\(self.isCompacting) — race detected after loadMessages await, will reload on idle")
+            logger.info("[ReloadTrace] DEFER-AFTER-AWAIT reason=\(reason) sid=\(sessionId.prefix(8)) isProcessing=\(self.isProcessing) isCompacting=\(self.isCompacting) — race detected after fingerprint await, will reload on idle")
             return
         }
-        let lastDbSortOrder = dbMessages.last?.sortOrder ?? 0
-        let dbCount = dbMessages.count
+        let lastDbSortOrder = fingerprint.maxSortOrder
+        let dbCount = fingerprint.count
         // Reload when new messages exist beyond our baseline. The second condition
         // handles synced sessions that were initially empty (lastKnownDbSortOrder == 0)
         // — messages arriving via iCloud should trigger a reload in that case too.
         // Also reload when messages were removed (e.g. retry deletion propagated from
         // another device) — detected by DB count being less than the known baseline.
         let hasNewMessages = lastDbSortOrder > lastKnownDbSortOrder
-        let wasEmptyNowHasMessages = lastKnownDbSortOrder == 0 && !dbMessages.isEmpty && messages.count <= 1
+        let wasEmptyNowHasMessages = lastKnownDbSortOrder == 0 && dbCount > 0 && messages.count <= 1
         let hasRemovedMessages = dbCount < lastKnownDbCount
         // Detect a silent sort_order rewrite by another sync path (e.g.
         // iCloud HEAL when LWW skipped the message but sort_order
@@ -103,7 +107,7 @@ extension AIChatViewModel {
         // in-memory ChatMessage array stays in the old order forever
         // because lastDbSortOrder is unchanged. Hash the sequence of
         // (id, sortOrder) pairs and compare against the last seen.
-        let hash = Self.computeOrderHash(of: dbMessages)
+        let hash = fingerprint.orderHash
         let hasReorderedMessages = hash != lastKnownDbOrderHash && lastKnownDbOrderHash != 0
         if hasNewMessages || wasEmptyNowHasMessages || hasRemovedMessages || hasReorderedMessages {
             let branch: String
@@ -265,6 +269,7 @@ extension AIChatViewModel {
         // Track the highest sortOrder and count so iCloud sync reload triggers for new or removed messages.
         lastKnownDbSortOrder = rawMessages.last?.sortOrder ?? 0
         lastKnownDbCount = rawMessages.count
+        lastKnownDbOrderHash = Self.computeOrderHash(of: rawMessages)
         // [T-ios-token-usage-reload-per-iteration] Zero the session token
         // accumulators BEFORE the empty-session early return below, so switching
         // this vm from a non-empty session to an empty one doesn't leave the old
@@ -300,12 +305,16 @@ extension AIChatViewModel {
         let showThinking = ProviderConfigStore.shared.inferenceConfig(for: sessionId)?.thinkingLevel.isEnabled ?? false
 
         for raw in rawMessages {
-            // Always rebuild agent history (every message matters for API context).
-            // Phase B: stamp the DB row id into dbMessageId so compact can resolve
-            // boundaries by id after restore.
-            var agentMsg = raw.toAgentMessage(mediaResolver: resolver)
-            agentMsg.dbMessageId = raw.id
-            loadedHistory.append(agentMsg)
+            // A group transcript is a display/routing projection. Its member
+            // agents run in their own private sessions, so this full API-context
+            // copy is never consumed. Avoid rebuilding it for long rooms.
+            if !isGroupTranscript {
+                // Phase B: stamp the DB row id into dbMessageId so compact can
+                // resolve boundaries by id after restore.
+                var agentMsg = raw.toAgentMessage(mediaResolver: resolver)
+                agentMsg.dbMessageId = raw.id
+                loadedHistory.append(agentMsg)
+            }
 
             // [T-bridge-message-ui-leak] The #579 role-alternation bridge is
             // LLM-context-only: it stays in loadedHistory (appended above, so
@@ -454,7 +463,9 @@ extension AIChatViewModel {
         //
         // Fallback chain for legacy markers (no firstKeptMessageId):
         //   firstKeptMessageId → boundaryMessageId → firstKeptSortOrder
-        let compactMarker = remoteDeviceId == nil ? await ChatStore.shared.latestCompactMarker(sessionId: sessionId) : nil
+        let compactMarker = remoteDeviceId == nil && !isGroupTranscript
+            ? await ChatStore.shared.latestCompactMarker(sessionId: sessionId)
+            : nil
         self.cachedLatestMarker = compactMarker
         if let marker = compactMarker {
             logger.info("[Compact] ━━━ Phase 2.5: restore (Phase B id-first) ━━━")
@@ -676,17 +687,23 @@ extension AIChatViewModel {
         // badge baseline to the current assistant-turn count. Without this, a
         // late/duplicate endBackgroundProcessing() after read (baseline still
         // at its -1 init) would see turns > -1 and re-badge with no new content.
-        lastBadgedAssistantTurnCount = loadedHistory.reduce(0) { $0 + ($1.role == .assistant ? 1 : 0) }
+        lastBadgedAssistantTurnCount = isGroupTranscript
+            ? rawMessages.reduce(0) { $0 + ($1.role == .assistant ? 1 : 0) }
+            : loadedHistory.reduce(0) { $0 + ($1.role == .assistant ? 1 : 0) }
 
         let phase25Elapsed = (CFAbsoluteTimeGetCurrent() - phase2aStart) * 1000 - phase2aElapsed
         let phase2sigStart = CFAbsoluteTimeGetCurrent()
 
-        // Restore Gemini thought signatures from persisted tool calls
+        // Restore Gemini thought signatures from persisted tool calls. Group
+        // transcripts never enter an agent loop; their members use private
+        // sessions, so this metadata would be another unused full scan.
         pendingThoughtSignatures = [:]
-        for raw in rawMessages {
-            for part in raw.parts {
-                if case .toolUse(let tu) = part, let sig = tu.thoughtSignature {
-                    pendingThoughtSignatures[tu.toolUseId] = ToolCallMetadata(thoughtSignature: sig)
+        if !isGroupTranscript {
+            for raw in rawMessages {
+                for part in raw.parts {
+                    if case .toolUse(let tu) = part, let sig = tu.thoughtSignature {
+                        pendingThoughtSignatures[tu.toolUseId] = ToolCallMetadata(thoughtSignature: sig)
+                    }
                 }
             }
         }
@@ -712,16 +729,25 @@ extension AIChatViewModel {
         // Phase 3: Extract tool snapshots
         let snapshotStart = CFAbsoluteTimeGetCurrent()
         var loadedSnapshots: [ToolSnapshotItem] = []
+        var toolUsesByID: [String: (name: String, input: String)] = [:]
+        for raw in rawMessages {
+            for part in raw.parts {
+                if case .toolUse(let toolUse) = part {
+                    toolUsesByID[toolUse.toolUseId] = (toolUse.name, toolUse.input)
+                }
+            }
+        }
         for raw in rawMessages {
             for part in raw.parts {
                 if case .toolResult(let tr) = part, let snap = tr.snapshot {
-                    let toolName = Self.findToolName(for: tr.toolUseId, in: rawMessages)
+                    let toolUse = toolUsesByID[tr.toolUseId]
+                    let toolName = toolUse?.name ?? "tool"
                     // For file_write: ensure snapshot contains file content, not just tool result
                     let finalSnap: ToolSnapshot
                     if toolName == "file_write",
                        let text = snap.text, text.hasPrefix("Wrote to ") || text.hasPrefix("Appended to ") {
                         // Old-format snapshot — recover file content from ToolUse input or disk
-                        let fileContent = Self.recoverFileWriteContent(for: tr.toolUseId, in: rawMessages)
+                        let fileContent = Self.recoverFileWriteContent(from: toolUse?.input)
                         if let fileContent, !fileContent.isEmpty {
                             let lines = fileContent.components(separatedBy: "\n")
                             let preview = lines.prefix(200).joined(separator: "\n")
@@ -897,31 +923,13 @@ extension AIChatViewModel {
         }
     }
 
-    /// Find the tool name for a given toolUseId by scanning all messages for a matching toolUse part.
-    private static func findToolName(for toolUseId: String, in messages: [RawMessage]) -> String {
-        for msg in messages {
-            for part in msg.parts {
-                if case .toolUse(let tu) = part, tu.toolUseId == toolUseId {
-                    return tu.name
-                }
-            }
-        }
-        return "tool"
-    }
-
     /// Recover original file content for a file_write tool from persisted ToolUse input.
-    private static func recoverFileWriteContent(for toolUseId: String, in messages: [RawMessage]) -> String? {
-        for msg in messages {
-            for part in msg.parts {
-                if case .toolUse(let tu) = part, tu.toolUseId == toolUseId, tu.name == "file_write" {
-                    guard let data = tu.input.data(using: .utf8),
-                          let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                          let content = dict["content"] as? String else { return nil }
-                    return content
-                }
-            }
-        }
-        return nil
+    private static func recoverFileWriteContent(from input: String?) -> String? {
+        guard let input,
+              let data = input.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return nil }
+        return dict["content"] as? String
     }
 
     /// Apply tool results from a tool-result RawMessage onto an assistant ChatMessage's tool blocks.

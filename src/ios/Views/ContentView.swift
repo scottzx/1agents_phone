@@ -952,7 +952,13 @@ struct ContentView: View {
                                 .id(id)
                         }
                     } else {
-                        AIChatView(sessionId: Self.isNewSessionId(id) ? nil : id, draftId: Self.isNewSessionId(id) ? id : nil, initialGroupId: Self.extractGroupId(from: id))
+                        let isDraft = Self.isNewSessionId(id)
+                        AIChatView(
+                            sessionId: isDraft ? nil : id,
+                            draftId: isDraft ? id : nil,
+                            initialGroupId: Self.extractGroupId(from: id),
+                            initialSession: isDraft ? nil : sessionForRow(id)
+                        )
                             .id(id)
                             .onAppear {
                                 if currentStackSessionId != id { currentStackSessionId = id }
@@ -974,7 +980,13 @@ struct ContentView: View {
             // on first send. The .id() ensures each draft gets its own View lifecycle.
             let isDraft = Self.isNewSessionId(id)
             let effectiveId: String? = isDraft ? nil : id
-            AIChatView(sessionId: effectiveId, draftId: isDraft ? id : nil, initialGroupId: Self.extractGroupId(from: id))
+            AIChatView(
+                sessionId: effectiveId,
+                draftId: isDraft ? id : nil,
+                initialGroupId: Self.extractGroupId(from: id),
+                initialSession: isDraft ? nil : sessionForRow(id),
+                showsHeaderBackButton: false
+            )
                 .id(id)
                 .onAppear {
                     draftLog.info("🔑DRAFT detailView APPEAR id=\(id) effectiveId=\(effectiveId ?? "nil") isDraft=\(isDraft)")
@@ -5448,4 +5460,3 @@ private struct ForceSyncToastBanner: View {
         .frame(maxWidth: 480)
     }
 }
-

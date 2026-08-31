@@ -389,6 +389,29 @@ final class AgentDirectoryCoordinator {
             return groupSendError(error, group: group)
         }
 
+        let targetSet = Set(targets)
+        let recipients = members.filter { member in
+            member.id != senderId && (atAll || targetSet.contains(member.id))
+        }
+        var destinations: [GroupA2ADeliveryDestination] = []
+        for recipient in recipients {
+            let sessionId = await GroupStore.shared.openMemberSession(group: group, agentId: recipient.id)
+            destinations.append(GroupA2ADeliveryDestination(
+                agentId: recipient.id,
+                name: recipient.name,
+                sessionId: sessionId
+            ))
+        }
+        await IOSGroupTranscriptPresenter.shared.appendA2ADelivery(
+            groupSessionId: group.sessionId,
+            senderAgentId: senderId,
+            groupId: group.id,
+            recipients: destinations,
+            message: message,
+            requestedAgentIds: atAll ? [GroupMentionRouter.everyoneId] : targets,
+            projectedMessage: GroupMentionRouter.render(canonical, members: members)
+        )
+
         if callerGroupId == groupId {
             pendingGroupMessages[callerSessionId, default: []].append(canonical)
             logger.info("queued in-turn group A2A group=\(groupId.prefix(8)) sender=\(senderId.prefix(8)) targets=\(targets.count) all=\(atAll)")
@@ -488,7 +511,9 @@ final class AgentDirectoryCoordinator {
     /// is visible to the user on purpose: an assistant they never addressed
     /// speaking in their conversation should never look like it came from them.
     private func envelope(from sender: String, message: String, awaitingReply: Bool) -> String {
-        var text = String(localized: "📨 来自助手「\(sender)」的消息：") + "\n\n" + message
+        var text = AgentInboundMessageClassifier.directRelayMarker
+            + String(localized: "来自助手「\(sender)」的消息：")
+            + "\n\n" + message
         if awaitingReply {
             text += "\n\n" + String(localized: "（对方正在等你的回复，你这一轮的最终文字会原样回传给它。）")
         }

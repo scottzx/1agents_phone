@@ -68,9 +68,11 @@ struct AgentListView: View {
                     roster
                 }
             }
-            .navigationTitle("一芥伙伴")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    MinisNavigationHeader(title: String(localized: "一芥伙伴"))
+                }
                 // Settings used to live several taps deep inside the session
                 // list. The roster is the app root now, so it owns the shortcut.
                 ToolbarItem(placement: .topBarLeading) {
@@ -108,7 +110,14 @@ struct AgentListView: View {
                 case .agent(let agentId):
                     AgentMainSessionView(agentId: agentId)
                 case .session(let sessionId):
-                    AIChatView(sessionId: sessionId)
+                    let destination = AgentSessionDestination(routeId: sessionId)
+                    AIChatView(
+                        sessionId: destination.sessionId,
+                        draftId: destination.draftId,
+                        initialSession: destination.sessionId.flatMap { id in
+                            sessions.first(where: { $0.id == id })
+                        }
+                    )
                 case .group(let groupId):
                     GroupSessionView(groupId: groupId)
                 }
@@ -664,17 +673,15 @@ struct AgentMainSessionView: View {
     var body: some View {
         Group {
             if let sessionId {
-                AIChatView(sessionId: sessionId)
+                AIChatView(
+                    sessionId: sessionId,
+                    initialHeaderTitle: store.agent(agentId)?.name,
+                    headerActionSystemImage: "slider.horizontal.3",
+                    headerActionAccessibilityLabel: String(localized: "Agent 设置"),
+                    onHeaderAction: { showingHome = true }
+                )
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showingHome = true } label: {
-                    Image(systemName: "slider.horizontal.3")
-                }
-                .accessibilityLabel(String(localized: "Agent 设置"))
             }
         }
         .sheet(isPresented: $showingHome) {

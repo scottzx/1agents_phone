@@ -70,18 +70,15 @@ struct GroupSessionView: View {
     var body: some View {
         Group {
             if let group {
-                AIChatView(sessionId: group.sessionId)
+                AIChatView(
+                    sessionId: group.sessionId,
+                    initialHeaderTitle: "\(group.title)（\(group.memberIds.count)人）",
+                    headerActionSystemImage: "person.2.badge.gearshape",
+                    headerActionAccessibilityLabel: String(localized: "群设置"),
+                    onHeaderAction: { showingSettings = true }
+                )
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button { showingSettings = true } label: {
-                    Image(systemName: "person.2.badge.gearshape")
-                }
-                .accessibilityLabel(String(localized: "群设置"))
-                .disabled(group == nil)
             }
         }
         .sheet(isPresented: $showingSettings) {

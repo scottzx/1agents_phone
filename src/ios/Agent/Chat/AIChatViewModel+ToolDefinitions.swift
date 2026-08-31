@@ -1,5 +1,32 @@
 import Foundation
 
+/// A group member gets the same public `send_agent_message` verb as a normal
+/// chat, but with a narrower schema. Conditional private/group fields were
+/// easy for smaller OpenAI-compatible models to ignore, producing a visible
+/// `@名字` sentence instead of a tool call. Requiring `group_id` and removing
+/// private-only knobs makes the group contract unambiguous without changing
+/// the unified tool semantics.
+enum GroupA2AToolDefinitions {
+    static func make(from directoryTools: [AgentToolDefinition]) -> [AgentToolDefinition] {
+        guard let list = directoryTools.first(where: { $0.name == "list_agents" }),
+              let send = directoryTools.first(where: { $0.name == "send_agent_message" }) else {
+            return []
+        }
+
+        let groupParameters = send.parameters.filter { key, _ in
+            key != "wait_seconds" && key != "interrupt"
+        }
+        let groupSend = AgentToolDefinition(
+            name: send.name,
+            description: "Send the current public group utterance to one or more group members. In this group session is_group MUST be true, group_id MUST be copied from the group context, agent_id MUST be a JSON list, and message MUST contain plain prose without @ mentions. Use [\"at_all\"] only when the current assistant is the group owner. This tool call, not visible @name text, is what wakes the recipients.",
+            parameters: groupParameters,
+            required: ["tool_title", "is_group", "group_id", "agent_id", "message"],
+            propertyOrdering: ["tool_title", "is_group", "group_id", "agent_id", "message"]
+        )
+        return [list, groupSend]
+    }
+}
+
 // MARK: - Tool Definitions (Canonical)
 
 extension AIChatViewModel {
@@ -64,9 +91,7 @@ extension AIChatViewModel {
             if groupId == nil {
                 tools.append(contentsOf: AgentDirectoryTools.definitions)
             } else {
-                tools.append(contentsOf: AgentDirectoryTools.definitions.filter {
-                    $0.name == "list_agents" || $0.name == "send_agent_message"
-                })
+                tools.append(contentsOf: GroupA2AToolDefinitions.make(from: AgentDirectoryTools.definitions))
             }
         }
 

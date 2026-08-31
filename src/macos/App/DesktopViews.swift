@@ -10,41 +10,30 @@ struct DesktopRootView: View {
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $model.selectedSessionID) {
-                Section("Conversations") {
-                    ForEach(model.conversations.filter { $0.kind == .conversation }) { item in
-                        conversationRow(item, icon: "message").tag(item.id)
-                    }
-                }
-                Section("Agents") {
-                    ForEach(model.agents) { agent in
-                        if let session = model.conversations.first(where: { $0.agentID == agent.id && $0.groupID == nil }) {
-                            conversationRow(session, icon: "person.crop.circle").tag(session.id)
-                        }
-                    }
-                    Button("New Agent…") { showingAgent = true }
-                }
-                Section("Groups") {
-                    ForEach(model.groups) { group in
-                        if let session = model.conversations.first(where: { $0.id == group.sessionID }) {
-                            conversationRow(session, icon: "person.3").tag(session.id)
-                        }
-                    }
-                    Button("New Group…") { showingGroup = true }
-                }
-            }
-            .navigationTitle("Minis")
+            sidebar
             .onChange(of: model.selectedSessionID) { _, id in if let id { Task { await model.open(id) } } }
-            .toolbar { Button { Task { await model.createConversation() } } label: { Image(systemName: "square.and.pencil") } }
         } content: {
             ChatColumn(model: model)
-                .navigationTitle(model.selectedConversation?.title ?? "Minis")
         } detail: {
             InspectorColumn(model: model)
         }
+        .navigationSplitViewStyle(.balanced)
         .safeAreaInset(edge: .bottom) {
-            HStack { Circle().fill(model.status.contains("error") ? .red : .green).frame(width: 7); Text(model.status).font(.caption).foregroundStyle(.secondary); Spacer() }
-                .padding(.horizontal, 12).padding(.vertical, 5).background(.bar)
+            HStack(spacing: 7) {
+                Circle()
+                    .fill(model.status.localizedCaseInsensitiveContains("error") ? .red : .green)
+                    .frame(width: 7, height: 7)
+                Text(model.status)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Text("Minis for Mac")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 7)
+            .background(.bar)
         }
         .sheet(isPresented: $showingAgent) { NewAgentView(model: model, isPresented: $showingAgent) }
         .sheet(isPresented: $showingGroup) { NewGroupView(model: model, isPresented: $showingGroup) }
@@ -71,8 +60,73 @@ struct DesktopRootView: View {
         }
     }
 
+    private var sidebar: some View {
+        List(selection: $model.selectedSessionID) {
+            Section {
+                Button {
+                    Task { await model.createConversation() }
+                } label: {
+                    Label("New conversation", systemImage: "square.and.pencil")
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 12, trailing: 8))
+            }
+
+            Section("CHATS") {
+                ForEach(model.conversations.filter { $0.kind == .conversation }) { item in
+                    conversationRow(item, icon: "message.fill").tag(item.id)
+                }
+            }
+            Section("AGENTS") {
+                ForEach(model.agents) { agent in
+                    if let session = model.conversations.first(where: { $0.agentID == agent.id && $0.groupID == nil }) {
+                        conversationRow(session, icon: "person.crop.circle.fill").tag(session.id)
+                    }
+                }
+                sidebarAction("New Agent…", icon: "person.badge.plus") { showingAgent = true }
+            }
+            Section("GROUPS") {
+                ForEach(model.groups) { group in
+                    if let session = model.conversations.first(where: { $0.id == group.sessionID }) {
+                        conversationRow(session, icon: "person.3.fill").tag(session.id)
+                    }
+                }
+                sidebarAction("New Group…", icon: "person.3.sequence.fill") { showingGroup = true }
+            }
+        }
+        .listStyle(.sidebar)
+        .navigationTitle("Minis")
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                Button { Task { await model.createConversation() } } label: { Image(systemName: "square.and.pencil") }
+                    .help("New conversation")
+            }
+        }
+    }
+
     private func conversationRow(_ item: RuntimeConversation, icon: String) -> some View {
-        Label { VStack(alignment: .leading) { Text(item.title); Text(item.updatedAt, style: .relative).font(.caption2).foregroundStyle(.secondary) } } icon: { Image(systemName: icon) }
+        Label {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.title).lineLimit(1)
+                Text(item.updatedAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: icon)
+                .foregroundStyle(.tint)
+        }
+        .padding(.vertical, 2)
+    }
+
+    private func sidebarAction(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func acceptDrop(_ providers: [NSItemProvider]) -> Bool {
@@ -100,39 +154,132 @@ private struct ChatColumn: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            chatHeader
             if model.selectedConversation == nil {
-                ContentUnavailableView("Choose a conversation", systemImage: "bubble.left.and.bubble.right")
+                ContentUnavailableView {
+                    Label("Choose a conversation", systemImage: "bubble.left.and.bubble.right.fill")
+                } description: {
+                    Text("Select a chat from the sidebar, or start a new conversation to begin.")
+                } actions: {
+                    Button("New conversation") { Task { await model.createConversation() } }
+                        .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.background)
             } else {
                 ScrollViewReader { proxy in
-                    List(model.messages) { message in
-                        VStack(alignment: .leading, spacing: 5) {
-                            if message.role == .user {
-                                Text("You").font(.caption.bold()).foregroundStyle(.secondary)
-                            } else {
-                                Text(senderName(message)).font(.caption.bold()).foregroundStyle(.tint)
+                    ScrollView {
+                        LazyVStack(spacing: 18) {
+                            if model.messages.isEmpty {
+                                welcomeState
                             }
-                            Text(message.text).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+                            ForEach(model.messages) { message in
+                                MessageBubble(message: message, senderName: senderName(message))
+                                    .id(message.id)
+                            }
                         }
-                        .padding(.vertical, 5).id(message.id)
+                        .padding(.horizontal, 28)
+                        .padding(.vertical, 24)
+                        .frame(maxWidth: 980, maxHeight: .infinity)
+                        .frame(maxWidth: .infinity)
                     }
                     .onChange(of: model.messages.count) { _, _ in if let id = model.messages.last?.id { proxy.scrollTo(id, anchor: .bottom) } }
                 }
-                Divider()
-                HStack(alignment: .bottom, spacing: 10) {
-                    TextEditor(text: $model.composer).frame(minHeight: 48, maxHeight: 120).font(.body)
-                    if model.isRunning {
-                        Button("Stop") { Task { await model.cancel() } }.buttonStyle(.bordered)
-                    } else {
-                        Button { Task { await model.send() } } label: { Image(systemName: "arrow.up.circle.fill").font(.title2) }.buttonStyle(.plain).disabled(!model.canSend)
-                    }
-                }.padding(12)
-                if !model.fileContextURLs.isEmpty {
-                    FileContextBar(model: model)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
-                }
+                composer
             }
         }
+        .background(.background)
+    }
+
+    private var chatHeader: some View {
+        HStack(spacing: 12) {
+            Image(systemName: model.selectedConversation == nil ? "sparkles" : "bubble.left.and.bubble.right.fill")
+                .font(.title3)
+                .foregroundStyle(.tint)
+                .frame(width: 34, height: 34)
+                .background(.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.selectedConversation?.title ?? "Your workspace")
+                    .font(.headline)
+                    .lineLimit(1)
+                Text(model.selectedConversation == nil ? "Start or select a conversation" : "Conversation")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if model.selectedConversation != nil {
+                Label(model.isRunning ? "Working" : "Ready", systemImage: model.isRunning ? "ellipsis" : "checkmark.circle.fill")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(model.isRunning ? Color.secondary : Color.green)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 6)
+                    .background(.quaternary, in: Capsule())
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 14)
+        .background(.bar)
+    }
+
+    private var welcomeState: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: "sparkles")
+                .font(.title2)
+                .foregroundStyle(.tint)
+            Text("What would you like to work on?")
+                .font(.title3.weight(.semibold))
+            Text("Give Minis a goal, add file context, or drop a folder anywhere in the window to switch workspaces.")
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(22)
+        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var composer: some View {
+        VStack(spacing: 9) {
+            if !model.fileContextURLs.isEmpty {
+                FileContextBar(model: model)
+            }
+            HStack(alignment: .bottom, spacing: 12) {
+                TextEditor(text: $model.composer)
+                    .font(.body)
+                    .scrollContentBackground(.hidden)
+                    .frame(minHeight: 54, maxHeight: 130)
+                    .padding(.horizontal, 5)
+                if model.isRunning {
+                    Button("Stop") { Task { await model.cancel() } }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                } else {
+                    Button { Task { await model.send() } } label: {
+                        Image(systemName: "arrow.up")
+                            .font(.headline.weight(.bold))
+                            .frame(width: 32, height: 32)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .clipShape(Circle())
+                    .disabled(!model.canSend)
+                    .help("Send message")
+                }
+            }
+            HStack {
+                Text("Drop files to add context")
+                Spacer()
+                Text("⌘↵ to send")
+            }
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.separator.opacity(0.55))
+        }
+        .padding(.horizontal, 22)
+        .padding(.vertical, 14)
+        .background(.bar)
     }
 
     private func senderName(_ message: RuntimeMessageRecord) -> String {
@@ -141,65 +288,153 @@ private struct ChatColumn: View {
     }
 }
 
+private struct MessageBubble: View {
+    let message: RuntimeMessageRecord
+    let senderName: String
+
+    private var isUser: Bool { message.role == .user }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            if !isUser { avatar }
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 5) {
+                Text(isUser ? "You" : senderName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isUser ? Color.secondary : Color.accentColor)
+                Text(message.text)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: 680, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 11)
+                    .background(isUser ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary.opacity(0.6)), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .foregroundStyle(isUser ? .white : .primary)
+            }
+            if isUser { avatar }
+        }
+        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+    }
+
+    private var avatar: some View {
+        Image(systemName: isUser ? "person.fill" : "sparkles")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(isUser ? Color.secondary : Color.accentColor)
+            .frame(width: 28, height: 28)
+            .background(.quaternary, in: Circle())
+    }
+}
+
 private struct InspectorColumn: View {
     @ObservedObject var model: DesktopViewModel
 
     var body: some View {
-        Form {
-            Section("Workspace") {
-                Text(model.workspacePath).font(.caption).textSelection(.enabled).lineLimit(3)
-                HStack {
-                    Button("Choose Folder…") { model.selectWorkspace() }
-                    Button("Reveal in Finder") { model.revealWorkspaceInFinder() }
-                        .disabled(model.workspacePath == "No workspace selected")
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                inspectorHeader
+                InspectorCard("Workspace", icon: "folder.fill") {
+                    Text(model.workspacePath)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                        .lineLimit(3)
+                    HStack {
+                        Button("Choose Folder…") { model.selectWorkspace() }
+                        Button("Reveal") { model.revealWorkspaceInFinder() }
+                            .disabled(model.workspacePath == "No workspace selected")
+                    }
                 }
-            }
-            Section("Agent command") {
-                Toggle("Allow the Agent to request macOS Shell", isOn: Binding(
-                    get: { model.selectedConversation?.agentShellAccess == true },
-                    set: { enabled in Task { await model.setAgentShellAccess(enabled) } }
-                ))
-                .help("Off by default. When enabled, every model-initiated command requires an explicit approval before it runs with your user permissions.")
-                TextEditor(text: $model.shellCommand).font(.body.monospaced()).frame(minHeight: 90)
-                Button("Run") { Task { await model.runShell() } }.disabled(model.isRunning)
-                if !model.shellOutput.isEmpty { ScrollView { Text(model.shellOutput).font(.caption.monospaced()).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }.frame(minHeight: 120) }
-            }
-            Section("Interactive terminal") {
-                if model.inspectorTerminalVisible {
-                    TerminalPanel(model: model, minimumHeight: 220)
-                } else {
-                    Button("Show Terminal") { model.showInspectorTerminal() }
+                InspectorCard("Agent command", icon: "terminal.fill") {
+                    Toggle("Allow macOS Shell requests", isOn: Binding(
+                        get: { model.selectedConversation?.agentShellAccess == true },
+                        set: { enabled in Task { await model.setAgentShellAccess(enabled) } }
+                    ))
+                    .help("Off by default. When enabled, every model-initiated command requires an explicit approval before it runs with your user permissions.")
+                    TextEditor(text: $model.shellCommand)
+                        .font(.body.monospaced())
+                        .scrollContentBackground(.hidden)
+                        .frame(minHeight: 86)
+                        .padding(7)
+                        .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                    Button("Run command") { Task { await model.runShell() } }
+                        .disabled(model.isRunning)
+                    if !model.shellOutput.isEmpty {
+                        ScrollView { Text(model.shellOutput).font(.caption.monospaced()).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+                            .frame(minHeight: 110)
+                            .padding(8)
+                            .background(.background, in: RoundedRectangle(cornerRadius: 8))
+                    }
                 }
-            }
-            if let conversation = model.selectedConversation {
-                Section("Runtime") {
-                    LabeledContent("Kind", value: conversation.kind.rawValue)
-                    LabeledContent("Session", value: String(conversation.id.prefix(8)))
-                    Picker("Provider", selection: Binding(
-                        get: { conversation.providerConfigurationID ?? "__default__" },
-                        set: { value in Task { await model.bindSelectedSession(to: value == "__default__" ? nil : value) } }
-                    )) {
-                        Text("Default").tag("__default__")
-                        ForEach(model.providerConfigurations, id: \.id) { configuration in
-                            Text(configuration.displayName).tag(configuration.id)
+                InspectorCard("Interactive terminal", icon: "rectangle.split.3x1") {
+                    if model.inspectorTerminalVisible {
+                        TerminalPanel(model: model, minimumHeight: 220)
+                    } else {
+                        Button("Show Terminal") { model.showInspectorTerminal() }
+                    }
+                }
+                if let conversation = model.selectedConversation {
+                    InspectorCard("Runtime", icon: "cpu") {
+                        LabeledContent("Kind", value: conversation.kind.rawValue)
+                        LabeledContent("Session", value: String(conversation.id.prefix(8)))
+                        Picker("Provider", selection: Binding(
+                            get: { conversation.providerConfigurationID ?? "__default__" },
+                            set: { value in Task { await model.bindSelectedSession(to: value == "__default__" ? nil : value) } }
+                        )) {
+                            Text("Default").tag("__default__")
+                            ForEach(model.providerConfigurations, id: \.id) { configuration in
+                                Text(configuration.displayName).tag(configuration.id)
+                            }
                         }
                     }
                 }
-            }
-            Section("iCloud Sync") {
-                Text(model.cloudSyncMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if let sync = model.cloudSyncStatus {
-                    LabeledContent("Uploaded", value: String(sync.uploadedCount))
-                    LabeledContent("Downloaded", value: String(sync.downloadedCount))
+                InspectorCard("iCloud Sync", icon: "icloud.fill") {
+                    Text(model.cloudSyncMessage).font(.caption).foregroundStyle(.secondary)
+                    if let sync = model.cloudSyncStatus {
+                        HStack { LabeledContent("Uploaded", value: String(sync.uploadedCount)); LabeledContent("Downloaded", value: String(sync.downloadedCount)) }
+                    }
+                    Button(model.isCloudSyncing ? "Syncing…" : "Sync Now") { Task { await model.synchronizeNow() } }
+                        .disabled(model.isCloudSyncing)
                 }
-                Button(model.isCloudSyncing ? "Syncing…" : "Sync Now") {
-                    Task { await model.synchronizeNow() }
-                }
-                .disabled(model.isCloudSyncing)
             }
-        }.formStyle(.grouped).frame(minWidth: 280)
+            .padding(16)
+        }
+        .frame(minWidth: 300)
+        .background(.background)
+    }
+
+    private var inspectorHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Workspace tools").font(.headline)
+                Text("Session controls and local tools").font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer()
+            Image(systemName: "slider.horizontal.3")
+                .foregroundStyle(.tint)
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+private struct InspectorCard<Content: View>: View {
+    let title: String
+    let icon: String
+    @ViewBuilder let content: Content
+
+    init(_ title: String, icon: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.icon = icon
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Label(title, systemImage: icon)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            content
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

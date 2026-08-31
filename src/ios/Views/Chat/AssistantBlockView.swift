@@ -199,6 +199,13 @@ struct ShimmerOverlay: View {
 
 // MARK: - Tool Capsule View (unified pill for all tool types)
 
+private struct A2ASessionPreview: Identifiable {
+    let sessionId: String
+    let agentName: String
+
+    var id: String { sessionId }
+}
+
 struct ToolCapsuleView: View {
     @ObservedObject var block: AssistantBlock
     let icon: String
@@ -211,6 +218,8 @@ struct ToolCapsuleView: View {
     @State private var dotsActive = false
     /// [T-tool-bg-suspended-hint] Drives the background-suspension info alert.
     @State private var showBgHintAlert = false
+    @State private var showA2ADestinations = false
+    @State private var a2aSessionPreview: A2ASessionPreview?
     @ObservedObject private var keepAlive = BackgroundKeepAliveManager.shared
 
     /// Show the yellow ⓘ hint only when this tool was flagged as background-
@@ -230,6 +239,16 @@ struct ToolCapsuleView: View {
             return summary
         }
         return block.toolDescription
+    }
+
+    private var a2aDelivery: GroupA2ADeliveryPayload? {
+        guard case .subagentTool(let action, _) = block.kind,
+              action == "send_agent_message" else { return nil }
+        return GroupA2ADeliveryPayload.decode(block.toolInputArgs)
+    }
+
+    private var linkedA2ADestinations: [GroupA2ADeliveryDestination] {
+        a2aDelivery?.destinations.filter { $0.sessionId != nil } ?? []
     }
 
     /// [T-ios-tool-bubble-longpress-menu] Human-readable, paste-back-able
@@ -357,6 +376,12 @@ struct ToolCapsuleView: View {
                         .foregroundStyle(ChatColors.tertiaryText)
                 }
 
+                if !linkedA2ADestinations.isEmpty {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(ChatColors.tertiaryText)
+                }
+
                 // Stop button for running commands
                 if case .running = block.toolStatus {
                     Button {
@@ -395,7 +420,7 @@ struct ToolCapsuleView: View {
             )
             .contentShape(Capsule())
             .onTapGesture {
-                detailBlock = block
+                openA2ADeliveryOrDetails()
             }
             .contextMenu {
                 // [T-ios-msg-contextmenu-recursion-crash] Gate the eager menu
@@ -478,6 +503,55 @@ struct ToolCapsuleView: View {
         } message: {
             Text(String(localized: "This tool may have been paused by the system while running in the background. Enable enhanced background execution to improve background task reliability."))
         }
+        .confirmationDialog(
+            String(localized: "查看投递会话"),
+            isPresented: $showA2ADestinations,
+            titleVisibility: .visible
+        ) {
+            ForEach(linkedA2ADestinations, id: \.agentId) { destination in
+                Button(destination.name) { openA2ADestination(destination) }
+            }
+            Button(String(localized: "取消"), role: .cancel) {}
+        } message: {
+            Text(String(localized: "选择要打开的成员会话"))
+        }
+        .sheet(item: $a2aSessionPreview) { preview in
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(String(localized: "A2A 投递会话"))
+                            .font(.headline)
+                        Text(preview.agentName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        a2aSessionPreview = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(String(localized: "关闭")))
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+
+                Divider()
+                AIChatView(
+                    sessionId: preview.sessionId,
+                    initialHeaderTitle: preview.agentName,
+                    showsPageHeader: false
+                )
+            }
+            // Open directly at the sheet's maximum height. Supplying the 90%
+            // detent first makes SwiftUI choose it as the initial stop, which
+            // creates the visible two-stage 90% → full-height interaction.
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .onChange(of: isStreaming) { streaming in
             dotsActive = streaming
         }
@@ -486,6 +560,27 @@ struct ToolCapsuleView: View {
                 dotsActive = true
             }
         }
+    }
+
+    private func openA2ADeliveryOrDetails() {
+        switch linkedA2ADestinations.count {
+        case 1:
+            if let destination = linkedA2ADestinations.first {
+                openA2ADestination(destination)
+            }
+        case 2...:
+            showA2ADestinations = true
+        default:
+            detailBlock = block
+        }
+    }
+
+    private func openA2ADestination(_ destination: GroupA2ADeliveryDestination) {
+        guard let sessionId = destination.sessionId else { return }
+        a2aSessionPreview = A2ASessionPreview(
+            sessionId: sessionId,
+            agentName: destination.name
+        )
     }
 
     // MARK: - Status / Icon

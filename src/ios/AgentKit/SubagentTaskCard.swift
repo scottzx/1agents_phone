@@ -139,8 +139,10 @@ struct SubagentTranscriptView: View {
     let task: ChatSession
 
     var body: some View {
-        AIChatView(sessionId: task.id)
-            .navigationTitle(task.spawnTitle ?? String(localized: "后台任务"))
-            .navigationBarTitleDisplayMode(.inline)
+        AIChatView(
+            sessionId: task.id,
+            initialSession: task,
+            initialHeaderTitle: task.spawnTitle ?? String(localized: "后台任务")
+        )
     }
 }

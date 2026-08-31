@@ -35,6 +35,15 @@ enum SyncStatus: Equatable {
     case disabled
 }
 
+/// Lightweight identity/order snapshot used to decide whether a cached chat
+/// needs a full reload. It intentionally excludes parts_json so merely opening
+/// an already-cached long session does not decode the entire conversation.
+struct SessionMessageFingerprint: Sendable, Equatable {
+    let count: Int
+    let maxSortOrder: Int
+    let orderHash: Int
+}
+
 // Chat persistence value types and the repository contract live in
 // src/apple/Domain/ChatPersistence.swift so iOS and macOS compile the same
 // Codable wire format. SQLite ownership remains in ChatStore below.
@@ -2446,6 +2455,46 @@ actor ChatStore {
         return (count, maxSo)
     }
 
+    /// Read only the columns needed by AIChatViewModel's cache-consistency
+    /// check. The ordered (id, sort_order) hash preserves detection of a sync
+    /// reorder where COUNT and MAX(sort_order) stay unchanged, without paying
+    /// for ContentPart/usage JSON decoding on every view re-entry.
+    func sessionMessageFingerprint(sessionId: String) -> SessionMessageFingerprint? {
+        let sql = """
+            SELECT id, sort_order
+            FROM messages
+            WHERE session_id = ?
+            ORDER BY sort_order ASC, created_at ASC, id ASC
+        """
+        var stmt: OpaquePointer?
+        var count = 0
+        var maxSortOrder = 0
+        var hasher = Hasher()
+
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            let error = sqlite3_errmsg(db).map { String(cString: $0) } ?? "unknown"
+            logger.error("[ChatStore.sessionMessageFingerprint] prepare failed for \(sessionId): \(error)")
+            sqlite3_finalize(stmt)
+            return nil
+        }
+        defer { sqlite3_finalize(stmt) }
+
+        sqlite3_bind_text(stmt, 1, (sessionId as NSString).utf8String, -1, nil)
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = String(cString: sqlite3_column_text(stmt, 0))
+            let sortOrder = Int(sqlite3_column_int64(stmt, 1))
+            hasher.combine(id)
+            hasher.combine(sortOrder)
+            count += 1
+            maxSortOrder = sortOrder
+        }
+        return SessionMessageFingerprint(
+            count: count,
+            maxSortOrder: maxSortOrder,
+            orderHash: count == 0 ? 0 : hasher.finalize()
+        )
+    }
+
     func loadMessages(sessionId: String) -> [RawMessage] {
         let totalStart = CFAbsoluteTimeGetCurrent()
         let sql = """
@@ -2509,7 +2558,7 @@ actor ChatStore {
             sqlite3_finalize(stmt)
             stmt = nil
             let fallbackSql = """
-                SELECT id, session_id, role, parts_json, created_at, token_usage
+                SELECT id, session_id, role, parts_json, created_at, token_usage, sort_order
                 FROM messages WHERE session_id = ? ORDER BY sort_order ASC, created_at ASC, id ASC
             """
             if sqlite3_prepare_v2(db, fallbackSql, -1, &stmt, nil) == SQLITE_OK {
@@ -2540,12 +2589,14 @@ actor ChatStore {
                     }
                     jsonDecodeTime += CFAbsoluteTimeGetCurrent() - decodeStart
 
-                    messages.append(RawMessage(
+                    var message = RawMessage(
                         id: id, sessionId: sessId, role: role, parts: parts,
                         createdAt: createdAt, tokenUsage: tokenUsage,
                         reasoningContent: nil,
                         streamInterruptCount: 0
-                    ))
+                    )
+                    message.sortOrder = Int(sqlite3_column_int64(stmt, 6))
+                    messages.append(message)
                 }
             } else {
                 let fallbackErr = sqlite3_errmsg(db).map { String(cString: $0) } ?? "unknown"
@@ -2558,18 +2609,10 @@ actor ChatStore {
         let jsonElapsed = jsonDecodeTime * 1000
         logger.info("[ChatStore.loadMessages] \(sessionId) — \(messages.count) messages in \(String(format: "%.1f", totalElapsed))ms (JSON decode: \(String(format: "%.1f", jsonElapsed))ms, SQL+IO: \(String(format: "%.1f", totalElapsed - jsonElapsed))ms)")
 
-        // DIAG: Detect sortOrder anomalies (duplicates, gaps). Small cost — O(n) scan.
-        // loadMessages doesn't populate sortOrder on RawMessage, so re-query it.
-        var sortOrders: [Int] = []
-        let soSql = "SELECT sort_order FROM messages WHERE session_id = ? ORDER BY sort_order ASC, created_at ASC, id ASC"
-        var soStmt: OpaquePointer?
-        if sqlite3_prepare_v2(db, soSql, -1, &soStmt, nil) == SQLITE_OK {
-            sqlite3_bind_text(soStmt, 1, (sessionId as NSString).utf8String, -1, nil)
-            while sqlite3_step(soStmt) == SQLITE_ROW {
-                sortOrders.append(Int(sqlite3_column_int64(soStmt, 0)))
-            }
-        }
-        sqlite3_finalize(soStmt)
+        // DIAG: Detect sortOrder anomalies from the rows already loaded. The
+        // previous implementation issued a second full ordered query here even
+        // though both primary and fallback paths now populate RawMessage.sortOrder.
+        let sortOrders = messages.map(\.sortOrder)
         if !sortOrders.isEmpty {
             let uniq = Set(sortOrders)
             let dupCount = sortOrders.count - uniq.count

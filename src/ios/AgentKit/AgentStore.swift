@@ -19,6 +19,7 @@ final class AgentStore: ObservableObject {
     static let shared = AgentStore()
 
     fileprivate let logger = AppLogger(category: "AgentStore")
+    private let sessionRunner: any AgentSessionRunning
 
     /// Non-archived agents, in roster order.
     @Published private(set) var agents: [AgentProfile] = []
@@ -26,7 +27,9 @@ final class AgentStore: ObservableObject {
     /// never flashes an empty state before migration has run.
     @Published private(set) var isReady = false
 
-    private init() {}
+    private init(sessionRunner: any AgentSessionRunning = IOSAgentSessionRunner.shared) {
+        self.sessionRunner = sessionRunner
+    }
 
     // MARK: - Launch
 
@@ -175,28 +178,13 @@ final class AgentStore: ObservableObject {
             return existing
         }
 
-        let vm = ViewModelCache.shared.createDraft()
-        vm.agentId = agentId
-        vm.agentRole = .main
-        // Seed the policy here, not just in loadSession(): a draft VM goes
-        // straight from createDraft() to send() without ever loading, so
-        // without this the agent's FIRST turn would assemble the standalone
-        // prompt and the full toolset — exactly the leak this whole split
-        // exists to prevent.
-        vm.resolvedToolPolicy = target.toolPolicy
-        let sid = await vm.ensureSessionReturningId()
-        await ChatStore.shared.linkSession(sid, agentId: agentId, role: "main")
-        // Session-level model override, installed the same way
-        // SessionsOffloadBridge.sendPrompt does it: the binding can only be
-        // written once the session has an id.
-        if let entryId = target.defaultModelEntryId,
-           ProviderConfigStore.shared.entry(for: entryId) != nil {
-            ProviderConfigStore.shared.setBinding(
-                SessionModelBinding(sessionId: sid, primarySource: .directEntry(modelEntryId: entryId)),
-                for: sid
-            )
-        }
-        ViewModelCache.shared.cacheDraft(vm, sessionId: sid)
+        guard let sid = await sessionRunner.createSession(AgentSessionCreateRequest(
+            agentId: agentId,
+            source: "agent",
+            role: AgentRunRole.main.rawValue,
+            toolPolicy: target.toolPolicy.rawValue,
+            defaultModelEntryId: target.defaultModelEntryId
+        )), !sid.isEmpty else { return nil }
 
         target.mainSessionId = sid
         target.updatedAt = Date()

@@ -4414,6 +4414,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             }
         }
         let tools = makeAgentTools()
+        // This keeps the existing streaming/concurrent implementation in
+        // charge for now, while the exact provider-independent tool contract
+        // used by a future shared-engine path is built on every real run.
+        let sharedRunTools = sharedAgentRunToolDefinitions(from: tools)
+        AgentRequestTrace.shared.step("agentLoop.sharedRunSeam", detail: "toolDefinitions=\(sharedRunTools.count)")
 
         var userSystemPrompt = baseSystemPrompt
         let activeModel = ProviderConfigStore.shared.entry(for: entry.id)?.model ?? selectedModel
@@ -5063,7 +5068,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
             let streamEnd = Date()
             let assistantText = streamResult.assistantText
-            let toolEntries = streamResult.toolEntries
+            var toolEntries = streamResult.toolEntries
             let stopReason = streamResult.stopReason
             turnUsage = streamResult.turnUsage
             logger.info("📐 Context after API: latestContextTokens=\(turnUsage.latestContextTokens) (in:\(turnUsage.inputTokens) cache_read:\(turnUsage.cacheReadTokens) cache_create:\(turnUsage.cacheCreationTokens))")
@@ -5359,6 +5364,24 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             var toolResultParts: [AgentContentPart] = []
             var pendingSnapshots: [String: (toolName: String, snapshot: ToolSnapshot)] = [:]
             var cancelledDuringToolExecution = false
+
+            if shouldUseSharedAgentRunEngine(for: toolEntries) {
+                let sharedOutcomes = try await executeSharedAgentRunToolBatch(
+                    entries: toolEntries,
+                    msgIdx: msgIdx,
+                    tools: tools,
+                    sharedTools: sharedRunTools
+                )
+                for outcome in sharedOutcomes {
+                    toolResultParts.append(outcome.resultPart)
+                    if let snapshotEntry = outcome.snapshotEntry { pendingSnapshots[outcome.toolId] = snapshotEntry }
+                    if let snapshotItem = outcome.snapshotItem { toolSnapshots.append(snapshotItem) }
+                    cancelledDuringToolExecution = cancelledDuringToolExecution || outcome.cancelled
+                }
+                // The shared engine has completed this batch. Leave the mature
+                // concurrent dispatcher below to handle only remaining paths.
+                toolEntries.removeAll()
+            }
 
             // Image budget for this batch of tool results.
             //

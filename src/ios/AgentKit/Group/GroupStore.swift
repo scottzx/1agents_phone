@@ -19,12 +19,15 @@ final class GroupStore: ObservableObject {
     static let shared = GroupStore()
 
     private let logger = AppLogger(category: "GroupStore")
+    private let sessionRunner: any AgentSessionRunning
 
     /// Non-archived groups, most recently active first.
     @Published private(set) var groups: [GroupProfile] = []
     @Published private(set) var isReady = false
 
-    private init() {}
+    private init(sessionRunner: any AgentSessionRunning = IOSAgentSessionRunner.shared) {
+        self.sessionRunner = sessionRunner
+    }
 
     // MARK: - Roster
 
@@ -98,17 +101,20 @@ final class GroupStore: ObservableObject {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        let vm = ViewModelCache.shared.createDraft()
-        vm.sessionSource = "group"
-        vm.isGroupTranscript = true
-        let sessionId = await vm.ensureSessionReturningId()
-        guard !sessionId.isEmpty else {
+        let groupId = UUID().uuidString
+        guard let sessionId = await sessionRunner.createSession(AgentSessionCreateRequest(
+            title: trimmed,
+            groupId: groupId,
+            source: "group",
+            role: GroupSessionRole.group,
+            groupMemberIds: Array(memberIds.prefix(GroupProfile.maxMembers))
+        )), !sessionId.isEmpty else {
             logger.error("could not create a session for group \(trimmed)")
             return nil
         }
-        await ChatStore.shared.linkGroupSession(sessionId, title: trimmed)
 
         let group = GroupProfile(
+            id: groupId,
             sessionId: sessionId,
             title: trimmed,
             emoji: emoji.isEmpty ? "👥" : emoji,
@@ -118,13 +124,6 @@ final class GroupStore: ObservableObject {
             memberIds: Array(memberIds.prefix(GroupProfile.maxMembers))
         )
         await ChatStore.shared.upsertGroup(group)
-
-        vm.groupId = group.id
-        // Seeded before the vm is cached: this draft never runs loadSession(),
-        // and without the roster the `@` picker in a just-created room falls
-        // through to the file list — no members to pick at all.
-        vm.groupMembers = await members(of: group)
-        ViewModelCache.shared.cacheDraft(vm, sessionId: sessionId)
 
         await refresh()
         logger.info("created group \(group.id.prefix(8)) members=\(group.memberIds.count) mode=\(mode.rawValue)")
@@ -170,36 +169,16 @@ final class GroupStore: ObservableObject {
         }
         guard let profile = await AgentStore.shared.loadAgent(agentId) else { return nil }
 
-        let vm = ViewModelCache.shared.createDraft()
-        vm.sessionSource = "group"
-        vm.agentId = agentId
-        vm.agentRole = .main
-        // Seeded before the first send() for the same reason AgentStore does
-        // it: a draft vm never runs loadSession(), so without this its first
-        // turn would assemble the wrong prompt and the wrong toolset.
-        vm.resolvedToolPolicy = profile.toolPolicy
-        vm.groupId = group.id
-
-        let sessionId = await vm.ensureSessionReturningId()
-        guard !sessionId.isEmpty else { return nil }
-
-        await ChatStore.shared.linkSession(
-            sessionId,
+        guard let sessionId = await sessionRunner.createSession(AgentSessionCreateRequest(
             agentId: agentId,
-            role: GroupSessionRole.member,
+            groupId: group.id,
             parentSessionId: group.sessionId,
-            spawnTitle: group.title
-        )
-        // Inherit the member's own model binding, so an agent answers in a
-        // group on the model the user picked for it.
-        if let entryId = profile.defaultModelEntryId,
-           ProviderConfigStore.shared.entry(for: entryId) != nil {
-            ProviderConfigStore.shared.setBinding(
-                SessionModelBinding(sessionId: sessionId, primarySource: .directEntry(modelEntryId: entryId)),
-                for: sessionId
-            )
-        }
-        ViewModelCache.shared.cacheDraft(vm, sessionId: sessionId)
+            source: "group",
+            role: GroupSessionRole.member,
+            spawnTitle: group.title,
+            toolPolicy: profile.toolPolicy.rawValue,
+            defaultModelEntryId: profile.defaultModelEntryId
+        )), !sessionId.isEmpty else { return nil }
         logger.info("opened group-member session \(sessionId.prefix(8)) agent=\(agentId.prefix(8)) group=\(group.id.prefix(8))")
         return sessionId
     }

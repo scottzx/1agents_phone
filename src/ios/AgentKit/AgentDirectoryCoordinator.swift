@@ -30,6 +30,7 @@ final class AgentDirectoryCoordinator {
     static let shared = AgentDirectoryCoordinator()
 
     private let logger = AppLogger(category: "AgentDirectory")
+    private let sessionRunner: any AgentSessionRunning
 
     /// Live relay edges: recipient session → sender session. An entry exists
     /// from the moment a message is delivered until the recipient's turn ends,
@@ -51,7 +52,9 @@ final class AgentDirectoryCoordinator {
     /// created looks like one the user created.
     private static let palette = ["#5B8DEF", "#E0A33E", "#4CAF7D", "#C46BC4", "#E4694E", "#5AA9C4"]
 
-    private init() {}
+    private init(sessionRunner: any AgentSessionRunning = IOSAgentSessionRunner.shared) {
+        self.sessionRunner = sessionRunner
+    }
 
     // MARK: - Entry point
 
@@ -141,7 +144,7 @@ final class AgentDirectoryCoordinator {
             if !agent.summary.isEmpty { entry += "\nabout: \(agent.summary)" }
             if agent.id == callerAgentId {
                 entry += "\nnote: this is you — you cannot message yourself."
-            } else if let main = agent.mainSessionId, isBusy(sessionId: main) {
+            } else if let main = agent.mainSessionId, await isBusy(sessionId: main) {
                 entry += "\nstatus: busy (mid-turn right now)"
             } else {
                 entry += "\nstatus: idle"
@@ -240,10 +243,7 @@ final class AgentDirectoryCoordinator {
             return refusal
         }
 
-        let (vm, isFresh) = ViewModelCache.shared.getOrCreate(for: targetSession)
-        if isFresh { await vm.loadSession() }
-
-        if vm.isProcessing || isBusy(sessionId: targetSession) {
+        if await isBusy(sessionId: targetSession) {
             guard interrupt else {
                 return """
                     \(target.name) is mid-turn right now, so the message was NOT delivered.
@@ -253,7 +253,7 @@ final class AgentDirectoryCoordinator {
                     supersedes what it is doing.
                     """
             }
-            vm.cancel()
+            sessionRunner.cancel(sessionId: targetSession)
             // cancel() flips isProcessing synchronously, so send() below would
             // be accepted immediately — but the cancelled loop is still tearing
             // down and writing to the transcript. A short settle keeps the
@@ -265,31 +265,24 @@ final class AgentDirectoryCoordinator {
         let sender = await senderLabel(agentId: callerAgentId)
         let inbound = envelope(from: sender, message: message, awaitingReply: waitSeconds > 0)
 
-        // Preserve whatever the user had half-typed in that conversation.
-        // send() clears inputText synchronously, so restoring right after the
-        // call puts their draft back untouched.
-        let draft = vm.inputText
-        let messageCountBeforeSend = vm.messages.count
-        vm.inputText = inbound
-        vm.send()
-        let accepted = vm.isProcessing
-        vm.inputText = draft
-
-        guard accepted else {
-            return """
-                \(target.name) did not accept the message — its conversation is \
-                at or near its context limit and is waiting on the user to \
-                compact it. Nothing was delivered. Tell the user plainly \
-                instead of retrying.
-                """
-        }
-
         relayOrigin[targetSession] = callerSessionId
         SessionBadgeStore.shared.pushFront(.unread, for: targetSession)
         logger.info("relayed message to agent=\(targetId.prefix(8)) wait=\(waitSeconds)s interrupt=\(interrupt)")
 
         guard waitSeconds > 0 else {
-            scheduleRelayCleanup(targetSession: targetSession, vm: vm)
+            Task { [weak self] in
+                guard let self else { return }
+                _ = await sessionRunner.run(AgentSessionRunRequest(
+                    sessionId: targetSession,
+                    prompt: inbound,
+                    agentId: targetId,
+                    source: "agent-relay",
+                    role: AgentRunRole.main.rawValue,
+                    toolPolicy: target.toolPolicy.rawValue,
+                    timeoutSeconds: TimeInterval(AgentDirectoryTools.maxWaitSeconds)
+                ))
+                relayOrigin[targetSession] = nil
+            }
             return """
                 Message delivered to \(target.name). You did not wait, so its \
                 reply goes to its own conversation and you will not see it — \
@@ -298,13 +291,30 @@ final class AgentDirectoryCoordinator {
                 """
         }
 
-        let landed = await awaitTurn(vm: vm, seconds: waitSeconds)
+        let result = await sessionRunner.run(AgentSessionRunRequest(
+            sessionId: targetSession,
+            prompt: inbound,
+            agentId: targetId,
+            source: "agent-relay",
+            role: AgentRunRole.main.rawValue,
+            toolPolicy: target.toolPolicy.rawValue,
+            timeoutSeconds: TimeInterval(waitSeconds)
+        ))
 
-        guard landed else {
+        guard result.accepted else {
+            relayOrigin[targetSession] = nil
+            return """
+                \(target.name) did not accept the message — its conversation is \
+                at or near its context limit and is waiting on the user to \
+                compact it. Nothing was delivered. Tell the user plainly \
+                instead of retrying.
+                """
+        }
+        guard !result.timedOut else {
             // Edge deliberately left in place — the recipient is still mid-turn
             // and could still try to answer us, which is exactly what the loop
             // guard exists to catch. The cleanup task retires it.
-            scheduleRelayCleanup(targetSession: targetSession, vm: vm)
+            scheduleRelayCleanup(targetSession: targetSession)
             return """
                 \(target.name) is still working on it after \(waitSeconds)s and \
                 the wait ran out. Its answer will land in its own conversation, \
@@ -316,7 +326,7 @@ final class AgentDirectoryCoordinator {
 
         relayOrigin[targetSession] = nil
 
-        guard let reply = lastAssistantText(vm: vm, after: messageCountBeforeSend), !reply.isEmpty else {
+        guard let reply = result.text, !reply.isEmpty else {
             return """
                 \(target.name) received the message but produced no text reply. \
                 Say so plainly rather than inventing what it might have said.
@@ -460,29 +470,18 @@ final class AgentDirectoryCoordinator {
 
     /// Drop the relay edge once the recipient's turn ends. Used on the paths
     /// where we are not parked waiting for it ourselves.
-    private func scheduleRelayCleanup(targetSession: String, vm: AIChatViewModel) {
+    private func scheduleRelayCleanup(targetSession: String) {
         Task { [weak self] in
             // Bounded: a turn that outlives this has long since stopped being
             // part of the relay we are guarding.
             let deadline = Date().addingTimeInterval(TimeInterval(AgentDirectoryTools.maxWaitSeconds))
-            while vm.isProcessing, Date() < deadline {
+            while Date() < deadline {
+                guard let self, await self.isBusy(sessionId: targetSession) else { break }
                 if Task.isCancelled { break }
                 do { try await Task.sleep(nanoseconds: 2_000_000_000) } catch { break }
             }
             self?.relayOrigin[targetSession] = nil
         }
-    }
-
-    // MARK: - Delivery helpers
-
-    // Waiting for the recipient's turn and reading its answer both moved to
-    // AgentTurnAwaiter when group chat needed the same two operations.
-    private func awaitTurn(vm: AIChatViewModel, seconds: Int) async -> Bool {
-        await AgentTurnAwaiter.awaitTurn(vm: vm, seconds: seconds)
-    }
-
-    private func lastAssistantText(vm: AIChatViewModel, after index: Int) -> String? {
-        AgentTurnAwaiter.lastAssistantText(vm: vm, after: index)
     }
 
     /// How the message is presented in the recipient's transcript. The header
@@ -504,9 +503,8 @@ final class AgentDirectoryCoordinator {
         return emoji + agent.name
     }
 
-    private func isBusy(sessionId: String) -> Bool {
-        if let vm = ViewModelCache.shared.get(for: sessionId), vm.isProcessing { return true }
-        return SessionActivityTracker.shared.isActive(sessionId)
+    private func isBusy(sessionId: String) async -> Bool {
+        await sessionRunner.isRunning(sessionId: sessionId)
     }
 
     // MARK: - Argument coercion

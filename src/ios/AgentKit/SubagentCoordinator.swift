@@ -19,6 +19,9 @@ import Foundation
 final class LocalSubagentExecutor: SubagentExecutor {
 
     private let logger = AppLogger(category: "Subagent")
+    private let sessionRunner: any AgentSessionRunning
+    private var runTasks: [String: Task<Void, Never>] = [:]
+    private var runGenerations: [String: UUID] = [:]
 
     /// Dispatch times, used to tell "not started yet" from "finished".
     /// SessionActivityTracker only flips to active once the loop is genuinely
@@ -27,44 +30,25 @@ final class LocalSubagentExecutor: SubagentExecutor {
     private var dispatchedAt: [String: Date] = [:]
     private static let startupGrace: TimeInterval = 20
 
+    init(sessionRunner: any AgentSessionRunning = IOSAgentSessionRunner.shared) {
+        self.sessionRunner = sessionRunner
+    }
+
     // MARK: - SubagentExecutor
 
     @discardableResult
     func spawn(_ task: SubagentTask) async throws -> String {
-        let vm = ViewModelCache.shared.createDraft()
-        vm.sessionSource = "subagent"
-        vm.agentId = task.agentId
-        // Set before the session exists: send() reads these when it assembles
-        // the prompt and the tool set, and a draft VM never runs loadSession()
-        // (which is the other place they get resolved).
-        vm.agentRole = .executor
-        vm.resolvedToolPolicy = .standalone
-
-        let sid = await vm.ensureSessionReturningId()
-        guard !sid.isEmpty else { throw SubagentError.sessionUnavailable }
-
-        await ChatStore.shared.linkSession(
-            sid,
+        guard let sid = await sessionRunner.createSession(AgentSessionCreateRequest(
             agentId: task.agentId,
-            role: "subagent",
             parentSessionId: task.parentSessionId,
-            spawnTitle: task.title
-        )
-
-        // Inherit the parent session's model binding so a task runs on the same
-        // model the user picked for the agent, rather than the global default.
-        if let parentBinding = ProviderConfigStore.shared.binding(for: task.parentSessionId) {
-            ProviderConfigStore.shared.setBinding(
-                SessionModelBinding(sessionId: sid, primarySource: parentBinding.primarySource),
-                for: sid
-            )
-        }
-
-        ViewModelCache.shared.cacheDraft(vm, sessionId: sid)
+            source: "subagent",
+            role: "subagent",
+            spawnTitle: task.title,
+            toolPolicy: AgentToolPolicy.standalone.rawValue,
+            inheritModelFromSessionId: task.parentSessionId
+        )), !sid.isEmpty else { throw SubagentError.sessionUnavailable }
         dispatchedAt[sid] = Date()
-
-        vm.inputText = task.prompt
-        vm.send()
+        startRun(sessionId: sid, prompt: task.prompt)
         logger.info("spawned subagent task=\(sid.prefix(8)) parent=\(task.parentSessionId.prefix(8))")
         return sid
     }
@@ -88,11 +72,11 @@ final class LocalSubagentExecutor: SubagentExecutor {
             )
         }
 
-        let isActive = SessionActivityTracker.shared.isActive(taskId)
-        let vm = ViewModelCache.shared.get(for: taskId)
-        let (activity, iteration) = liveProgress(vm: vm, taskId: taskId)
+        let runtimeStatus = await sessionRunner.status(sessionId: taskId)
+        let activity = runtimeStatus.currentActivity
+        let iteration = runtimeStatus.iteration
 
-        if isActive {
+        if runtimeStatus.isRunning {
             return SubagentStatus(taskId: taskId, title: title, state: .running,
                                   currentActivity: activity, iteration: iteration, result: nil)
         }
@@ -100,7 +84,7 @@ final class LocalSubagentExecutor: SubagentExecutor {
         // Not active and still marked running: either it finished (the common
         // case — reconcile now, which also covers a finish that happened while
         // the app was backgrounded) or it never got off the ground.
-        let answer = finalAnswer(vm: vm, session: session)
+        let answer = runtimeStatus.lastAssistantText ?? session.lastMessage
         if let answer, !answer.isEmpty {
             await ChatStore.shared.updateSpawnOutcome(taskId, status: "done", result: answer)
             dispatchedAt[taskId] = nil
@@ -155,62 +139,50 @@ final class LocalSubagentExecutor: SubagentExecutor {
               session.spawnStatus == "running" else {
             throw SubagentError.notRunning(taskId)
         }
-        let (vm, isFresh) = ViewModelCache.shared.getOrCreate(for: taskId)
-        if isFresh { await vm.loadSession() }
-        // Interrupt whatever is in flight but keep the transcript: the point of
-        // steering is that the subagent does not start over.
-        if vm.isProcessing { vm.cancel() }
-        vm.agentRole = .executor
-        vm.resolvedToolPolicy = .standalone
-        vm.inputText = text
-        vm.send()
+        sessionRunner.cancel(sessionId: taskId)
         dispatchedAt[taskId] = Date()
+        startRun(sessionId: taskId, prompt: text)
     }
 
     func stop(taskId: String) async {
-        if let vm = ViewModelCache.shared.get(for: taskId), vm.isProcessing {
-            vm.cancel()
-        }
-        let partial = await ChatStore.shared.getSession(taskId).flatMap {
-            finalAnswer(vm: ViewModelCache.shared.get(for: taskId), session: $0)
-        }
+        sessionRunner.cancel(sessionId: taskId)
+        runTasks.removeValue(forKey: taskId)?.cancel()
+        runGenerations.removeValue(forKey: taskId)
+        let partial = await sessionRunner.status(sessionId: taskId).lastAssistantText
         await ChatStore.shared.updateSpawnOutcome(taskId, status: "stopped", result: partial)
         dispatchedAt[taskId] = nil
     }
 
-    // MARK: - Progress extraction
-
-    /// Live "what is it doing" line. Mirrors the extraction
-    /// SessionsOffloadBridge.getSessionStatus already does for `last_tool`.
-    private func liveProgress(vm: AIChatViewModel?, taskId: String) -> (String, Int) {
-        let iteration = SessionActivityTracker.shared.sessionToolInfo[taskId]?.loopIteration ?? 0
-        guard let vm, let lastAssistant = vm.messages.last(where: { $0.role == .assistant }) else {
-            return ("", iteration)
-        }
-        let toolBlock = lastAssistant.blocks.last { block in
-            switch block.kind {
-            case .text, .thinking, .info: return false
-            default: return true
+    private func startRun(sessionId: String, prompt: String) {
+        runTasks.removeValue(forKey: sessionId)?.cancel()
+        let generation = UUID()
+        runGenerations[sessionId] = generation
+        runTasks[sessionId] = Task { [weak self] in
+            guard let self else { return }
+            let result = await sessionRunner.run(AgentSessionRunRequest(
+                sessionId: sessionId,
+                prompt: prompt,
+                source: "subagent",
+                role: AgentRunRole.executor.rawValue,
+                toolPolicy: AgentToolPolicy.standalone.rawValue,
+                timeoutSeconds: TimeInterval(SubagentTools.maxWaitSeconds)
+            ))
+            guard runGenerations[sessionId] == generation else { return }
+            runTasks[sessionId] = nil
+            runGenerations[sessionId] = nil
+            dispatchedAt[sessionId] = nil
+            if result.cancelled { return }
+            if result.accepted, !result.timedOut, let text = result.text, !text.isEmpty {
+                await ChatStore.shared.updateSpawnOutcome(sessionId, status: "done", result: text)
+            } else {
+                let reason = result.timedOut
+                    ? String(localized: "子任务执行超时。")
+                    : String(localized: "子任务没有产生任何结果就结束了。")
+                await ChatStore.shared.updateSpawnOutcome(sessionId, status: "failed", result: reason)
             }
         }
-        let activity = toolBlock.map { $0.toolSummary ?? $0.toolDescription } ?? ""
-        return (activity, iteration)
     }
 
-    /// The subagent's report: the text of its last assistant turn. Prefers the
-    /// live VM (freshest) and falls back to the persisted preview.
-    private func finalAnswer(vm: AIChatViewModel?, session: ChatSession) -> String? {
-        if let vm, let lastAssistant = vm.messages.last(where: { $0.role == .assistant }) {
-            let joined = lastAssistant.blocks
-                .filter { $0.kind == .text }
-                .map(\.content)
-                .joined(separator: "\n")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !joined.isEmpty { return joined }
-        }
-        let fallback = session.lastMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return (fallback?.isEmpty == false) ? fallback : nil
-    }
 }
 
 // MARK: - Coordinator

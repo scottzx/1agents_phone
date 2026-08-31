@@ -64,6 +64,7 @@ Package.resolved
 
 # macOS
 .DS_Store
+.artifacts/
 
 # Environment and secrets
 .env

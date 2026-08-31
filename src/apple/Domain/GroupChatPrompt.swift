@@ -22,7 +22,9 @@
 
 import Foundation
 
-enum GroupChatPrompt {
+// Shared Apple-domain prompt construction.
+
+public enum GroupChatPrompt {
 
     /// Prefix stamped on every group turn prompt. A member's own session shows
     /// these turns in its history, and this is how the UI, compaction and a
@@ -94,7 +96,7 @@ enum GroupChatPrompt {
     ///   Production freeform turns allow a structured A2A handoff even after a
     ///   direct user question; the next routing window ends naturally if no
     ///   message is posted.
-    static func turnPrompt(
+    public static func turnPrompt(
         member: GroupMember,
         groupTitle: String,
         peers: [GroupMember],
@@ -123,7 +125,7 @@ enum GroupChatPrompt {
     /// The roundtable turn prompt (DEMO_PRD.md §3): the topic plus every prior
     /// opinion in full, so each speaker can agree with or push back on what was
     /// already said instead of answering in a vacuum.
-    static func roundtableTurnPrompt(
+    public static func roundtableTurnPrompt(
         member: GroupMember,
         groupTitle: String,
         peers: [GroupMember],
@@ -186,7 +188,7 @@ enum GroupChatPrompt {
     ///
     /// Peers are listed by name and id because a member hands off with the
     /// structured A2A tool and must not guess either identifier.
-    static func memberSystemBlock(
+    public static func memberSystemBlock(
         member: GroupMember,
         groupId: String,
         groupTitle: String,

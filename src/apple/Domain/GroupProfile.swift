@@ -21,8 +21,10 @@
 
 import Foundation
 
+// Shared Apple-domain group value types.
+
 /// How turn-taking is decided in a group.
-enum GroupChatMode: String, Codable, CaseIterable {
+public enum GroupChatMode: String, Codable, CaseIterable, Sendable {
     /// @-routed. Who speaks next is whoever the last messages addressed.
     case freeform
     /// Fixed order, every member sees every prior opinion, owner sums up.
@@ -49,17 +51,17 @@ enum GroupChatMode: String, Codable, CaseIterable {
 /// `sessions.spawn_role` values this feature adds. The column already carries
 /// "main" / "subagent" / "legacy"; these two extend that vocabulary rather than
 /// introducing a parallel one, so every existing query keeps working.
-enum GroupSessionRole {
+public enum GroupSessionRole {
     /// The transcript the user reads. `agent_id` is NULL — a group has no owner
     /// session, which is exactly why it can hold several speakers.
-    static let group = "group"
+    public static let group = "group"
     /// One member's private thread inside one group. Never listed, never
     /// purged (see the note on ChatStore.purgeExpiredSubagentSessions).
-    static let member = "group-member"
+    public static let member = "group-member"
 }
 
-struct GroupProfile: Identifiable, Codable, Hashable {
-    let id: String
+public struct GroupProfile: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
     /// The `sessions` row holding the transcript.
     var sessionId: String
     var title: String
@@ -83,9 +85,9 @@ struct GroupProfile: Identifiable, Codable, Hashable {
     /// Same ceiling grok-bot uses (`GROUP_MAX_MEMBERS`). Members speak strictly
     /// one at a time, so a seventh member is another whole model turn of
     /// latency before the user hears anything back.
-    static let maxMembers = 6
+    public static let maxMembers = 6
 
-    init(
+    public init(
         id: String = UUID().uuidString,
         sessionId: String,
         title: String,
@@ -113,7 +115,7 @@ struct GroupProfile: Identifiable, Codable, Hashable {
 
     // Mirrors AgentProfile's cheap-comparison contract: the roster is diffed by
     // SwiftUI on every transaction flush, and `updatedAt` is the change proxy.
-    static func == (lhs: GroupProfile, rhs: GroupProfile) -> Bool {
+    public static func == (lhs: GroupProfile, rhs: GroupProfile) -> Bool {
         lhs.id == rhs.id
             && lhs.updatedAt == rhs.updatedAt
             && lhs.title == rhs.title
@@ -124,7 +126,7 @@ struct GroupProfile: Identifiable, Codable, Hashable {
             && lhs.archivedAt == rhs.archivedAt
     }
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(updatedAt)
     }
@@ -134,53 +136,63 @@ struct GroupProfile: Identifiable, Codable, Hashable {
 /// flattened to just what a group turn needs. Kept separate from AgentProfile
 /// so GroupMentionRouter stays a pure function over values and can be tested
 /// without AgentStore, ChatStore or a running app.
-struct GroupMember: Identifiable, Equatable, Hashable {
+public struct GroupMember: Identifiable, Equatable, Hashable, Sendable {
     /// The agent id. Also the participant id on the hardware wire.
-    let id: String
-    let name: String
+    public let id: String
+    public let name: String
     /// Short role label ("市场专家"). Doubles as an @-handle when non-empty.
-    let title: String
-    let emoji: String
-    let accentColor: String
+    public let title: String
+    public let emoji: String
+    public let accentColor: String
     /// One line for the "other participants" block of a member's system prompt.
-    let summary: String
+    public let summary: String
     /// Position in the roster: roundtable speaking order, and the hardware's
     /// round-screen node slot.
-    let slot: Int
+    public let slot: Int
+
+    public init(id: String, name: String, title: String, emoji: String, accentColor: String, summary: String, slot: Int) {
+        self.id = id
+        self.name = name
+        self.title = title
+        self.emoji = emoji
+        self.accentColor = accentColor
+        self.summary = summary
+        self.slot = slot
+    }
 
     /// Name with its emoji, for a log line or a device roster label.
-    var displayName: String {
+    public var displayName: String {
         emoji.isEmpty ? name : "\(emoji) \(name)"
     }
 }
 
 /// Who said one line in a group.
-enum GroupSpeaker: Equatable, Hashable {
+public enum GroupSpeaker: Equatable, Hashable, Sendable {
     case user
     case member(String)
 
-    var memberId: String? {
+    public var memberId: String? {
         if case .member(let id) = self { return id }
         return nil
     }
 
-    var isUser: Bool { self == .user }
+    public var isUser: Bool { self == .user }
 }
 
 /// One line of the shared transcript, as the router and the prompt builder see
 /// it. This is the projection of a `RawMessage` — tool calls, thinking and
 /// everything else a member did privately never become a GroupMessage.
-struct GroupMessage: Equatable, Hashable {
-    let speaker: GroupSpeaker
-    let text: String
+public struct GroupMessage: Equatable, Hashable, Sendable {
+    public let speaker: GroupSpeaker
+    public let text: String
 
-    init(speaker: GroupSpeaker, text: String) {
+    public init(speaker: GroupSpeaker, text: String) {
         self.speaker = speaker
         self.text = text
     }
 
-    static func user(_ text: String) -> GroupMessage { .init(speaker: .user, text: text) }
-    static func member(_ id: String, _ text: String) -> GroupMessage {
+    public static func user(_ text: String) -> GroupMessage { .init(speaker: .user, text: text) }
+    public static func member(_ id: String, _ text: String) -> GroupMessage {
         .init(speaker: .member(id), text: text)
     }
 }
@@ -190,15 +202,15 @@ struct GroupMessage: Equatable, Hashable {
 /// `GROUP_MAX_MEMBER_TURNS`, `GROUP_PROMPT_HISTORY_LIMIT`); the reasoning is
 /// theirs and it holds here: caps are cheaper and far more predictable than any
 /// heuristic for "the conversation has finished".
-enum GroupChatLimits {
+public enum GroupChatLimits {
     /// Rounds of speaking per user message.
-    static let maxRounds = 3
+    public static let maxRounds = 3
     /// Total member messages per user message, across all rounds.
-    static let maxMemberTurns = 10
+    public static let maxMemberTurns = 10
     /// Transcript lines shown to a member in one turn prompt.
-    static let promptHistoryLimit = 24
+    public static let promptHistoryLimit = 24
     /// Ceiling on how long one member's turn may run before the room moves on.
     /// Same value as SubagentTools.maxWaitSeconds, for the same reason: a group
     /// turn is no more entitled to block than a dispatched task is.
-    static let memberTurnTimeoutSeconds = 240
+    public static let memberTurnTimeoutSeconds = 240
 }

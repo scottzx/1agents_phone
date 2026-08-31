@@ -35,348 +35,9 @@ enum SyncStatus: Equatable {
     case disabled
 }
 
-// MARK: - Data Model
-
-/// A chat session (conversation thread).
-struct ChatSession: Identifiable, Codable, Hashable {
-    let id: String
-    var title: String?
-    var category: String?
-    let modelId: String
-    let createdAt: Date
-    var updatedAt: Date
-    var lastMessage: String?
-    var source: String?       // e.g. "shortcut" for Shortcuts-triggered sessions
-    var lastSyncedAt: Date?   // non-nil if successfully synced to iCloud
-    var remoteDeviceId: String?   // non-nil if this session came from another device via iCloud
-    var remoteDeviceName: String? // human-readable name of the remote device
-    var pinnedAt: Date?       // non-nil if session is pinned; timestamp of when it was pinned
-
-    // MARK: - Agent linkage
-    //
-    // A session used to be a standalone unit of work. It is now owned by an
-    // AgentProfile, and `spawnRole` says which kind of session it is:
-    //   "main"     — the agent's single long-lived conversation
-    //   "subagent" — a scratch session holding one dispatched task; hidden
-    //                from every session list, reachable only from its parent's
-    //                task card
-    //   "legacy"   — a pre-Agent session migrated onto the default agent
-    //   nil        — not yet migrated
-    var agentId: String?
-    var parentSessionId: String?
-    var spawnRole: String?
-    var spawnTitle: String?
-    /// running | done | failed | stopped. Only meaningful for subagent rows.
-    var spawnStatus: String?
-    /// The subagent's final plain-text answer, handed back to the parent.
-    var spawnResult: String?
-
-    var isSubagent: Bool { spawnRole == "subagent" }
-
-    /// Whether this session is from a remote device (read-only).
-    var isRemote: Bool { remoteDeviceId != nil }
-
-    /// Whether this session is pinned to the top of the list.
-    var isPinned: Bool { pinnedAt != nil }
-
-    // MARK: - Equatable / Hashable (cheap, content-via-proxy)
-    //
-    // [T-ios-session-list-equatable-jank] The compiler-synthesized
-    // `==`/`hash` compared EVERY stored field — including the long
-    // `lastMessage` / `title` strings. SwiftUI's sidebar `ForEach(groupedSessions)`
-    // makes AttributeGraph deep-compare the whole `[ChatSession]` array on every
-    // transaction flush (session switch, tap, foreground, iCloud inbound). In
-    // DEBUG that synthesized `String.==` runs the Unicode NFC normalization
-    // slow path (no inlining / ARC elision), and across a long session list it
-    // pinned the main thread for 1–2s+ (HangDetector: ChatSession
-    // __derived_struct_equals → _stringCompareSlow → _NFCNormalizer). Release
-    // optimizes it away, which is why Release didn't stall.
-    //
-    // Replace with an explicit cheap comparison: identity + the short
-    // change-driving fields, using `updatedAt` as the proxy for the heavy
-    // `lastMessage` (and any other body content) — every content mutation bumps
-    // `updatedAt`, so we never need to NFC-compare the long string to detect a
-    // change. `title`/`category`/`source` ARE compared (they can change without
-    // a content write, e.g. rename / categorize) but they're short. Net: the
-    // sidebar diff no longer touches the long strings.
-    static func == (lhs: ChatSession, rhs: ChatSession) -> Bool {
-        lhs.id == rhs.id
-            && lhs.updatedAt == rhs.updatedAt
-            && lhs.pinnedAt == rhs.pinnedAt
-            && lhs.title == rhs.title
-            && lhs.category == rhs.category
-            && lhs.source == rhs.source
-            && lhs.lastSyncedAt == rhs.lastSyncedAt
-            && lhs.remoteDeviceId == rhs.remoteDeviceId
-            && lhs.remoteDeviceName == rhs.remoteDeviceName
-            && lhs.spawnStatus == rhs.spawnStatus
-        // Intentionally NOT comparing `lastMessage` (long string; `updatedAt`
-        // is its change proxy) or the immutable `modelId` / `createdAt`.
-    }
-
-    func hash(into hasher: inout Hasher) {
-        // Mirror ==: cheap, identity + updatedAt. Avoids hashing long strings.
-        hasher.combine(id)
-        hasher.combine(updatedAt)
-    }
-}
-
-/// Role for a raw message turn.
-enum MessageRole: String, Codable {
-    case user
-    case assistant
-}
-
-/// Reference to a media file stored in Library/MinisChat/minis/<sessionId>/
-struct MediaRef: Codable, Hashable {
-    let id: String
-    let relativePath: String
-    let mimeType: String
-    let originalFileName: String?
-    /// iSH-visible linux path the file is mirrored to (e.g.
-    /// `/var/minis/attachments/uploads/<name>`, `/var/minis/browser/<sid>/...`).
-    /// Optional — older persisted rows decode with `nil` and fall back to
-    /// spillover at request-budget elide time. New writes always populate
-    /// this when the file is offloaded to iSH-visible storage.
-    let linuxPath: String?
-
-    init(id: String, relativePath: String, mimeType: String, originalFileName: String?, linuxPath: String? = nil) {
-        self.id = id
-        self.relativePath = relativePath
-        self.mimeType = mimeType
-        self.originalFileName = originalFileName
-        self.linuxPath = linuxPath
-    }
-}
-
-/// A tool call requested by the assistant.
-struct ToolUse: Codable, Hashable {
-    let toolUseId: String
-    let name: String
-    let input: String
-    let description: String?
-    let thoughtSignature: String?  // Gemini 3.x thought signature
-}
-
-/// A snapshot captured from a tool execution result.
-struct ToolSnapshot: Codable, Hashable {
-    enum SnapshotType: String, Codable, Hashable {
-        case text
-        case image
-    }
-    let type: SnapshotType
-    let text: String?        // For .text snapshots (last N lines of output)
-    let mediaRef: MediaRef?  // For .image snapshots (browser screenshot)
-    let duration: TimeInterval?  // Execution duration in seconds
-}
-
-/// Result of executing a tool.
-struct ToolResult: Codable, Hashable {
-    let toolUseId: String
-    let output: String
-    let success: Bool
-    let mediaRef: MediaRef?
-    let snapshot: ToolSnapshot?
-    /// Final page URL after browser tool execution (for display in tool detail sheet).
-    /// Truncated to ≤512 characters if the original was longer.
-    let pageURL: String?
-    /// Terminal execution status: "success" | "failed" | "cancelled".
-    /// Optional for backward compatibility with rows written before this field existed;
-    /// when nil, callers fall back to `success` (which cannot distinguish failed from cancelled).
-    let status: String?
-
-    /// Truncate a URL to at most `maxLength` characters by eliding the middle.
-    /// Returns the original if it's already short enough.
-    static func truncateURL(_ url: String, maxLength: Int = 512) -> String {
-        guard url.count > maxLength else { return url }
-        let marker = "…[truncated]…"
-        let keep = (maxLength - marker.count) / 2
-        let head = String(url.prefix(keep))
-        let tail = String(url.suffix(keep))
-        return head + marker + tail
-    }
-}
-
-/// A single content part within a message — the atomic unit.
-enum ContentPart: Codable, Hashable {
-    case text(String)
-    case mediaRef(MediaRef)
-    case toolUse(ToolUse)
-    case toolResult(ToolResult)
-
-    // MARK: Codable
-
-    private enum CodingKeys: String, CodingKey {
-        case type
-        case value
-    }
-
-    private enum PartType: String, Codable {
-        case text
-        case mediaRef
-        case toolUse
-        case toolResult
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case .text(let s):
-            try container.encode(PartType.text, forKey: .type)
-            try container.encode(s, forKey: .value)
-        case .mediaRef(let ref):
-            try container.encode(PartType.mediaRef, forKey: .type)
-            try container.encode(ref, forKey: .value)
-        case .toolUse(let tu):
-            try container.encode(PartType.toolUse, forKey: .type)
-            try container.encode(tu, forKey: .value)
-        case .toolResult(let tr):
-            try container.encode(PartType.toolResult, forKey: .type)
-            try container.encode(tr, forKey: .value)
-        }
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let partType = try container.decode(PartType.self, forKey: .type)
-        switch partType {
-        case .text:
-            self = .text(try container.decode(String.self, forKey: .value))
-        case .mediaRef:
-            self = .mediaRef(try container.decode(MediaRef.self, forKey: .value))
-        case .toolUse:
-            self = .toolUse(try container.decode(ToolUse.self, forKey: .value))
-        case .toolResult:
-            self = .toolResult(try container.decode(ToolResult.self, forKey: .value))
-        }
-    }
-}
-
-/// A compact boundary marker in a session's message history.
-/// Represents the point where older messages were summarized to save context.
-///
-/// Identity model (post Phase A):
-///   - `firstKeptMessageId` is the authoritative active-region start.
-///   - `lastCompactedMessageId` is the last message in the compacted range.
-///   - Sort-order fields (`firstKeptSortOrder`, `uiBoundarySortOrder`) and
-///     `boundaryMessageId` are retained for legacy markers and cross-device
-///     sync compatibility with older builds, used only as fallbacks.
-struct CompactMarker: Identifiable, Codable {
-    let id: String
-    let sessionId: String
-    /// LLM-generated summary of the compacted messages.
-    let summary: String
-    /// LEGACY: sort_order of the first message AFTER the compacted range.
-    /// Only used as fallback when firstKeptMessageId resolution fails.
-    let firstKeptSortOrder: Int
-    /// Number of raw messages that were compacted. UI display only.
-    let compactedCount: Int
-    let createdAt: Date
-    /// LEGACY: sort_order of the UI boundary message.
-    /// Only used as fallback for divider positioning on legacy markers.
-    let uiBoundarySortOrder: Int?
-    /// LEGACY: DB message ID of the boundary message (pre-Phase A name for firstKeptMessageId).
-    /// Kept for cross-device sync compatibility with older builds.
-    let boundaryMessageId: String?
-    /// PRIMARY: DB message ID of the first kept (active-region) message.
-    /// All restore / compact logic resolves boundaries through this id.
-    /// Optional only for legacy markers written before Phase A.
-    let firstKeptMessageId: String?
-    /// PRIMARY: DB message ID of the last compacted message (right edge of the
-    /// compacted range). Used by prune protection to avoid deleting marker anchors.
-    /// Optional only for legacy markers written before Phase A.
-    let lastCompactedMessageId: String?
-    /// Marker schema version. 1 = legacy multi-field model (firstKept/boundary/
-    /// sortOrder fallback chain). 2 = simplified id-only model: only
-    /// `lastCompactedMessageId` is authoritative; everything before it (incl.)
-    /// is the compacted range, everything after it is "live anchor + new msgs".
-    /// `compactedCount` and `summary` are still meaningful for UI; all other
-    /// columns are ignored for v2 markers.
-    var version: Int = 1
-}
-
-/// Token usage stats stored with a message.
-struct StoredTokenUsage: Codable, Hashable {
-    var inputTokens: Int
-    var outputTokens: Int
-    var cacheCreationTokens: Int
-    var cacheReadTokens: Int
-    var latestContextTokens: Int?
-}
-
-/// A single message in the conversation (one "turn").
-struct RawMessage: Identifiable, Codable, Hashable {
-    let id: String
-    let sessionId: String
-    let role: MessageRole
-    let parts: [ContentPart]
-    let createdAt: Date
-    var tokenUsage: StoredTokenUsage?
-    /// Reasoning content from thinking models (Kimi, DeepSeek, QwQ, etc.) — must be echoed back.
-    var reasoningContent: String?
-    /// Number of mid-stream auto-retries that occurred before this message completed successfully.
-    /// 0 means no interruption. Persisted to DB for display after session reload.
-    var streamInterruptCount: Int = 0
-    /// Database sort_order value. Populated during loadMessages, used for compact boundary tracking.
-    var sortOrder: Int = 0
-    /// [T-error-persist-ios] Device-local error string for a failed assistant
-    /// turn. Mirrors ChatMessage.error; persisted to the messages.error_info
-    /// column so the error indicator survives reload. nil = no error.
-    var errorInfo: String? = nil
-
-    /// Which agent spoke this line, in a group transcript. Nil everywhere else,
-    /// which is every message this app wrote before groups existed: a 1:1
-    /// session's assistant turn is unambiguously its own agent, so nothing had
-    /// to record a speaker. A group session has several, so it does.
-    var senderAgentId: String? = nil
-
-    /// True if this message contains only tool results (no user text).
-    /// These are internal agent loop messages that shouldn't render as user bubbles.
-    var isToolResultOnly: Bool {
-        role == .user && !parts.isEmpty && parts.allSatisfy {
-            if case .toolResult = $0 { return true }
-            return false
-        }
-    }
-
-    /// [T-bridge-message-ui-leak] The internal assistant "bridge" row inserted
-    /// when a queued user message interrupts a tool loop (#579): it exists
-    /// purely to keep agentHistory role-alternation intact
-    /// (…user(tool_result) → assistant(bridge) → user(queued)…) and must
-    /// never render in the chat UI. Detected by content match rather than a
-    /// schema flag: we generate this text verbatim, a content match also hides
-    /// rows persisted by OLDER builds (a new column could not), and no
-    /// DB/iCloud-sync wiring is needed.
-    static let internalBridgeText =
-        "(Interrupted mid-task by a new user message. Decide based on the new message and overall context whether the prior task should continue — do not forget or abandon it unless the user explicitly says to stop, or the new message makes clear it is no longer needed.)"
-
-    /// Every bridge text this app has ever generated. A row persisted by an
-    /// OLDER build carries the PREVIOUS wording; matching the current constant
-    /// alone would fail and leak that row into the UI (the exact regression seen
-    /// after the 2026-07-23 wording change, d2e111e9). Match against the full
-    /// set so old and new persisted bridges are both recognized. Prefix-match
-    /// (not equality) tolerates trailing-whitespace / normalization drift from
-    /// DB round-trips.
-    static let internalBridgeTexts: [String] = [
-        internalBridgeText,
-        // Pre-d2e111e9 wording.
-        "(Interrupted mid-task to handle your new message. Will return to the prior task after.)",
-    ]
-
-    /// True when `text` is any known internal-bridge string. Shared by
-    /// RawMessage and ChatMessage so every layer recognizes the same rows.
-    static func isInternalBridgeText(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return internalBridgeTexts.contains { trimmed == $0 }
-    }
-
-    var isInternalBridge: Bool {
-        guard role == .assistant, parts.count == 1,
-              case .text(let s) = parts[0] else { return false }
-        return Self.isInternalBridgeText(s)
-    }
-}
-
+// Chat persistence value types and the repository contract live in
+// src/apple/Domain/ChatPersistence.swift so iOS and macOS compile the same
+// Codable wire format. SQLite ownership remains in ChatStore below.
 // MARK: - ChatStore Actor
 
 /// Persistent store for chat sessions, messages, and media files.
@@ -468,29 +129,9 @@ actor ChatStore {
     }
 
     private func createTables() {
-        exec("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id          TEXT PRIMARY KEY,
-                title       TEXT,
-                model_id    TEXT NOT NULL,
-                created_at  REAL NOT NULL,
-                updated_at  REAL NOT NULL
-            )
-        """)
-
-        exec("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id          TEXT PRIMARY KEY,
-                session_id  TEXT NOT NULL REFERENCES sessions(id),
-                role        TEXT NOT NULL,
-                parts_json  TEXT NOT NULL,
-                created_at  REAL NOT NULL,
-                token_usage TEXT,
-                sort_order  INTEGER NOT NULL
-            )
-        """)
-
-        exec("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, sort_order)")
+        exec(ChatPersistenceSchema.createSessionsSQL)
+        exec(ChatPersistenceSchema.createMessagesSQL)
+        exec(ChatPersistenceSchema.createMessageIndexSQL)
         // [T-ios-listsessions-part-flags] Supports listSessions' per-role
         // preview subqueries: SEARCH … (session_id=? AND role=?) ORDER BY
         // sort_order DESC LIMIT 1. Measured ~30ms vs ~58ms on the plain
@@ -6977,6 +6618,82 @@ extension ChatStore {
             }
         }
         return total
+    }
+}
+
+// MARK: - Shared ChatRepository adapter
+
+extension ChatStore: ChatRepository {
+    func repositorySessions() async throws -> [ChatSession] {
+        listSessions()
+    }
+
+    func repositorySession(id: String) async throws -> ChatSession? {
+        getSession(id)
+    }
+
+    func repositorySaveSession(_ session: ChatSession) async throws {
+        invalidateSessionListCache()
+        let sql = """
+            INSERT INTO sessions (
+                id, title, category, model_id, created_at, updated_at, source,
+                last_synced_at, remote_origin_device_id, pinned_at, agent_id,
+                parent_session_id, spawn_role, spawn_title, spawn_status, spawn_result
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                title = excluded.title,
+                category = excluded.category,
+                model_id = excluded.model_id,
+                updated_at = excluded.updated_at,
+                source = excluded.source,
+                last_synced_at = excluded.last_synced_at,
+                remote_origin_device_id = excluded.remote_origin_device_id,
+                pinned_at = excluded.pinned_at,
+                agent_id = excluded.agent_id,
+                parent_session_id = excluded.parent_session_id,
+                spawn_role = excluded.spawn_role,
+                spawn_title = excluded.spawn_title,
+                spawn_status = excluded.spawn_status,
+                spawn_result = excluded.spawn_result
+            """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw ChatRepositoryError.persistence("Unable to prepare ChatSession upsert.")
+        }
+        defer { sqlite3_finalize(stmt) }
+        sqlite3_bind_text(stmt, 1, (session.id as NSString).utf8String, -1, nil)
+        bindOptionalText(stmt, index: 2, value: session.title)
+        bindOptionalText(stmt, index: 3, value: session.category)
+        sqlite3_bind_text(stmt, 4, (session.modelId as NSString).utf8String, -1, nil)
+        sqlite3_bind_double(stmt, 5, session.createdAt.timeIntervalSince1970)
+        sqlite3_bind_double(stmt, 6, session.updatedAt.timeIntervalSince1970)
+        bindOptionalText(stmt, index: 7, value: session.source)
+        if let value = session.lastSyncedAt { sqlite3_bind_double(stmt, 8, value.timeIntervalSince1970) }
+        else { sqlite3_bind_null(stmt, 8) }
+        bindOptionalText(stmt, index: 9, value: session.remoteDeviceId)
+        if let value = session.pinnedAt { sqlite3_bind_double(stmt, 10, value.timeIntervalSince1970) }
+        else { sqlite3_bind_null(stmt, 10) }
+        bindOptionalText(stmt, index: 11, value: session.agentId)
+        bindOptionalText(stmt, index: 12, value: session.parentSessionId)
+        bindOptionalText(stmt, index: 13, value: session.spawnRole)
+        bindOptionalText(stmt, index: 14, value: session.spawnTitle)
+        bindOptionalText(stmt, index: 15, value: session.spawnStatus)
+        bindOptionalText(stmt, index: 16, value: session.spawnResult)
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw ChatRepositoryError.persistence("Unable to persist ChatSession \(session.id).")
+        }
+    }
+
+    func repositoryDeleteSession(id: String) async throws {
+        deleteSession(id)
+    }
+
+    func repositoryMessages(sessionId: String) async throws -> [RawMessage] {
+        loadMessages(sessionId: sessionId)
+    }
+
+    func repositoryAppendMessages(_ messages: [RawMessage]) async throws {
+        appendMessages(messages)
     }
 }
 

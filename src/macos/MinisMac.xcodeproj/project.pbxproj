@@ -1,0 +1,179 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* MinisMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* MinisMacApp.swift */; };
+		A10000000000000000000002 /* DesktopViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* DesktopViewModel.swift */; };
+		A10000000000000000000003 /* DesktopViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* DesktopViews.swift */; };
+		A10000000000000000000004 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* main.swift */; };
+		A10000000000000000000005 /* MinisDesktopCore in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000001 /* MinisDesktopCore */; };
+		A10000000000000000000006 /* MinisDesktopCore in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000001 /* MinisDesktopCore */; };
+		A10000000000000000000007 /* MinisRuntimeService in Embed Runtime */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* MinisRuntimeService */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10000000000000000000008 /* MacTerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* MacTerminalView.swift */; };
+		A10000000000000000000009 /* MacNativeToolHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* MacNativeToolHost.swift */; };
+		A10000000000000000000010 /* FileContextFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* FileContextFormatter.swift */; };
+		A10000000000000000000011 /* FileContextFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* FileContextFormatterTests.swift */; };
+		A10000000000000000000012 /* OpenRouterOAuthCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* OpenRouterOAuthCoordinator.swift */; };
+		A10000000000000000000013 /* OpenRouterOAuthTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* OpenRouterOAuthTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A80000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A70000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A60000000000000000000002;
+			remoteInfo = MinisRuntimeService;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A40000000000000000000005 /* Embed Runtime */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (A10000000000000000000007 /* MinisRuntimeService in Embed Runtime */, );
+			name = "Embed Runtime";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* MinisMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MinisMacApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* DesktopViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DesktopViewModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* DesktopViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/DesktopViews.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeService/main.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* MinisMac.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MinisMac.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000006 /* MinisRuntimeService */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = MinisRuntimeService; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000007 /* MacTerminalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MacTerminalView.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* MacNativeToolHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/MacNativeToolHost.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* FileContextFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/FileContextFormatter.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* MinisMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MinisMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000011 /* FileContextFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/FileContextFormatterTests.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* OpenRouterOAuthCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App/OpenRouterOAuthCoordinator.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* OpenRouterOAuthTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/OpenRouterOAuthTests.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A40000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000005 /* MinisDesktopCore in Frameworks */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A40000000000000000000007 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000006 /* MinisDesktopCore in Frameworks */, ); runOnlyForDeploymentPostprocessing = 0; };
+		A40000000000000000000009 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A30000000000000000000001 = {
+			isa = PBXGroup;
+			children = (A30000000000000000000003 /* App */, A30000000000000000000004 /* RuntimeService */, A30000000000000000000005 /* Tests */, A30000000000000000000002 /* Products */);
+			sourceTree = "<group>";
+		};
+		A30000000000000000000002 /* Products */ = {isa = PBXGroup; children = (A20000000000000000000005 /* MinisMac.app */, A20000000000000000000006 /* MinisRuntimeService */, A20000000000000000000010 /* MinisMacTests.xctest */); name = Products; sourceTree = "<group>"; };
+		A30000000000000000000003 /* App */ = {isa = PBXGroup; children = (A20000000000000000000001, A20000000000000000000002, A20000000000000000000003, A20000000000000000000007, A20000000000000000000008, A20000000000000000000009, A20000000000000000000012); name = App; sourceTree = "<group>"; };
+		A30000000000000000000004 /* RuntimeService */ = {isa = PBXGroup; children = (A20000000000000000000004); name = RuntimeService; sourceTree = "<group>"; };
+		A30000000000000000000005 /* Tests */ = {isa = PBXGroup; children = (A20000000000000000000011 /* FileContextFormatterTests.swift */, A20000000000000000000013 /* OpenRouterOAuthTests.swift */); name = Tests; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A60000000000000000000001 /* MinisMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000001 /* Build configuration list for PBXNativeTarget "MinisMac" */;
+			buildPhases = (A40000000000000000000001 /* Sources */, A40000000000000000000002 /* Frameworks */, A40000000000000000000003 /* Resources */, A40000000000000000000005 /* Embed Runtime */);
+			buildRules = ();
+			dependencies = (A80000000000000000000002 /* PBXTargetDependency */);
+			name = MinisMac;
+			packageProductDependencies = (A90000000000000000000001 /* MinisDesktopCore */);
+			productName = MinisMac;
+			productReference = A20000000000000000000005 /* MinisMac.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A60000000000000000000002 /* MinisRuntimeService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000002 /* Build configuration list for PBXNativeTarget "MinisRuntimeService" */;
+			buildPhases = (A40000000000000000000006 /* Sources */, A40000000000000000000007 /* Frameworks */);
+			buildRules = ();
+			dependencies = ();
+			name = MinisRuntimeService;
+			packageProductDependencies = (A90000000000000000000001 /* MinisDesktopCore */);
+			productName = MinisRuntimeService;
+			productReference = A20000000000000000000006 /* MinisRuntimeService */;
+			productType = "com.apple.product-type.tool";
+		};
+		A60000000000000000000003 /* MinisMacTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B20000000000000000000003 /* Build configuration list for PBXNativeTarget "MinisMacTests" */;
+			buildPhases = (A40000000000000000000008 /* Sources */, A40000000000000000000009 /* Frameworks */);
+			buildRules = ();
+			dependencies = (A80000000000000000000003 /* PBXTargetDependency */);
+			name = MinisMacTests;
+			packageProductDependencies = ();
+			productName = MinisMacTests;
+			productReference = A20000000000000000000010 /* MinisMacTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A70000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2660; LastUpgradeCheck = 2660; TargetAttributes = {A60000000000000000000001 = {CreatedOnToolsVersion = 26.0; }; A60000000000000000000002 = {CreatedOnToolsVersion = 26.0; }; }; };
+			buildConfigurationList = B20000000000000000000000 /* Build configuration list for PBXProject "MinisMac" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = A30000000000000000000001;
+			packageReferences = (A90000000000000000000000 /* XCLocalSwiftPackageReference "../.." */);
+			productRefGroup = A30000000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A60000000000000000000001 /* MinisMac */, A60000000000000000000002 /* MinisRuntimeService */, A60000000000000000000003 /* MinisMacTests */);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A40000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A40000000000000000000001 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000008, A10000000000000000000009, A10000000000000000000010, A10000000000000000000012); runOnlyForDeploymentPostprocessing = 0; };
+		A40000000000000000000006 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000004); runOnlyForDeploymentPostprocessing = 0; };
+		A40000000000000000000008 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000011, A10000000000000000000013); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A80000000000000000000002 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000002 /* MinisRuntimeService */; targetProxy = A80000000000000000000001 /* PBXContainerItemProxy */; };
+		A80000000000000000000003 /* PBXTargetDependency */ = {isa = PBXTargetDependency; target = A60000000000000000000001 /* MinisMac */; };
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		B10000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; ONLY_ACTIVE_ARCH = YES; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Debug; };
+		B10000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 6.0; }; name = Release; };
+		B10000000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_HARDENED_RUNTIME = YES; ENABLE_TESTABILITY = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Minis; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity"; INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Minis needs Calendar access only when you ask an agent to list or create events."; INFOPLIST_KEY_NSContactsUsageDescription = "Minis needs Contacts access only when you ask an agent to search contacts."; INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Minis needs Reminders access only when you ask an agent to list or create reminders."; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks"); MACOSX_DEPLOYMENT_TARGET = 14.0; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.openminis.MinisMac; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; }; name = Debug; };
+		B10000000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Minis; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity"; INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Minis needs Calendar access only when you ask an agent to list or create events."; INFOPLIST_KEY_NSContactsUsageDescription = "Minis needs Contacts access only when you ask an agent to search contacts."; INFOPLIST_KEY_NSRemindersFullAccessUsageDescription = "Minis needs Reminders access only when you ask an agent to list or create reminders."; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks"); MACOSX_DEPLOYMENT_TARGET = 14.0; MARKETING_VERSION = 1.0; PRODUCT_BUNDLE_IDENTIFIER = com.openminis.MinisMac; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; }; name = Release; };
+		B10000000000000000000005 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = RuntimeService/MinisRuntimeService.entitlements; CODE_SIGN_STYLE = Automatic; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library"; PRODUCT_BUNDLE_IDENTIFIER = com.openminis.MinisMac.RuntimeService; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_VERSION = 6.0; }; name = Debug; };
+		B10000000000000000000006 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_ENTITLEMENTS = RuntimeService/MinisRuntimeService.entitlements; CODE_SIGN_STYLE = Automatic; ENABLE_HARDENED_RUNTIME = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; OTHER_SWIFT_FLAGS = "$(inherited) -parse-as-library"; PRODUCT_BUNDLE_IDENTIFIER = com.openminis.MinisMac.RuntimeService; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 6.0; }; name = Release; };
+		B10000000000000000000007 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; PRODUCT_BUNDLE_IDENTIFIER = com.openminis.MinisMacTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MinisMac.app/Contents/MacOS/MinisMac"; }; name = Debug; };
+		B10000000000000000000008 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; PRODUCT_BUNDLE_IDENTIFIER = com.openminis.MinisMacTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MinisMac.app/Contents/MacOS/MinisMac"; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		B20000000000000000000000 /* Build configuration list for PBXProject "MinisMac" */ = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000001, B10000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B20000000000000000000001 /* Build configuration list for PBXNativeTarget "MinisMac" */ = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000003, B10000000000000000000004); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B20000000000000000000002 /* Build configuration list for PBXNativeTarget "MinisRuntimeService" */ = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000005, B10000000000000000000006); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B20000000000000000000003 /* Build configuration list for PBXNativeTarget "MinisMacTests" */ = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000007, B10000000000000000000008); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A90000000000000000000000 /* XCLocalSwiftPackageReference "../.." */ = {isa = XCLocalSwiftPackageReference; relativePath = ../..; };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A90000000000000000000001 /* MinisDesktopCore */ = {isa = XCSwiftPackageProductDependency; package = A90000000000000000000000 /* XCLocalSwiftPackageReference "../.." */; productName = MinisDesktopCore; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A70000000000000000000001 /* Project object */;
+}

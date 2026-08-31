@@ -19,7 +19,8 @@
 //
 
 import Foundation
-import SwiftUI
+
+// Shared Apple-domain model. UI-only color rendering lives in AgentAccent.swift.
 
 /// How much of the tool surface an agent is allowed to see.
 ///
@@ -27,7 +28,7 @@ import SwiftUI
 /// orchestrator physically cannot call `shell_execute`, so its transcript
 /// cannot fill up with shell output no matter what the model decides to do —
 /// the guarantee is structural, not a line in the system prompt.
-enum AgentToolPolicy: String, Codable, CaseIterable {
+public enum AgentToolPolicy: String, Codable, CaseIterable, Sendable {
     /// Dispatch + memory + read-only. No shell, no writes, no browser.
     case orchestrator
     /// The full historical toolset, and no ability to dispatch. This is what
@@ -53,15 +54,15 @@ enum AgentToolPolicy: String, Codable, CaseIterable {
 
 /// The role a running agent loop is playing. Drives both prompt assembly and
 /// tool-set construction (see `AIChatViewModel.agentRole`).
-enum AgentRunRole: String, Codable {
+public enum AgentRunRole: String, Codable, Sendable {
     /// A persistent agent's own long-lived main session.
     case main
     /// A headless subagent working one dispatched task in a scratch session.
     case executor
 }
 
-struct AgentProfile: Identifiable, Codable, Hashable {
-    let id: String
+public struct AgentProfile: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
     var name: String
     /// Character avatar. One or two emoji — deliberately not an image, so
     /// creating an agent never needs a picker or a crop step.
@@ -88,9 +89,9 @@ struct AgentProfile: Identifiable, Codable, Hashable {
 
     /// Identifier of the agent every pre-existing session is migrated onto.
     /// Kept stable (not a UUID) so migration is idempotent across launches.
-    static let defaultAgentId = "agent-default"
+    public static let defaultAgentId = "agent-default"
 
-    init(
+    public init(
         id: String = UUID().uuidString,
         name: String,
         emoji: String = "🤖",
@@ -128,7 +129,7 @@ struct AgentProfile: Identifiable, Codable, Hashable {
     // long note on `ChatSession.==`): the roster is diffed by SwiftUI on every
     // transaction flush, so avoid deep-comparing the long `summary` string.
     // `updatedAt` is its change proxy — every mutation bumps it.
-    static func == (lhs: AgentProfile, rhs: AgentProfile) -> Bool {
+    public static func == (lhs: AgentProfile, rhs: AgentProfile) -> Bool {
         lhs.id == rhs.id
             && lhs.updatedAt == rhs.updatedAt
             && lhs.name == rhs.name
@@ -140,7 +141,7 @@ struct AgentProfile: Identifiable, Codable, Hashable {
             && lhs.sortOrder == rhs.sortOrder
     }
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(updatedAt)
     }
@@ -148,7 +149,7 @@ struct AgentProfile: Identifiable, Codable, Hashable {
 
 // MARK: - Per-agent filesystem layout
 
-extension AgentProfile {
+public extension AgentProfile {
 
     /// Root of every agent's private directory tree, in host terms.
     ///
@@ -156,7 +157,13 @@ extension AgentProfile {
     /// the FileProvider extension and the iSH bind mount both pick it up with
     /// the machinery that already exists for those roots.
     nonisolated static var agentsPersistentDir: URL {
+        #if os(macOS)
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return support.appendingPathComponent("Minis", isDirectory: true)
+            .appendingPathComponent("Agents", isDirectory: true)
+        #else
         AIChatViewModel.minisAppGroupRoot.appendingPathComponent("agents", isDirectory: true)
+        #endif
     }
 
     /// Linux-side path of the same root, as the agent sees it.
@@ -196,22 +203,5 @@ extension AgentProfile {
     nonisolated static func ensureDirectories(for agentId: String) {
         let fm = FileManager.default
         try? fm.createDirectory(at: memoryDir(for: agentId), withIntermediateDirectories: true)
-    }
-}
-
-// MARK: - Accent colour
-
-/// Small hex → Color resolver for the roster chips. Deliberately not an
-/// `extension Color` so it cannot collide with one added elsewhere later.
-enum AgentAccent {
-    static func color(_ hex: String) -> Color {
-        var raw = hex.trimmingCharacters(in: .whitespacesAndNewlines)
-        if raw.hasPrefix("#") { raw.removeFirst() }
-        guard raw.count == 6, let value = UInt32(raw, radix: 16) else { return .accentColor }
-        return Color(
-            red: Double((value >> 16) & 0xFF) / 255,
-            green: Double((value >> 8) & 0xFF) / 255,
-            blue: Double(value & 0xFF) / 255
-        )
     }
 }

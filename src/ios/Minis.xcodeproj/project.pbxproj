@@ -82,6 +82,7 @@
 		E52000007 /* ClaudeOAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000016 /* ClaudeOAuthManager.swift */; };
 		E52000009 /* AnthropicModelsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52000018 /* AnthropicModelsAPI.swift */; };
 		E53000001 /* AIChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000011 /* AIChatViewModel.swift */; };
+		E5VME001 /* AIChatViewModel+AgentRunEngineAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5VME011 /* AIChatViewModel+AgentRunEngineAdapter.swift */; };
 		E53000002 /* AIChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000012 /* AIChatView.swift */; };
 		E53000004 /* ChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000014 /* ChatStore.swift */; };
 		E53000005 /* UsageStatsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53000015 /* UsageStatsView.swift */; };
@@ -165,6 +166,15 @@
 		E5CR00002 /* CrashReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5CR00012 /* CrashReporter.swift */; };
 		E5CR00003 /* CrashSignalHandler.m in Sources */ = {isa = PBXBuildFile; fileRef = E5CR00013 /* CrashSignalHandler.m */; };
 		E5D00001 /* ProviderTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00011 /* ProviderTypes.swift */; };
+		E5D0000A /* ProviderDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D0001A /* ProviderDomain.swift */; };
+		E5AD0001 /* AgentProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0011 /* AgentProfile.swift */; };
+		E5AD0002 /* GroupProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0012 /* GroupProfile.swift */; };
+		E5AD0003 /* GroupMentionRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0013 /* GroupMentionRouter.swift */; };
+		E5AD0004 /* GroupChatPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0014 /* GroupChatPrompt.swift */; };
+		E5AD0007 /* GroupChatEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0017 /* GroupChatEngine.swift */; };
+		E5AD0005 /* AgentRunEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0015 /* AgentRunEngine.swift */; };
+		E5AD0006 /* ChatPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0016 /* ChatPersistence.swift */; };
+		E5AD0008 /* SyncV2Contracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0018 /* SyncV2Contracts.swift */; };
 		E5D00002 /* ProviderInstance.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00012 /* ProviderInstance.swift */; };
 		E5D00003 /* ModelEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00013 /* ModelEntry.swift */; };
 		E5D00004 /* ModelGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00014 /* ModelGroup.swift */; };
@@ -683,6 +693,7 @@
 		E52000016 /* ClaudeOAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeOAuthManager.swift; sourceTree = "<group>"; };
 		E52000018 /* AnthropicModelsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicModelsAPI.swift; sourceTree = "<group>"; };
 		E53000011 /* AIChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatViewModel.swift; sourceTree = "<group>"; };
+		E5VME011 /* AIChatViewModel+AgentRunEngineAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AIChatViewModel+AgentRunEngineAdapter.swift"; sourceTree = "<group>"; };
 		E53000012 /* AIChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIChatView.swift; sourceTree = "<group>"; };
 		E53000014 /* ChatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatStore.swift; sourceTree = "<group>"; };
 		E53000015 /* UsageStatsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageStatsView.swift; sourceTree = "<group>"; };
@@ -769,6 +780,15 @@
 		E5CR00013 /* CrashSignalHandler.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = CrashSignalHandler.m; sourceTree = "<group>"; };
 		E5CR00014 /* CrashSignalHandler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = CrashSignalHandler.h; sourceTree = "<group>"; };
 		E5D00011 /* ProviderTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderTypes.swift; sourceTree = "<group>"; };
+		E5D0001A /* ProviderDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderDomain.swift; sourceTree = "<group>"; };
+		E5AD0011 /* AgentProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentProfile.swift; sourceTree = "<group>"; };
+		E5AD0012 /* GroupProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupProfile.swift; sourceTree = "<group>"; };
+		E5AD0013 /* GroupMentionRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupMentionRouter.swift; sourceTree = "<group>"; };
+		E5AD0014 /* GroupChatPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatPrompt.swift; sourceTree = "<group>"; };
+		E5AD0017 /* GroupChatEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatEngine.swift; sourceTree = "<group>"; };
+		E5AD0015 /* AgentRunEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunEngine.swift; sourceTree = "<group>"; };
+		E5AD0016 /* ChatPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPersistence.swift; sourceTree = "<group>"; };
+		E5AD0018 /* SyncV2Contracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncV2Contracts.swift; sourceTree = "<group>"; };
 		E5D00012 /* ProviderInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderInstance.swift; sourceTree = "<group>"; };
 		E5D00013 /* ModelEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelEntry.swift; sourceTree = "<group>"; };
 		E5D00014 /* ModelGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelGroup.swift; sourceTree = "<group>"; };
@@ -1316,6 +1336,7 @@
 			isa = PBXGroup;
 			children = (
 				E51000031 /* Minis */,
+				E5AD0030 /* AppleDomain */,
 				E5E000031 /* Shared */,
 				E5E000030 /* ShareExtension */,
 				E5H000030 /* AgentWidget */,
@@ -1365,6 +1386,22 @@
 			name = Minis;
 			sourceTree = "<group>";
 		};
+		E5AD0030 /* AppleDomain */ = {
+			isa = PBXGroup;
+			children = (
+				E5AD0011 /* AgentProfile.swift */,
+				E5AD0015 /* AgentRunEngine.swift */,
+				E5AD0016 /* ChatPersistence.swift */,
+				E5AD0018 /* SyncV2Contracts.swift */,
+				E5AD0012 /* GroupProfile.swift */,
+				E5AD0013 /* GroupMentionRouter.swift */,
+				E5AD0014 /* GroupChatPrompt.swift */,
+				E5AD0017 /* GroupChatEngine.swift */,
+			);
+			name = AppleDomain;
+			path = "../apple/Domain";
+			sourceTree = "<group>";
+		};
 		E51000032 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -1399,6 +1436,7 @@
 				E52000013 /* LLMProvider.swift */,
 				E5F00002 /* LLMProviderFactory.swift */,
 				E59000011 /* AgentProvider.swift */,
+				E5D0001A /* ProviderDomain.swift */,
 				E5D00011 /* ProviderTypes.swift */,
 				E5D00012 /* ProviderInstance.swift */,
 				E5D00013 /* ModelEntry.swift */,
@@ -1895,6 +1933,7 @@
 			isa = PBXGroup;
 			children = (
 				E53000011 /* AIChatViewModel.swift */,
+				E5VME011 /* AIChatViewModel+AgentRunEngineAdapter.swift */,
 				E5VMA0011 /* AIChatViewModel+Attachments.swift */,
 				E5VMA0012 /* AIChatViewModel+SlashCommands.swift */,
 				E5VMA0013 /* AIChatViewModel+MentionMenu.swift */,
@@ -2716,6 +2755,7 @@
 				E5KIMI0D1 /* KimiModelsAPI.swift in Sources */,
 				E52000009 /* AnthropicModelsAPI.swift in Sources */,
 				E53000001 /* AIChatViewModel.swift in Sources */,
+				E5VME001 /* AIChatViewModel+AgentRunEngineAdapter.swift in Sources */,
 				E5VMA0001 /* AIChatViewModel+Attachments.swift in Sources */,
 				E5VMA0002 /* AIChatViewModel+SlashCommands.swift in Sources */,
 				E5VMA0003 /* AIChatViewModel+MentionMenu.swift in Sources */,
@@ -2890,6 +2930,15 @@
 				E7A000001 /* OpenRouterModelsAPI.swift in Sources */,
 				E7A000002 /* OpenRouterOAuthManager.swift in Sources */,
 				E5D00001 /* ProviderTypes.swift in Sources */,
+				E5D0000A /* ProviderDomain.swift in Sources */,
+				E5AD0001 /* AgentProfile.swift in Sources */,
+				E5AD0005 /* AgentRunEngine.swift in Sources */,
+				E5AD0006 /* ChatPersistence.swift in Sources */,
+				E5AD0008 /* SyncV2Contracts.swift in Sources */,
+				E5AD0002 /* GroupProfile.swift in Sources */,
+				E5AD0003 /* GroupMentionRouter.swift in Sources */,
+				E5AD0004 /* GroupChatPrompt.swift in Sources */,
+				E5AD0007 /* GroupChatEngine.swift in Sources */,
 				E5D00002 /* ProviderInstance.swift in Sources */,
 				E5D00003 /* ModelEntry.swift in Sources */,
 				E5D00004 /* ModelGroup.swift in Sources */,

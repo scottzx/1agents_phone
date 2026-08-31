@@ -35,7 +35,9 @@
 
 import Foundation
 
-enum GroupMentionRouter {
+// Shared Apple-domain mention parsing and routing.
+
+public enum GroupMentionRouter {
 
     // MARK: - Wire format
 
@@ -98,7 +100,7 @@ enum GroupMentionRouter {
     /// roster order. That is a real ambiguity in the text the user typed and
     /// there is nothing better to do with it; the `@` picker is the way to be
     /// unambiguous.
-    static func encode(_ text: String, members: [GroupMember]) -> String {
+    public static func encode(_ text: String, members: [GroupMember]) -> String {
         guard text.contains("@") else { return text }
 
         // Protect existing tokens from the name pass below: an id could
@@ -161,7 +163,7 @@ enum GroupMentionRouter {
     /// A token for an agent that has left the roster renders as
     /// `@已退出的成员` rather than as a raw id: the line stays readable, and it
     /// stays honest about who is no longer here.
-    static func render(_ text: String, members: [GroupMember]) -> String {
+    public static func render(_ text: String, members: [GroupMember]) -> String {
         let found = tokens(in: text)
         guard !found.isEmpty else { return text }
 
@@ -427,20 +429,20 @@ enum GroupMentionRouter {
     // MARK: - Routing
 
     /// Who should speak, and why.
-    struct Resolution: Equatable {
+    public struct Resolution: Equatable, Sendable {
         /// Member ids in roster order. Empty means the room goes quiet.
-        var responderIds: [String]
-        var reason: Reason
+        public var responderIds: [String]
+        public var reason: Reason
         /// Members that used `@所有人` without being the group owner. Their
         /// broadcast was ignored (their named mentions still count). Surfaced
         /// rather than swallowed so the bridge log can explain a quiet room.
-        var downgradedEveryoneBy: [String]
+        public var downgradedEveryoneBy: [String]
         /// Members that addressed someone by NAME instead of by `<@id>` token.
         /// It worked, but only by the fallback in `parseMentions` — worth a log
         /// line, because the day one of them is renamed it stops working.
-        var usedLooseNamesBy: [String]
+        public var usedLooseNamesBy: [String]
 
-        enum Reason: String, Equatable {
+        public enum Reason: String, Equatable, Sendable {
             /// Addressed to the whole room by the user or the owner.
             case everyone
             /// Explicitly named.
@@ -455,7 +457,7 @@ enum GroupMentionRouter {
             case none
         }
 
-        init(
+        public init(
             responderIds: [String],
             reason: Reason,
             downgradedEveryoneBy: [String] = [],
@@ -467,7 +469,7 @@ enum GroupMentionRouter {
             self.usedLooseNamesBy = usedLooseNamesBy
         }
 
-        static let quiet = Resolution(responderIds: [], reason: .none)
+        public static let quiet = Resolution(responderIds: [], reason: .none)
     }
 
     /// Resolve one round of responders.
@@ -499,7 +501,7 @@ enum GroupMentionRouter {
     ///   must address each other explicitly; silence ends the exchange.
     ///
     /// A member never answers itself: senders in this batch are always removed.
-    static func resolveResponders(
+    public static func resolveResponders(
         members: [GroupMember],
         newMessages: [GroupMessage],
         history: [GroupMessage],
@@ -592,7 +594,7 @@ enum GroupMentionRouter {
     /// Round N starts with member N. One line, and it removes the first-mover
     /// bias that would otherwise make the same agent set the frame every time
     /// (grok's `orderRoundSpeakers`).
-    static func orderRoundSpeakers<T>(_ ids: [T], round: Int) -> [T] {
+    public static func orderRoundSpeakers<T>(_ ids: [T], round: Int) -> [T] {
         guard !ids.isEmpty else { return [] }
         let offset = ((round % ids.count) + ids.count) % ids.count
         return Array(ids[offset...] + ids[..<offset])
@@ -601,7 +603,7 @@ enum GroupMentionRouter {
     /// What a member has not seen yet: everything after the last thing it said.
     /// A member that has never spoken gets the whole transcript
     /// (grok's `messagesSinceMemberLastSpoke`).
-    static func messagesSinceMemberLastSpoke(
+    public static func messagesSinceMemberLastSpoke(
         _ history: [GroupMessage],
         memberId: String
     ) -> [GroupMessage] {
@@ -616,7 +618,7 @@ enum GroupMentionRouter {
     /// Explicit silence. A member with nothing to add says so, and the room
     /// notices — this is what lets a conversation end because it is over rather
     /// than because a counter ran out.
-    static func isPass(_ text: String) -> Bool {
+    public static func isPass(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return true }
         let stripped = trimmed

@@ -300,6 +300,22 @@ struct ProviderInstance: Identifiable, Codable, Hashable {
     }
 }
 
+extension ProviderInstance {
+    /// Projects the iOS-selected instance and model onto the portable Runtime
+    /// contract. Endpoint construction stays with the platform/provider client
+    /// because different provider protocols have different URL paths.
+    func providerConfiguration(endpoint: URL, model: LLMModel) -> ProviderConfiguration {
+        ProviderConfiguration(
+            id: id,
+            displayName: label,
+            endpoint: endpoint,
+            model: ProviderModel(id: model.id, displayName: model.displayName, provider: model.provider),
+            providerType: providerType,
+            unknownProviderTypeRaw: unknownProviderTypeRaw
+        )
+    }
+}
+
 /// L2 credential cache: memoizes `hasAnyCredential` per instanceId, negatives
 /// included. [T-new-session-hang-credential-cache]
 ///

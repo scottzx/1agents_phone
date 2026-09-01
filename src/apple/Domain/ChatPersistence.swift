@@ -415,12 +415,22 @@ public struct RawMessage: Identifiable, Codable, Hashable, Sendable {
     }
 
     public var isAsyncTaskNotice: Bool {
-        guard role == .assistant, !parts.isEmpty else { return false }
-        return parts.allSatisfy {
-            if case .toolUse(let tu) = $0 {
-                return tu.name == ChatPersistenceSchema.asyncTaskNoticeToolName
+        guard !parts.isEmpty else { return false }
+        switch role {
+        case .assistant:
+            return parts.allSatisfy {
+                if case .toolUse(let tu) = $0 {
+                    return tu.name == ChatPersistenceSchema.asyncTaskNoticeToolName
+                }
+                return false
             }
-            return false
+        case .user:
+            return parts.allSatisfy {
+                if case .toolResult(let result) = $0 {
+                    return result.toolUseId.hasPrefix(ChatPersistenceSchema.asyncTaskNoticeToolUseIdPrefix)
+                }
+                return false
+            }
         }
     }
 }
@@ -429,8 +439,12 @@ public struct RawMessage: Identifiable, Codable, Hashable, Sendable {
 public struct AsyncTaskNotice: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let sourceSessionId: String
-    public let taskType: String       // "shell" | "subagent" | "a2a" | "group"
+    public let taskType: String       // "shell" | "subagent" | "a2a"
     public let taskId: String
+    /// The agent which executed the task (subagent) or received the delivery
+    /// (direct A2A). Kept separate from taskId so one agent can receive many
+    /// independently tracked deliveries.
+    public let agentId: String?
     public let title: String?
     public let status: String         // "done" | "failed" | "stopped"
     public let result: String
@@ -444,6 +458,7 @@ public struct AsyncTaskNotice: Identifiable, Codable, Hashable, Sendable {
         sourceSessionId: String,
         taskType: String,
         taskId: String,
+        agentId: String? = nil,
         title: String? = nil,
         status: String = "done",
         result: String,
@@ -456,6 +471,7 @@ public struct AsyncTaskNotice: Identifiable, Codable, Hashable, Sendable {
         self.sourceSessionId = sourceSessionId
         self.taskType = taskType
         self.taskId = taskId
+        self.agentId = agentId
         self.title = title
         self.status = status
         self.result = result
@@ -472,6 +488,7 @@ public struct AsyncTaskNotice: Identifiable, Codable, Hashable, Sendable {
 /// add indexes and columns, but these names and wire formats cannot be renamed.
 public enum ChatPersistenceSchema {
     public static let asyncTaskNoticeToolName = "async_task_notice"
+    public static let asyncTaskNoticeToolUseIdPrefix = "async-notice:"
     public static let sessionsTable = "sessions"
     public static let messagesTable = "messages"
     public static let asyncTaskNoticesTable = "async_task_notices"
@@ -507,6 +524,7 @@ public enum ChatPersistenceSchema {
             source_session_id TEXT NOT NULL,
             task_type         TEXT NOT NULL,
             task_id           TEXT NOT NULL,
+            agent_id          TEXT,
             title             TEXT,
             status            TEXT NOT NULL,
             result            TEXT NOT NULL,

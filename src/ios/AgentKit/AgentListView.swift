@@ -23,6 +23,8 @@ enum AgentRoute: Hashable {
     case agent(String)
     case session(String)
     case group(String)
+    case agentDetail(String)
+    case groupDetail(String)
 }
 
 enum ChatListMode: String, CaseIterable, Identifiable {
@@ -30,6 +32,8 @@ enum ChatListMode: String, CaseIterable, Identifiable {
     case chats = "聊天"
     /// Standalone, historical sessions that do not belong to an agent/group.
     case sessions = "对话"
+    /// Operational queue across every top-level and hidden execution session.
+    case tasks = "任务"
 
     var id: String { rawValue }
 
@@ -37,8 +41,16 @@ enum ChatListMode: String, CaseIterable, Identifiable {
         switch self {
         case .chats: return "bubble.left.and.bubble.right"
         case .sessions: return "clock.arrow.circlepath"
+        case .tasks: return "list.bullet.clipboard"
         }
     }
+}
+
+private enum TaskQueueTimeRange: String, CaseIterable, Identifiable {
+    case recentSevenDays = "近 7 天"
+    case all = "全部"
+
+    var id: String { rawValue }
 }
 
 private enum AppRootTab: Hashable {
@@ -64,6 +76,7 @@ private enum UnifiedChatItem: Identifiable {
 struct AgentListView: View {
     @ObservedObject private var store = AgentStore.shared
     @ObservedObject private var activity = SessionActivityTracker.shared
+    @ObservedObject private var concurrency = SessionConcurrencyManager.shared
     /// Drives the unread dot. An agent's conversation can now gain a message
     /// the user never sent — another agent's `send_agent_message` lands there —
     /// so the roster has to be able to say "something arrived in here".
@@ -71,10 +84,13 @@ struct AgentListView: View {
     @ObservedObject private var groups = GroupStore.shared
 
     @AppStorage("home.chatListMode") private var selectedMode: ChatListMode = .chats
+    @AppStorage("home.taskQueueTimeRange") private var taskQueueTimeRange: TaskQueueTimeRange = .recentSevenDays
+    @AppStorage("home.taskQueueStatus") private var selectedTaskStatus: TaskQueueStatus = .inProgress
     @State private var selectedRootTab: AppRootTab = .chats
     @State private var searchText = ""
     @State private var sessions: [ChatSession] = []
     @State private var sessionsById: [String: ChatSession] = [:]
+    @State private var taskQueueEntries: [TaskQueueEntry] = []
     @State private var searchResults: [ChatStore.SearchResult] = []
     @State private var searchTask: Task<Void, Never>?
 
@@ -82,6 +98,8 @@ struct AgentListView: View {
     @State private var contactsPath: [AgentRoute] = []
     @State private var showingCreate = false
     @State private var showingCreateGroup = false
+    @State private var isAgentsExpanded = true
+    @State private var isGroupsExpanded = true
     /// Members per group, resolved once when the roster loads so each row can
     /// show who is in it without an async lookup per redraw.
     @State private var groupMembers: [String: [GroupMember]] = [:]
@@ -167,6 +185,20 @@ struct AgentListView: View {
                         )
                     case .group(let groupId):
                         GroupSessionView(groupId: groupId)
+                    case .agentDetail(let agentId):
+                        AgentDetailView(
+                            agentId: agentId,
+                            onSendMessage: { id in chatPath.append(.agent(id)) },
+                            onOpenSession: { sid in chatPath.append(.session(sid)) },
+                            onOpenGroup: { gid in chatPath.append(.group(gid)) }
+                        )
+                    case .groupDetail(let groupId):
+                        GroupDetailView(
+                            groupId: groupId,
+                            onEnterGroupChat: { id in chatPath.append(.group(id)) },
+                            onOpenAgentDetail: { aid in chatPath.append(.agentDetail(aid)) },
+                            onOpenSession: { sid in chatPath.append(.session(sid)) }
+                        )
                     }
                 }
                 .toolbar(.hidden, for: .tabBar)
@@ -274,6 +306,28 @@ struct AgentListView: View {
                 .onChange(of: searchText) { _ in
                     scheduleSearch()
                 }
+            if selectedMode == .tasks {
+                Menu {
+                    ForEach(TaskQueueTimeRange.allCases) { range in
+                        Button {
+                            taskQueueTimeRange = range
+                        } label: {
+                            Label(
+                                range.rawValue,
+                                systemImage: taskQueueTimeRange == range ? "checkmark" : "calendar"
+                            )
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "calendar")
+                        Text(taskQueueTimeRange == .recentSevenDays ? "7天" : "全部")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.accentColor)
+                }
+                .accessibilityLabel(String(localized: "任务时间范围"))
+            }
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
@@ -296,22 +350,31 @@ struct AgentListView: View {
         switch selectedMode {
         case .chats: return String(localized: "搜索私聊和群聊...")
         case .sessions: return String(localized: "搜索对话...")
+        case .tasks: return String(localized: "搜索任务和会话...")
         }
     }
 
     private var roster: some View {
         List {
-            Section {
-                switch selectedMode {
-                case .chats:
+            switch selectedMode {
+            case .chats:
+                Section {
                     chatsList
-                case .sessions:
-                    sessionsList
+                } header: {
+                    searchBarHeader
                 }
-            } header: {
-                filterAndSearchBar
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .textCase(nil)
+            case .sessions:
+                Section {
+                    sessionsList
+                } header: {
+                    searchBarHeader
+                }
+            case .tasks:
+                Section {
+                    taskQueueSelectedContent
+                } header: {
+                    taskControlsHeader
+                }
             }
         }
         .listStyle(.insetGrouped)
@@ -324,14 +387,63 @@ struct AgentListView: View {
         }
     }
 
+    private var searchBarHeader: some View {
+        filterAndSearchBar
+            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+            .textCase(nil)
+    }
+
+    private var taskControlsHeader: some View {
+        VStack(spacing: 8) {
+            filterAndSearchBar
+            taskStatusTabs
+        }
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+        .textCase(nil)
+    }
+
+    private var taskStatusTabs: some View {
+        Picker(String(localized: "任务状态"), selection: $selectedTaskStatus) {
+            ForEach(TaskQueueStatus.allCases) { status in
+                Text("\(status.rawValue) \(taskEntries(for: status).count)")
+                    .tag(status)
+            }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityLabel(String(localized: "切换任务状态"))
+    }
+
     private var contactsRoot: some View {
         NavigationStack(path: $contactsPath) {
             List {
-                Section(String(localized: "智能体")) {
-                    agentsList(path: $contactsPath)
+                Section {
+                    contactsSearchBar
                 }
-                Section(String(localized: "群聊")) {
-                    groupsList(path: $contactsPath)
+                .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                .listRowBackground(Color.clear)
+
+                Section {
+                    if isAgentsExpanded {
+                        agentsList(path: $contactsPath)
+                    }
+                } header: {
+                    collapsibleSectionHeader(
+                        title: String(localized: "智能体"),
+                        count: sortedFilteredAgents.count,
+                        isExpanded: $isAgentsExpanded
+                    )
+                }
+
+                Section {
+                    if isGroupsExpanded {
+                        groupsList(path: $contactsPath)
+                    }
+                } header: {
+                    collapsibleSectionHeader(
+                        title: String(localized: "群聊"),
+                        count: sortedFilteredGroups.count,
+                        isExpanded: $isGroupsExpanded
+                    )
                 }
             }
             .listStyle(.insetGrouped)
@@ -340,15 +452,83 @@ struct AgentListView: View {
             .navigationDestination(for: AgentRoute.self) { route in
                 Group {
                     switch route {
-                    case .agent(let agentId): AgentMainSessionView(agentId: agentId)
-                    case .group(let groupId): GroupSessionView(groupId: groupId)
-                    case .session(let sessionId): AIChatView(sessionId: sessionId)
+                    case .agent(let agentId):
+                        AgentMainSessionView(agentId: agentId)
+                    case .session(let sessionId):
+                        AIChatView(sessionId: sessionId)
+                    case .group(let groupId):
+                        GroupSessionView(groupId: groupId)
+                    case .agentDetail(let agentId):
+                        AgentDetailView(
+                            agentId: agentId,
+                            onSendMessage: { id in contactsPath.append(.agent(id)) },
+                            onOpenSession: { sid in contactsPath.append(.session(sid)) },
+                            onOpenGroup: { gid in contactsPath.append(.group(gid)) }
+                        )
+                    case .groupDetail(let groupId):
+                        GroupDetailView(
+                            groupId: groupId,
+                            onEnterGroupChat: { id in contactsPath.append(.group(id)) },
+                            onOpenAgentDetail: { aid in contactsPath.append(.agentDetail(aid)) },
+                            onOpenSession: { sid in contactsPath.append(.session(sid)) }
+                        )
                     }
                 }
                 .toolbar(.hidden, for: .tabBar)
             }
         }
         .toolbar(contactsPath.isEmpty ? .visible : .hidden, for: .tabBar)
+    }
+
+    private var contactsSearchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+            TextField(String(localized: "搜索智能体和群聊..."), text: $searchText)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .frame(height: 38)
+        .background(Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.secondarySystemGroupedBackground : UIColor.white }))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private func collapsibleSectionHeader(
+        title: String,
+        count: Int,
+        isExpanded: Binding<Bool>
+    ) -> some View {
+        Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                isExpanded.wrappedValue.toggle()
+            }
+        } label: {
+            HStack {
+                Text("\(title) (\(count))")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color(UIColor.secondaryLabel))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color(UIColor.tertiaryLabel))
+                    .rotationEffect(.degrees(isExpanded.wrappedValue ? 90 : 0))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .textCase(nil)
     }
 
     // MARK: - Tab Views
@@ -478,17 +658,44 @@ struct AgentListView: View {
     }
 
     @ViewBuilder
+    private var taskQueueSelectedContent: some View {
+        let entries = taskEntries(for: selectedTaskStatus)
+        if entries.isEmpty {
+            Text(emptyTaskQueueLabel(for: selectedTaskStatus))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 24)
+        } else {
+            ForEach(entries) { entry in
+                Button {
+                    openTaskQueueEntry(entry)
+                } label: {
+                    TaskQueueRow(
+                        entry: entry,
+                        status: selectedTaskStatus,
+                        queuePosition: queuePosition(for: entry.session.id),
+                        toolInfo: activity.sessionToolInfo[entry.session.id],
+                        metadata: taskMetadata(for: entry)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
     private func agentsList(path: Binding<[AgentRoute]>) -> some View {
-        if filteredAgents.isEmpty {
+        if sortedFilteredAgents.isEmpty {
             Text(String(localized: "暂无智能体"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 24)
         } else {
-            ForEach(filteredAgents) { agent in
+            ForEach(sortedFilteredAgents) { agent in
                 Button {
-                    path.wrappedValue.append(.agent(agent.id))
+                    path.wrappedValue.append(.agentDetail(agent.id))
                 } label: {
                     AgentRow(
                         agent: agent,
@@ -511,16 +718,16 @@ struct AgentListView: View {
 
     @ViewBuilder
     private func groupsList(path: Binding<[AgentRoute]>) -> some View {
-        if filteredGroups.isEmpty {
+        if sortedFilteredGroups.isEmpty {
             Text(String(localized: "暂无群聊"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.vertical, 24)
         } else {
-            ForEach(filteredGroups) { group in
+            ForEach(sortedFilteredGroups) { group in
                 Button {
-                    path.wrappedValue.append(.group(group.id))
+                    path.wrappedValue.append(.groupDetail(group.id))
                 } label: {
                     AgentGroupRow(
                         group: group,
@@ -556,6 +763,133 @@ struct AgentListView: View {
         }
     }
 
+    private var visibleTaskQueueEntries: [TaskQueueEntry] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sevenDaysAgo = Date().addingTimeInterval(-7 * 24 * 60 * 60)
+
+        return taskQueueEntries.filter { entry in
+            let status = taskStatus(for: entry.session.id)
+            if taskQueueTimeRange == .recentSevenDays,
+               status == .completed,
+               entry.lastReplyAt.map({ $0 < sevenDaysAgo }) ?? true {
+                return false
+            }
+
+            guard !query.isEmpty else { return true }
+            let session = entry.session
+            return ([session.spawnTitle, session.title, session.lastMessage, session.source, session.spawnRole]
+                .compactMap { $0 }
+                + [taskMetadata(for: entry).searchableText])
+                .contains { $0.localizedCaseInsensitiveContains(query) }
+        }
+    }
+
+    private func taskEntries(for status: TaskQueueStatus) -> [TaskQueueEntry] {
+        visibleTaskQueueEntries
+            .filter { taskStatus(for: $0.session.id) == status }
+            .sorted { lhs, rhs in
+                if status == .waiting {
+                    return queuePosition(for: lhs.session.id) < queuePosition(for: rhs.session.id)
+                }
+                let leftDate = lhs.lastReplyAt ?? lhs.session.updatedAt
+                let rightDate = rhs.lastReplyAt ?? rhs.session.updatedAt
+                return leftDate > rightDate
+            }
+    }
+
+    private func taskStatus(for sessionId: String) -> TaskQueueStatus {
+        if concurrency.isSuspended(sessionId) { return .waiting }
+        if activity.isActive(sessionId) || concurrency.runningSessions.contains(sessionId) {
+            return .inProgress
+        }
+        return .completed
+    }
+
+    private func queuePosition(for sessionId: String) -> Int {
+        (concurrency.suspendedSessions.firstIndex(of: sessionId) ?? Int.max - 1) + 1
+    }
+
+    private func taskMetadata(for entry: TaskQueueEntry) -> TaskQueueCardMetadata {
+        let session = entry.session
+        let parent = session.parentSessionId.flatMap { parentId in
+            taskQueueEntries.first(where: { $0.session.id == parentId })?.session
+        }
+        // A subagent belongs to the conversation that launched it. For other
+        // execution sessions the row itself is the conversation context.
+        let contextSession = session.isSubagent ? (parent ?? session) : session
+
+        let group = groups.groups.first { candidate in
+            candidate.sessionId == contextSession.id
+                || candidate.sessionId == contextSession.parentSessionId
+        }
+
+        let memberNames: [String]
+        if let group {
+            let members = groupMembers[group.id] ?? []
+            if contextSession.spawnRole == GroupSessionRole.member,
+               let memberId = contextSession.agentId,
+               let member = members.first(where: { $0.id == memberId }) {
+                memberNames = [member.displayName]
+            } else {
+                memberNames = members.map(\.displayName)
+            }
+        } else {
+            memberNames = []
+        }
+
+        let initiatingAgentId: String? = {
+            if session.isSubagent {
+                return parent?.agentId ?? session.agentId
+            }
+            guard contextSession.agentId != AgentProfile.defaultAgentId else { return nil }
+            return contextSession.agentId
+        }()
+        let initiatingAgentName = (session.isSubagent || group == nil)
+            ? initiatingAgentId.flatMap { store.agent($0)?.name }
+            : nil
+
+        let conversationType: String
+        if group != nil {
+            conversationType = String(localized: "群聊")
+        } else if initiatingAgentId != nil {
+            conversationType = String(localized: "聊天")
+        } else {
+            conversationType = String(localized: "对话")
+        }
+
+        return TaskQueueCardMetadata(
+            conversationType: conversationType,
+            taskType: session.isSubagent ? String(localized: "子智能体") : nil,
+            primaryAgentName: initiatingAgentName,
+            groupMemberNames: memberNames
+        )
+    }
+
+    private func openTaskQueueEntry(_ entry: TaskQueueEntry) {
+        let session = entry.session
+        if let group = groups.groups.first(where: { $0.sessionId == session.id }) {
+            chatPath.append(.group(group.id))
+            return
+        }
+        if let agentId = session.agentId,
+           store.agent(agentId)?.mainSessionId == session.id {
+            chatPath.append(.agent(agentId))
+            return
+        }
+        chatPath.append(.session(session.id))
+    }
+
+    private func emptyTaskQueueLabel(for status: TaskQueueStatus) -> String {
+        switch status {
+        case .waiting: return String(localized: "暂无等待中的会话")
+        case .inProgress: return String(localized: "暂无进行中的会话")
+        case .completed:
+            return taskQueueTimeRange == .recentSevenDays
+                ? String(localized: "近 7 天暂无已完成会话")
+                : String(localized: "暂无已完成会话")
+        }
+    }
+
     private var unifiedChats: [UnifiedChatItem] {
         let direct = filteredAgents.map(UnifiedChatItem.direct)
         let group = filteredGroups.map(UnifiedChatItem.group)
@@ -581,6 +915,10 @@ struct AgentListView: View {
         }
     }
 
+    private var sortedFilteredAgents: [AgentProfile] {
+        AlphabetHelper.sortedByAlphabet(filteredAgents, by: \.name)
+    }
+
     private var filteredGroups: [GroupProfile] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return groups.groups }
@@ -588,6 +926,10 @@ struct AgentListView: View {
             $0.title.localizedCaseInsensitiveContains(q)
                 || (groupMembers[$0.id]?.contains { $0.name.localizedCaseInsensitiveContains(q) } ?? false)
         }
+    }
+
+    private var sortedFilteredGroups: [GroupProfile] {
+        AlphabetHelper.sortedByAlphabet(filteredGroups, by: \.title)
     }
 
     private func startNewSession() {
@@ -598,7 +940,9 @@ struct AgentListView: View {
 
     private func loadSessions() async {
         let all = await ChatStore.shared.listSessions()
+        let queueEntries = await ChatStore.shared.listTaskQueueEntries()
         sessionsById = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
+        taskQueueEntries = queueEntries
         sessions = all.filter { s in
             let isDefault = s.agentId == nil || s.agentId == AgentProfile.defaultAgentId
             let isNotGroup = s.spawnRole != GroupSessionRole.group
@@ -609,7 +953,7 @@ struct AgentListView: View {
     private func scheduleSearch() {
         searchTask?.cancel()
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else {
+        guard selectedMode == .sessions, !query.isEmpty else {
             searchResults = []
             return
         }

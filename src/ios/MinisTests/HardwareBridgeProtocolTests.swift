@@ -1,5 +1,6 @@
 #if DEBUG
 import XCTest
+@testable import Minis
 
 /// Wire-format tests for the agent_link extensions: typed event decoding, the
 /// generic 0x33 encoder, and 0x37 roster fragmentation.

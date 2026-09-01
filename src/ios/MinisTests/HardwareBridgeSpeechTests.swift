@@ -1,6 +1,7 @@
 #if DEBUG
 import Foundation
 import XCTest
+@testable import Minis
 
 final class HardwareBridgeSpeechTests: XCTestCase {
     func testVoiceReplyStartFrameUsesLittleEndianSessionID() throws {

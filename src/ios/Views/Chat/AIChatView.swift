@@ -264,8 +264,15 @@ struct AIChatView: View {
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
     @Environment(\.dismiss) private var dismiss
     @State private var inputFocused: Bool = false
+    @State private var isKeyboardVisible: Bool = false
     @State private var inputHasSelection: Bool = false
     @State private var inputIsScrollable: Bool = false
+
+    /// True when the user is actively inputting and the software keyboard is visible on screen.
+    private var isHeaderHiddenForKeyboard: Bool {
+        inputFocused && isKeyboardVisible
+    }
+
     /// [T-ios-composer-swipe-send-at-bottom] True when the composer's text is
     /// scrolled to its end (or is short enough not to scroll). Combined with
     /// `inputIsScrollable` to decide whether a vertical drag belongs to the
@@ -717,10 +724,12 @@ struct AIChatView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .top, spacing: 0) {
-            if showsPageHeader {
+            if showsPageHeader && !isHeaderHiddenForKeyboard {
                 chatPageHeader
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
+        .animation(.easeInOut(duration: 0.25), value: isHeaderHiddenForKeyboard)
         .background {
             if showsHeaderBackButton {
                 MinisInteractivePopBridge()
@@ -904,6 +913,34 @@ struct AIChatView: View {
             // (e.g. /skill tap) so the keyboard pops up immediately and
             // the user can keep typing without an extra tap on the field.
             inputFocused = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { note in
+            let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                let isVisible = frame.height > 100 && frame.minY < UIScreen.main.bounds.height
+                withAnimation(.easeInOut(duration: duration)) {
+                    isKeyboardVisible = isVisible
+                }
+            } else {
+                withAnimation(.easeInOut(duration: duration)) {
+                    isKeyboardVisible = true
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { note in
+            let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+            withAnimation(.easeInOut(duration: duration)) {
+                isKeyboardVisible = false
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { note in
+            let duration = note.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.25
+            if let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                let isVisible = frame.height > 100 && frame.minY < UIScreen.main.bounds.height
+                withAnimation(.easeInOut(duration: duration)) {
+                    isKeyboardVisible = isVisible
+                }
+            }
         }
         .modifier(ChatInputAppendListener(vm: vm, inputFocused: $inputFocused))
         .modifier(RerunFromToolBlockListener(vm: vm))
@@ -3319,7 +3356,8 @@ struct AIChatView: View {
             .modifier(ComposerSurface())
             .frame(maxWidth: maxContentWidth)
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.top, 4)
+            .padding(.bottom, 0)
             // [T-ios-geometry-observer-crash] onGeometryChange replaces the
             // GeometryReader scaffold (async-renderer SIGTRAP — see the
             // floating-bar site). Fires with the initial value too, so the

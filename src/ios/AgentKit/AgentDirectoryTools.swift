@@ -23,10 +23,9 @@
 //    - a busy target is a refusal, not a queue. Silently stacking messages
 //      behind a running turn hides the contention; `interrupt: true` is the
 //      explicit opt-in, and it is the caller who has to decide.
-//    - waiting for the reply is a parameter, not the default. `wait_seconds`
-//      parks the caller inside its tool call exactly like `check_subagent`
-//      does, so the reply can be folded into the same turn; 0 posts and moves
-//      on.
+//    - direct delivery is always asynchronous. The caller gets a task id
+//      immediately and receives the peer's terminal result through an
+//      async_task_notice.
 //
 //  Group A2A extends that same tool rather than adding a parallel verb. A
 //  direct message is `is_group:false + agent_id[] + message`; a pseudo-group
@@ -45,10 +44,13 @@ enum AgentDirectoryTools {
 
     static let names: Set<String> = ["create_agent", "list_agents", "send_agent_message"]
 
-    /// Upper bound on a single `send_agent_message` park, in seconds. Shared
-    /// with the dispatch tools so a caller cannot park longer waiting on a
-    /// colleague than it can waiting on its own subagent.
-    static var maxWaitSeconds: Int { SubagentTools.maxWaitSeconds }
+    /// Upper bound on how long we keep waiting for the recipient's background
+    /// turn. The sender never parks for this duration; an outcome is returned
+    /// later through its notice. Deliberately its own value rather than an
+    /// alias of `SubagentTools.maxRunSeconds` — the two dispatch paths have no
+    /// reason to move together, and aliasing meant retuning one silently
+    /// retuned the other.
+    static let maxWaitSeconds = 1800
 
     static var definitions: [AgentToolDefinition] {
         [
@@ -86,12 +88,10 @@ enum AgentDirectoryTools {
                     "group_id": AgentToolParam(type: .string, description: "Required only when is_group is true: the explicit group id whose shared transcript receives this message. Copy it from the group context; never guess it."),
                     "agent_id": AgentToolParam(type: .stringArray, description: "Recipients as a list of agent ids. In group mode every id must be a member. Group owners use [\"at_all\"] to address everyone; if it appears alongside ids, at_all wins."),
                     "message": AgentToolParam(type: .string, description: "What you want to say. Self-contained — it starts with none of your context. Write it as one colleague to another, in the user's language, and say plainly what you want back."),
-                    "wait_seconds": AgentToolParam(type: .integer, description: "Private mode only: seconds to wait for the reply (default 0, max 240). Group mode is routed by the group orchestrator and does not return peer replies through this tool call."),
-                    "is_background": AgentToolParam(type: .boolean, description: "Private mode only: whether to send asynchronously in the background. Defaults to true. When true, returns immediately with delivery confirmation and notifies you via async_task_notice when the recipient replies; when false (or when wait_seconds > 0), waits in the current turn."),
                     "interrupt": AgentToolParam(type: .boolean, description: "Private mode only: if true, interrupt a busy recipient before delivery. Never applies to group mode."),
                 ],
                 required: ["tool_title", "is_group", "agent_id", "message"],
-                propertyOrdering: ["tool_title", "is_group", "group_id", "agent_id", "message", "wait_seconds", "is_background", "interrupt"]
+                propertyOrdering: ["tool_title", "is_group", "group_id", "agent_id", "message", "interrupt"]
             ),
         ]
     }
@@ -122,8 +122,8 @@ enum AgentDirectoryTools {
         - list_agents: who exists, what each is for, and whether it is busy.
         - send_agent_message: use `is_group: false` + an `agent_id` list for \
         a private broadcast, or `is_group: true` + explicit `group_id` + an \
-        `agent_id` list for a group's shared transcript. `wait_seconds` \
-        applies only to private messages.
+        `agent_id` list for a group's shared transcript. Private deliveries \
+        return a task_id immediately and report replies asynchronously.
         - create_agent: hire a new one. It shows up in the user's roster \
         immediately.
 
@@ -140,7 +140,8 @@ enum AgentDirectoryTools {
 
         - Private broadcast: `{ "is_group": false, "agent_id": ["<agent-id>"],
           "message": "..." }`. Omit group_id. Every listed agent receives the
-          same private message. wait_seconds and interrupt work only here.
+          same private message as an independent asynchronous task. interrupt
+          works only here.
         - Group A2A: `{ "is_group": true, "group_id": "<group-id>",
           "agent_id": ["<member-id>"], "message": "..." }`. This writes one
           public line to the shared transcript and wakes only those members.

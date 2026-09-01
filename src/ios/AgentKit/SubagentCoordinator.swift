@@ -71,8 +71,25 @@ final class LocalSubagentExecutor: SubagentExecutor {
         let title = session.spawnTitle ?? session.title ?? ""
         let persisted = session.spawnStatus ?? "running"
 
-        // Terminal state already written — nothing to reconcile.
+        // A terminal state is a claim, not proof. A run whose wait ran out was
+        // written `failed` while its loop went right on working, and the old
+        // short-circuit here made that verdict permanent — every later check
+        // parroted "failed" past a session that had long since delivered. Look
+        // at the runtime before believing it. `stopped` is the exception: the
+        // user asked for it, so it stands.
         if persisted != "running" {
+            if persisted != "stopped" {
+                let live = await sessionRunner.status(sessionId: taskId)
+                if live.isRunning {
+                    // `updateSpawnOutcome` COALESCEs its result argument, so ""
+                    // — not nil — is what clears the stale timeout text.
+                    await ChatStore.shared.updateSpawnOutcome(taskId, status: "running", result: "")
+                    logger.info("reopened task=\(taskId.prefix(8)): marked \(persisted) but its loop is still running")
+                    return SubagentStatus(taskId: taskId, title: title, state: .running,
+                                          currentActivity: live.currentActivity,
+                                          iteration: live.iteration, result: nil)
+                }
+            }
             return SubagentStatus(
                 taskId: taskId, title: title,
                 state: SubagentStatus.State(rawValue: persisted) ?? .unknown,
@@ -97,6 +114,13 @@ final class LocalSubagentExecutor: SubagentExecutor {
         if let answer, !answer.isEmpty {
             await ChatStore.shared.updateSpawnOutcome(taskId, status: "done", result: answer)
             dispatchedAt[taskId] = nil
+            // The run Task that would normally announce this is gone — the
+            // process was killed mid-task, or the finish landed with nobody
+            // listening. Reconciling here without posting left tasks that had
+            // completed perfectly well never mentioned to their parent at all.
+            await postTerminalNotice(taskId: taskId, session: session,
+                                     generation: runGenerations[taskId],
+                                     status: "done", result: answer)
             return SubagentStatus(taskId: taskId, title: title, state: .done,
                                   currentActivity: "", iteration: iteration, result: answer)
         }
@@ -106,6 +130,9 @@ final class LocalSubagentExecutor: SubagentExecutor {
             let reason = String(localized: "子任务没有产生任何结果就结束了。")
             await ChatStore.shared.updateSpawnOutcome(taskId, status: "failed", result: reason)
             dispatchedAt[taskId] = nil
+            await postTerminalNotice(taskId: taskId, session: session,
+                                     generation: runGenerations[taskId],
+                                     status: "failed", result: reason)
             return SubagentStatus(taskId: taskId, title: title, state: .failed,
                                   currentActivity: "", iteration: iteration, result: reason)
         }
@@ -115,62 +142,47 @@ final class LocalSubagentExecutor: SubagentExecutor {
                               currentActivity: activity, iteration: iteration, result: nil)
     }
 
-    /// Park the caller until the task lands or `seconds` elapse.
-    ///
-    /// The parent's agent loop is suspended inside its tool call for the whole
-    /// wait, which means it keeps its SessionConcurrencyManager slot (5 total).
-    /// Parent + subagent is 2 of 5, so a normal dispatch has room; only a user
-    /// with several conversations running at once could see a subagent queue
-    /// behind a parked parent, and that resolves when the wait expires rather
-    /// than deadlocking.
-    func wait(taskId: String, seconds: Int) async -> SubagentStatus {
-        let deadline = Date().addingTimeInterval(TimeInterval(max(0, seconds)))
-        var snapshot = await status(taskId: taskId)
-        while !snapshot.isTerminal && Date() < deadline {
-            // Cancellation (the user tapping Stop on the parent) must break the
-            // park. Task.sleep throws on cancel, and swallowing that with `try?`
-            // would spin this loop at full speed until the deadline.
-            if Task.isCancelled { break }
-            do {
-                // 1s granularity: the parent turn is parked here, so a tighter
-                // poll buys nothing and a looser one adds latency to short tasks.
-                try await Task.sleep(nanoseconds: 1_000_000_000)
-            } catch {
-                break
-            }
-            snapshot = await status(taskId: taskId)
-        }
-        return snapshot
-    }
-
     func message(taskId: String, text: String) async throws {
-        guard let session = await ChatStore.shared.getSession(taskId),
-              session.spawnStatus == "running" else {
+        guard let session = await ChatStore.shared.getSession(taskId) else {
+            throw SubagentError.taskNotFound(taskId)
+        }
+        // Deliberately NOT gated on `spawn_status == "running"`. A task wrongly
+        // marked failed is exactly the one an orchestrator wants to steer back
+        // on track, and the old guard made it unreachable — the only recovery
+        // left was spawning a second subagent onto the same files. Only an
+        // explicit stop is final.
+        guard session.spawnStatus != "stopped" else {
             throw SubagentError.notRunning(taskId)
         }
         sessionRunner.cancel(sessionId: taskId)
+        await ChatStore.shared.updateSpawnOutcome(taskId, status: "running", result: "")
         dispatchedAt[taskId] = Date()
         startRun(sessionId: taskId, prompt: text)
     }
 
-    func stop(taskId: String) async {
+    @discardableResult
+    func stop(taskId: String) async -> Bool {
+        guard let session = await ChatStore.shared.getSession(taskId) else { return false }
+        let persisted = session.spawnStatus ?? "running"
+        let live = await sessionRunner.status(sessionId: taskId)
+        // The old guard was `spawn_status == "running"`, which made a task that
+        // had been wrongly written off unkillable — the one case where stopping
+        // matters most, since it is still burning tokens and touching files.
+        // Stop anything the runtime says is alive, whatever the row claims. A
+        // task that is genuinely over keeps the outcome it earned.
+        guard persisted == "running" || live.isRunning else { return false }
+
+        let generation = runGenerations[taskId]
         sessionRunner.cancel(sessionId: taskId)
         runTasks.removeValue(forKey: taskId)?.cancel()
         runGenerations.removeValue(forKey: taskId)
-        let partial = await sessionRunner.status(sessionId: taskId).lastAssistantText
+        let partial = live.lastAssistantText
         await ChatStore.shared.updateSpawnOutcome(taskId, status: "stopped", result: partial)
-        if let parentSessionId = tasks[taskId]?.parentSessionId, !parentSessionId.isEmpty {
-            await AsyncTaskNoticeManager.shared.postNotice(
-                sourceSessionId: parentSessionId,
-                taskType: "subagent",
-                taskId: taskId,
-                title: tasks[taskId]?.title,
-                status: "stopped",
-                result: partial ?? String(localized: "任务已被终止。"),
-                filesPath: OrchestratorPrompt.taskDeliveryDir(taskId: taskId)
-            )
-        }
+        await postTerminalNotice(taskId: taskId, session: session, generation: generation,
+                                 status: "stopped",
+                                 result: partial ?? String(localized: "任务已被终止。"))
         dispatchedAt[taskId] = nil
+        return true
     }
 
     private func startRun(sessionId: String, prompt: String) {
@@ -185,7 +197,7 @@ final class LocalSubagentExecutor: SubagentExecutor {
                 source: "subagent",
                 role: AgentRunRole.executor.rawValue,
                 toolPolicy: AgentToolPolicy.standalone.rawValue,
-                timeoutSeconds: TimeInterval(SubagentTools.maxWaitSeconds)
+                timeoutSeconds: TimeInterval(SubagentTools.maxRunSeconds)
             ))
             guard runGenerations[sessionId] == generation else { return }
             runTasks[sessionId] = nil
@@ -193,37 +205,83 @@ final class LocalSubagentExecutor: SubagentExecutor {
             dispatchedAt[sessionId] = nil
             if result.cancelled { return }
 
-            let taskInfo = tasks[sessionId]
-            let parentSessionId = taskInfo?.parentSessionId
-            let taskTitle = taskInfo?.title
-            let filesDir = OrchestratorPrompt.taskDeliveryDir(taskId: sessionId)
-
-            let statusStr: String
+            // `result.timedOut` says the awaiter stopped waiting, nothing more.
+            // Taking it for death is what buried finished tasks under "failed".
+            let session = await ChatStore.shared.getSession(sessionId)
+            let persistedStatus: String
+            let noticeStatus: String
             let resultText: String
-            if result.accepted, !result.timedOut, let text = result.text, !text.isEmpty {
-                statusStr = "done"
+
+            switch await classifyBackgroundRun(result: result, runner: sessionRunner, sessionId: sessionId) {
+            case .done(let text):
+                persistedStatus = "done"
+                noticeStatus = "done"
                 resultText = text
-                await ChatStore.shared.updateSpawnOutcome(sessionId, status: "done", result: text)
-            } else {
-                statusStr = "failed"
-                resultText = result.timedOut
-                    ? String(localized: "子任务执行超时。")
-                    : String(localized: "子任务没有产生任何结果就结束了。")
-                await ChatStore.shared.updateSpawnOutcome(sessionId, status: "failed", result: resultText)
+            case .stillRunning:
+                // Now the bound means something: still going after
+                // `maxRunSeconds`, which at that length reads as stuck rather
+                // than busy. Cancel it for real so the state we report is true,
+                // and keep whatever it managed to produce.
+                sessionRunner.cancel(sessionId: sessionId)
+                let partial = await sessionRunner.status(sessionId: sessionId).lastAssistantText
+                persistedStatus = "failed"
+                noticeStatus = "timed_out"
+                resultText = partial ?? String(localized: "子任务执行超时。")
+            case .timedOut:
+                persistedStatus = "failed"
+                noticeStatus = "timed_out"
+                resultText = String(localized: "子任务执行超时。")
+            case .notAccepted, .producedNothing:
+                persistedStatus = "failed"
+                noticeStatus = "failed"
+                resultText = String(localized: "子任务没有产生任何结果就结束了。")
             }
 
-            if let parentSessionId, !parentSessionId.isEmpty {
-                await AsyncTaskNoticeManager.shared.postNotice(
-                    sourceSessionId: parentSessionId,
-                    taskType: "subagent",
-                    taskId: sessionId,
-                    title: taskTitle,
-                    status: statusStr,
-                    result: resultText,
-                    filesPath: filesDir
-                )
-            }
+            await ChatStore.shared.updateSpawnOutcome(sessionId, status: persistedStatus, result: resultText)
+            await postTerminalNotice(taskId: sessionId, session: session, generation: generation,
+                                     status: noticeStatus, result: resultText)
         }
+    }
+
+    /// Announce a task's terminal state to its parent.
+    ///
+    /// The parent, agent and title come from the in-memory dispatch record
+    /// first and the session row second. That fallback is what makes this
+    /// survive a relaunch: `tasks` is memory-only, so anything reconciled after
+    /// a restart used to find no parent and post nothing at all — the task
+    /// finished, and nobody was ever told.
+    ///
+    /// Re-posting is safe: `AsyncTaskNoticeManager` drops a notice id it has
+    /// already delivered, so whichever path gets there first wins and the
+    /// others are no-ops.
+    private func postTerminalNotice(
+        taskId: String,
+        session: ChatSession?,
+        generation: UUID?,
+        status: String,
+        result: String
+    ) async {
+        let info = tasks[taskId]
+        let parentSessionId = info?.parentSessionId ?? session?.parentSessionId ?? ""
+        guard !parentSessionId.isEmpty else {
+            logger.warning("task=\(taskId.prefix(8)) has no parent session; terminal notice dropped")
+            return
+        }
+        await AsyncTaskNoticeManager.shared.postNotice(
+            sourceSessionId: parentSessionId,
+            taskType: "subagent",
+            taskId: taskId,
+            agentId: info?.agentId ?? session?.agentId,
+            title: info?.title ?? session?.spawnTitle,
+            status: status,
+            result: result,
+            filesPath: OrchestratorPrompt.taskDeliveryDir(taskId: taskId),
+            noticeId: Self.noticeId(taskId: taskId, generation: generation)
+        )
+    }
+
+    private static func noticeId(taskId: String, generation: UUID?) -> String {
+        "async:subagent:\(taskId):\(generation?.uuidString ?? "terminal")"
     }
 
 }
@@ -266,7 +324,6 @@ final class SubagentCoordinator {
     private func handleSpawn(input: [String: Any], parentSessionId: String, agentId: String?) async -> String {
         let title = (input["task_title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let prompt = (input["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let runInBackground = (input["run_in_background"] as? Bool) ?? true
         guard !prompt.isEmpty else {
             return "Error: `prompt` is required and must describe the task in full. The subagent starts with no context."
         }
@@ -287,54 +344,25 @@ final class SubagentCoordinator {
             return "Failed to start the task: \(error.localizedDescription)"
         }
 
-        if runInBackground {
-            return """
-                Task started.
-                task_id: \(taskId)
-                title: \(task.title)
-                status: running
-                files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
+        return """
+            Task started.
+            task_id: \(taskId)
+            agent_id: \(task.agentId)
+            title: \(task.title)
+            status: running
+            files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
 
-                It is working in the background now. You will be automatically notified via async_task_notice when it finishes. Any files it produces land in the directory above, which you can file_read. You may end your turn now.
-                """
-        } else {
-            let snapshot = await executor.wait(taskId: taskId, seconds: 30)
-            if snapshot.isTerminal {
-                return """
-                    task_id: \(taskId)
-                    title: \(task.title)
-                    status: \(snapshot.state.rawValue)
-                    files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
-
-                    Result:
-                    \(snapshot.result ?? "")
-                    """
-            } else {
-                return """
-                    Task started.
-                    task_id: \(taskId)
-                    title: \(task.title)
-                    status: running
-                    files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
-
-                    The task is still running after 30 seconds and has been moved to the background. You will be automatically notified via async_task_notice when it finishes.
-                    """
-            }
-        }
+            It is working in the background now. You will be automatically notified via async_task_notice when it finishes. Any files it produces land in the directory above, which you can file_read. You may end your turn now.
+            """
     }
 
     private func handleCheck(input: [String: Any]) async -> String {
         guard let taskId = input["task_id"] as? String, !taskId.isEmpty else {
             return "Error: `task_id` is required."
         }
-        let waitSeconds = min(
-            max((input["wait_seconds"] as? Int) ?? 0, 0),
-            SubagentTools.maxWaitSeconds
-        )
-
-        let snapshot = waitSeconds > 0
-            ? await executor.wait(taskId: taskId, seconds: waitSeconds)
-            : await executor.status(taskId: taskId)
+        // Legacy callers may still send wait_seconds. It is accepted and
+        // ignored so this manual status query never parks the parent turn.
+        let snapshot = await executor.status(taskId: taskId)
 
         switch snapshot.state {
         case .unknown:
@@ -344,7 +372,7 @@ final class SubagentCoordinator {
             if !snapshot.currentActivity.isEmpty { lines.append("currently: \(snapshot.currentActivity)") }
             if snapshot.iteration > 0 { lines.append("steps so far: \(snapshot.iteration)") }
             lines.append("")
-            lines.append("Still working. Call check_subagent again with a wait_seconds long enough for the remaining work. If the activity and step count have not moved across several checks, it is stuck — stop_subagent and either retry or tell the user plainly.")
+            lines.append("Still working. Completion will arrive automatically through async_task_notice; no polling loop is required.")
             return lines.joined(separator: "\n")
         case .done:
             return """
@@ -387,7 +415,7 @@ final class SubagentCoordinator {
         }
         do {
             try await executor.message(taskId: taskId, text: text)
-            return "Instruction delivered to task \(taskId); it kept its context and is working on it. Check back with check_subagent."
+            return "Instruction delivered to task \(taskId); it kept its context and is working on it. Completion will be reported automatically."
         } catch {
             return "Could not steer task \(taskId): \(error.localizedDescription)"
         }
@@ -397,7 +425,30 @@ final class SubagentCoordinator {
         guard let taskId = input["task_id"] as? String, !taskId.isEmpty else {
             return "Error: `task_id` is required."
         }
-        await executor.stop(taskId: taskId)
+        guard await executor.stop(taskId: taskId) else {
+            let snapshot = await executor.status(taskId: taskId)
+            if snapshot.state == .unknown {
+                return "No task with id \(taskId). Check the task_id returned by spawn_subagent."
+            }
+            return """
+                Task \(taskId) was already \(snapshot.state.rawValue) — there was nothing \
+                left to stop. Its result stands as it is; do not report it as cancelled.
+                """
+        }
         return "Task \(taskId) stopped. Whatever it produced is kept, but it will not continue."
+    }
+
+    /// Reconcile subagent sessions still marked `running` with no live run
+    /// behind them — the residue of a process killed mid-task.
+    ///
+    /// `status(taskId:)` does the work: it writes the real outcome and posts the
+    /// notice the dead run never got to post. Without this, a task that finished
+    /// while the app was gone stayed `running` forever and its parent was never
+    /// told, unless the orchestrator happened to check on it by hand.
+    func recoverOrphanedTasks() async {
+        let orphans = await ChatStore.shared.runningSubagentSessions()
+        for session in orphans {
+            _ = await executor.status(taskId: session.id)
+        }
     }
 }

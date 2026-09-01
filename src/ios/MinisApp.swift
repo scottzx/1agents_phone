@@ -175,7 +175,15 @@ struct MinisApp: App {
         AgentLiveActivityManager.shared.cleanupStaleActivities(source: "MinisApp.init")
         // Start screen-awake controller — it will observe running tasks
         // + the user's opt-in flag and toggle the idle timer accordingly.
-        Task { @MainActor in KeepScreenAwakeController.shared.start() }
+        Task { @MainActor in
+            KeepScreenAwakeController.shared.start()
+            await AsyncTaskNoticeManager.shared.recoverPendingNotices()
+            // Rows still saying `running` after a relaunch are tasks whose run
+            // died with the process. Reconciling them writes their real outcome
+            // and posts the notice that run never got to post; each one drains
+            // itself, so this goes after the pending sweep.
+            await SubagentCoordinator.shared.recoverOrphanedTasks()
+        }
     }
 
     var body: some Scene {

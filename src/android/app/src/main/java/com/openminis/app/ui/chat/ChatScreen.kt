@@ -4226,7 +4226,7 @@ fun ChatScreen(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .padding(horizontal = 12.dp)
-                    .padding(top = 2.dp, bottom = 8.dp),
+                    .padding(top = 2.dp, bottom = 0.dp),
             ) {
                 // T13 banner moved INSIDE the LazyColumn so it renders at the
                 // visual end of the message list (mirrors iOS — see the

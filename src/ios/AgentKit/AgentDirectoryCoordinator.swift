@@ -231,7 +231,6 @@ final class AgentDirectoryCoordinator {
             return "\(target.name) is archived and is not part of the roster any more. Tell the user rather than working around it."
         }
 
-        let waitSeconds = min(max(int(input["wait_seconds"]) ?? 0, 0), AgentDirectoryTools.maxWaitSeconds)
         let interrupt = bool(input["interrupt"]) ?? false
 
         guard let targetSession = await AgentStore.shared.openMainSession(for: targetId), !targetSession.isEmpty else {
@@ -263,96 +262,79 @@ final class AgentDirectoryCoordinator {
         }
 
         let sender = await senderLabel(agentId: callerAgentId)
-        let inbound = envelope(from: sender, message: message, awaitingReply: waitSeconds > 0)
+        let inbound = envelope(from: sender, message: message, awaitingReply: true)
+        let taskId = UUID().uuidString
 
         relayOrigin[targetSession] = callerSessionId
         SessionBadgeStore.shared.pushFront(.unread, for: targetSession)
-        logger.info("relayed message to agent=\(targetId.prefix(8)) wait=\(waitSeconds)s interrupt=\(interrupt)")
+        logger.info("relayed async message task=\(taskId.prefix(8)) agent=\(targetId.prefix(8)) interrupt=\(interrupt)")
 
-        let isBackground = (input["is_background"] as? Bool) ?? (waitSeconds == 0)
-
-        guard !isBackground && waitSeconds > 0 else {
-            let targetAgentName = target.name
-            let targetAgentId = targetId
-            Task { [weak self] in
-                guard let self else { return }
-                let result = await sessionRunner.run(AgentSessionRunRequest(
-                    sessionId: targetSession,
-                    prompt: inbound,
-                    agentId: targetId,
-                    source: "agent-relay",
-                    role: AgentRunRole.main.rawValue,
-                    toolPolicy: target.toolPolicy.rawValue,
-                    timeoutSeconds: TimeInterval(AgentDirectoryTools.maxWaitSeconds)
-                ))
-                relayOrigin[targetSession] = nil
-
-                let statusStr = (result.accepted && !result.timedOut && result.text?.isEmpty == false) ? "done" : "failed"
-                let replyText = result.text ?? (result.timedOut ? String(localized: "对方回复超时。") : String(localized: "对方未产生有效文本回复。"))
-                await AsyncTaskNoticeManager.shared.postNotice(
-                    sourceSessionId: callerSessionId,
-                    taskType: "a2a",
-                    taskId: targetAgentId,
-                    title: targetAgentName,
-                    status: statusStr,
-                    result: replyText
-                )
-            }
-            return """
-                Message delivered to \(target.name). It is answering in the background; you will be automatically notified via async_task_notice when its reply is ready. You may end your turn now.
-                """
-        }
-
-        let result = await sessionRunner.run(AgentSessionRunRequest(
-            sessionId: targetSession,
-            prompt: inbound,
-            agentId: targetId,
-            source: "agent-relay",
-            role: AgentRunRole.main.rawValue,
-            toolPolicy: target.toolPolicy.rawValue,
-            timeoutSeconds: TimeInterval(waitSeconds)
-        ))
-
-        guard result.accepted else {
+        let targetAgentName = target.name
+        let targetAgentId = targetId
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await sessionRunner.run(AgentSessionRunRequest(
+                sessionId: targetSession,
+                prompt: inbound,
+                agentId: targetId,
+                source: "agent-relay",
+                role: AgentRunRole.main.rawValue,
+                toolPolicy: target.toolPolicy.rawValue,
+                timeoutSeconds: TimeInterval(AgentDirectoryTools.maxWaitSeconds)
+            ))
             relayOrigin[targetSession] = nil
-            return """
-                \(target.name) did not accept the message — its conversation is \
-                at or near its context limit and is waiting on the user to \
-                compact it. Nothing was delivered. Tell the user plainly \
-                instead of retrying.
-                """
-        }
-        guard !result.timedOut else {
-            // Edge deliberately left in place — the recipient is still mid-turn
-            // and could still try to answer us, which is exactly what the loop
-            // guard exists to catch. The cleanup task retires it.
-            scheduleRelayCleanup(targetSession: targetSession)
-            return """
-                \(target.name) is still working on it after \(waitSeconds)s and \
-                the wait ran out. Its answer will land in its own conversation, \
-                not here. Either send again with a longer wait_seconds, or tell \
-                the user where the answer will show up — do not promise to \
-                bring it back yourself.
-                """
-        }
 
-        relayOrigin[targetSession] = nil
+            let status: String
+            let reply: String
+            if result.cancelled {
+                status = "stopped"
+                reply = result.text ?? String(localized: "对方回复已停止。")
+            } else {
+                // `timedOut` only ever meant "we stopped waiting" — the
+                // recipient's loop is never cancelled by the deadline. Reading
+                // it as failure reported timeouts for replies that had already
+                // landed, or were seconds away.
+                switch await classifyBackgroundRun(result: result, runner: sessionRunner, sessionId: targetSession) {
+                case .done(let text):
+                    status = "done"
+                    reply = text
+                case .stillRunning:
+                    // Deliberately NOT cancelled: this is another agent's own
+                    // conversation, not a scratch session we own. Say so, so
+                    // the sender does not treat a late reply as a second one.
+                    status = "timed_out"
+                    reply = String(localized: "对方仍在处理，回复可能稍后才到。")
+                case .timedOut:
+                    status = "timed_out"
+                    reply = String(localized: "对方回复超时。")
+                case .notAccepted:
+                    status = "failed"
+                    reply = String(localized: "对方会话未接受这次投递。")
+                case .producedNothing:
+                    status = "failed"
+                    reply = String(localized: "对方未产生有效文本回复。")
+                }
+            }
 
-        guard let reply = result.text, !reply.isEmpty else {
-            return """
-                \(target.name) received the message but produced no text reply. \
-                Say so plainly rather than inventing what it might have said.
-                """
+            await AsyncTaskNoticeManager.shared.postNotice(
+                sourceSessionId: callerSessionId,
+                taskType: "a2a",
+                taskId: taskId,
+                agentId: targetAgentId,
+                title: targetAgentName,
+                status: status,
+                result: reply,
+                noticeId: "async:a2a:\(taskId)"
+            )
         }
-
         return """
-            \(target.name) replied:
+            Message delivered.
+            task_id: \(taskId)
+            agent_id: \(targetId)
+            agent: \(target.name)
+            status: running
 
-            \(reply)
-
-            That is their answer, in their words. Use it, attribute it to them \
-            when it matters, and disagree with it if you have reason to — you \
-            are the one talking to the user.
+            It is answering in the background. You will be automatically notified via async_task_notice when its reply is ready. You may end your turn now.
             """
     }
 
@@ -436,8 +418,7 @@ final class AgentDirectoryCoordinator {
             group: group,
             sender: sender,
             members: members,
-            canonicalText: canonical,
-            callerSessionId: callerSessionId
+            canonicalText: canonical
         )
         logger.info("posted external group A2A group=\(groupId.prefix(8)) sender=\(senderId.prefix(8)) targets=\(targets.count) all=\(atAll)")
         return "Message posted to group \(group.title). The group orchestrator will project the updated shared context to the addressed members."
@@ -503,22 +484,6 @@ final class AgentDirectoryCoordinator {
         return nil
     }
 
-    /// Drop the relay edge once the recipient's turn ends. Used on the paths
-    /// where we are not parked waiting for it ourselves.
-    private func scheduleRelayCleanup(targetSession: String) {
-        Task { [weak self] in
-            // Bounded: a turn that outlives this has long since stopped being
-            // part of the relay we are guarding.
-            let deadline = Date().addingTimeInterval(TimeInterval(AgentDirectoryTools.maxWaitSeconds))
-            while Date() < deadline {
-                guard let self, await self.isBusy(sessionId: targetSession) else { break }
-                if Task.isCancelled { break }
-                do { try await Task.sleep(nanoseconds: 2_000_000_000) } catch { break }
-            }
-            self?.relayOrigin[targetSession] = nil
-        }
-    }
-
     /// How the message is presented in the recipient's transcript. The header
     /// is visible to the user on purpose: an assistant they never addressed
     /// speaking in their conversation should never look like it came from them.
@@ -553,13 +518,6 @@ final class AgentDirectoryCoordinator {
     private func string(_ value: Any?) -> String {
         guard let value = value as? String else { return "" }
         return value.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func int(_ value: Any?) -> Int? {
-        if let i = value as? Int { return i }
-        if let d = value as? Double { return Int(d) }
-        if let s = value as? String { return Int(s.trimmingCharacters(in: .whitespacesAndNewlines)) }
-        return nil
     }
 
     private func bool(_ value: Any?) -> Bool? {

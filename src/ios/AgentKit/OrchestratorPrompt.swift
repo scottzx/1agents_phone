@@ -99,11 +99,11 @@ enum OrchestratorPrompt {
             multi-step investigation, file or data processing, web research, \
             running commands, anything that needs a tool you do not have — goes \
             to `spawn_subagent`.
-            3. **Stay with it until it lands.** Call `check_subagent` with a \
-            `wait_seconds` sized to the task, and keep checking until it \
-            reaches a terminal state.
-            4. **Deliver the result yourself.** Fold what came back into a \
-            normal reply, in your own voice.
+            3. **Let it run.** The dispatch returns a task_id immediately. End \
+            the current turn instead of polling or waiting for completion.
+            4. **Deliver the result when notified.** A later \
+            `async_task_notice` wakes you with the terminal result; fold it \
+            into a normal reply in your own voice.
 
             ## Writing a dispatch prompt
 
@@ -170,8 +170,9 @@ enum OrchestratorPrompt {
             - spawn_subagent: hand one self-contained task to a background \
             subagent with the full execution toolset. Returns a task_id \
             immediately.
-            - check_subagent: check on a task; `wait_seconds` parks you here \
-            until it lands without blocking the subagent.
+            - check_subagent: manually inspect a task's current status. It \
+            always returns immediately; completion normally arrives through \
+            `async_task_notice`.
             - message_subagent: push a new instruction into a running task, \
             keeping its context.
             - stop_subagent: abort a task for good.

@@ -45,6 +45,19 @@ struct SessionMessageFingerprint: Sendable, Equatable {
     let orderHash: Int
 }
 
+/// One row in the global task queue. Unlike `listSessions()`, the task queue
+/// deliberately includes scratch subagent and group-member sessions so the
+/// user can inspect every conversation that is waiting, running, or recently
+/// completed. `lastReplyAt` is the timestamp of the newest assistant reply and
+/// is kept separate from `ChatSession.updatedAt` so a newly queued user prompt
+/// does not make an old completed conversation look recent.
+struct TaskQueueEntry: Identifiable, Sendable {
+    let session: ChatSession
+    let lastReplyAt: Date?
+
+    var id: String { session.id }
+}
+
 // Chat persistence value types and the repository contract live in
 // src/apple/Domain/ChatPersistence.swift so iOS and macOS compile the same
 // Codable wire format. SQLite ownership remains in ChatStore below.
@@ -73,6 +86,7 @@ actor ChatStore {
     // ChatStore is an actor, so these fields need no extra locking.
     private var sessionListCache: [ChatSession]?
     private var sessionListCacheDirty = true
+    private var taskQueueCache: [TaskQueueEntry]?
 
     /// [T-ios-listsessions-cache] Mark the cached session list stale. Called by
     /// every mutation that can change what listSessions() returns — the row set
@@ -80,6 +94,7 @@ actor ChatStore {
     /// field (title/category/pin/model/preview text from new messages).
     private func invalidateSessionListCache() {
         sessionListCacheDirty = true
+        taskQueueCache = nil
     }
 
     init() {
@@ -349,6 +364,7 @@ actor ChatStore {
 
         // Async task completion notices table
         exec(ChatPersistenceSchema.createAsyncTaskNoticesSQL)
+        addColumnIfMissing(table: "async_task_notices", column: "agent_id", definition: "TEXT")
         exec(ChatPersistenceSchema.createAsyncTaskNoticesIndexSQL)
 
         // One-shot cleanup: drop legacy v1 dirty rows that have a v2
@@ -1072,6 +1088,74 @@ actor ChatStore {
         sessionListCache = sessions
         sessionListCacheDirty = false
         return sessions
+    }
+
+    /// Complete conversation queue for the Tasks mode.
+    ///
+    /// This intentionally does not share `listSessions()`'s top-level-only
+    /// predicate: hidden subagent scratch sessions and private group-member
+    /// sessions are real execution units and must be visible in an operational
+    /// queue. The latest assistant preview/date are fetched with the same
+    /// indexed correlated-subquery shape used by `listSessions()`.
+    func listTaskQueueEntries() -> [TaskQueueEntry] {
+        if let taskQueueCache { return taskQueueCache }
+
+        let assistantMask = Self.partFlagHasText | Self.partFlagHasToolUse
+        let sql = """
+            SELECT s.id, s.title, s.model_id, s.created_at, s.updated_at, s.category,
+                   s.source, s.pinned_at, s.agent_id, s.parent_session_id,
+                   s.spawn_role, s.spawn_title, s.spawn_status, s.folder_id,
+                   (SELECT m.parts_json FROM messages m
+                     WHERE m.session_id = s.id
+                       AND m.role = 'assistant'
+                       AND (m.part_flags & \(assistantMask)) != 0
+                     ORDER BY m.sort_order DESC LIMIT 1),
+                   (SELECT m.created_at FROM messages m
+                     WHERE m.session_id = s.id
+                       AND m.role = 'assistant'
+                       AND (m.part_flags & \(assistantMask)) != 0
+                     ORDER BY m.sort_order DESC LIMIT 1)
+              FROM sessions s
+             ORDER BY s.updated_at DESC
+            """
+
+        var stmt: OpaquePointer?
+        var entries: [TaskQueueEntry] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                let id = Self.colText(stmt, 0)
+                guard !id.isEmpty else { continue }
+
+                let pinnedAt: Date? = sqlite3_column_type(stmt, 7) != SQLITE_NULL
+                    ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 7)) : nil
+                let latestAssistantJSON = Self.colTextOpt(stmt, 14)
+                let lastReplyAt: Date? = sqlite3_column_type(stmt, 15) != SQLITE_NULL
+                    ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 15)) : nil
+
+                let session = ChatSession(
+                    id: id,
+                    title: Self.colTextOpt(stmt, 1),
+                    category: Self.colTextOpt(stmt, 5),
+                    modelId: Self.colText(stmt, 2),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3)),
+                    updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4)),
+                    lastMessage: latestAssistantJSON.flatMap { extractTextFromPartsJSON($0) },
+                    source: Self.colTextOpt(stmt, 6),
+                    pinnedAt: pinnedAt,
+                    agentId: Self.colTextOpt(stmt, 8),
+                    parentSessionId: Self.colTextOpt(stmt, 9),
+                    spawnRole: Self.colTextOpt(stmt, 10),
+                    spawnTitle: Self.colTextOpt(stmt, 11),
+                    spawnStatus: Self.colTextOpt(stmt, 12),
+                    folderId: Self.colTextOpt(stmt, 13)
+                )
+                entries.append(TaskQueueEntry(session: session, lastReplyAt: lastReplyAt))
+            }
+        }
+        sqlite3_finalize(stmt)
+
+        taskQueueCache = entries
+        return entries
     }
 
     /// Query sync_devices table and check UserDefaults to find which remote devices have sync enabled.
@@ -2009,6 +2093,46 @@ actor ChatStore {
         var result: [ChatSession] = []
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_text(stmt, 1, (parentSessionId as NSString).utf8String, -1, nil)
+            while sqlite3_step(stmt) == SQLITE_ROW {
+                result.append(ChatSession(
+                    id: String(cString: sqlite3_column_text(stmt, 0)),
+                    title: sqlite3_column_text(stmt, 1).map { String(cString: $0) },
+                    category: sqlite3_column_text(stmt, 5).map { String(cString: $0) },
+                    modelId: String(cString: sqlite3_column_text(stmt, 2)),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 3)),
+                    updatedAt: Date(timeIntervalSince1970: sqlite3_column_double(stmt, 4)),
+                    source: sqlite3_column_text(stmt, 6).map { String(cString: $0) },
+                    agentId: sqlite3_column_text(stmt, 8).map { String(cString: $0) },
+                    parentSessionId: sqlite3_column_text(stmt, 9).map { String(cString: $0) },
+                    spawnRole: sqlite3_column_text(stmt, 10).map { String(cString: $0) },
+                    spawnTitle: sqlite3_column_text(stmt, 11).map { String(cString: $0) },
+                    spawnStatus: sqlite3_column_text(stmt, 12).map { String(cString: $0) },
+                    spawnResult: sqlite3_column_text(stmt, 13).map { String(cString: $0) }
+                ))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return result
+    }
+
+    /// Every subagent session still marked `running`, oldest first.
+    ///
+    /// After a relaunch these are suspects, not facts: `spawn_status` is only
+    /// written by the run that owns the task, so a process killed mid-task
+    /// leaves the row saying `running` forever. `SubagentCoordinator`
+    /// reconciles them at launch. A task that is genuinely still running is in
+    /// here too and reconciles to `running` again, which is the point.
+    func runningSubagentSessions() -> [ChatSession] {
+        let sql = """
+            SELECT id, title, model_id, created_at, updated_at, category, source, pinned_at,
+                   agent_id, parent_session_id, spawn_role, spawn_title, spawn_status, spawn_result
+              FROM sessions
+             WHERE spawn_role = 'subagent' AND COALESCE(spawn_status, 'running') = 'running'
+             ORDER BY created_at ASC
+            """
+        var stmt: OpaquePointer?
+        var result: [ChatSession] = []
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             while sqlite3_step(stmt) == SQLITE_ROW {
                 result.append(ChatSession(
                     id: String(cString: sqlite3_column_text(stmt, 0)),
@@ -4608,8 +4732,8 @@ actor ChatStore {
     func saveAsyncTaskNotice(_ notice: AsyncTaskNotice) {
         let sql = """
             INSERT OR REPLACE INTO async_task_notices
-            (id, source_session_id, task_type, task_id, title, status, result, files_path, created_at, is_delivered, delivered_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (id, source_session_id, task_type, task_id, agent_id, title, status, result, files_path, created_at, is_delivered, delivered_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
@@ -4617,24 +4741,25 @@ actor ChatStore {
         sqlite3_bind_text(stmt, 2, (notice.sourceSessionId as NSString).utf8String, -1, nil)
         sqlite3_bind_text(stmt, 3, (notice.taskType as NSString).utf8String, -1, nil)
         sqlite3_bind_text(stmt, 4, (notice.taskId as NSString).utf8String, -1, nil)
+        bindOptionalText(stmt, index: 5, value: notice.agentId)
         if let title = notice.title {
-            sqlite3_bind_text(stmt, 5, (title as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 6, (title as NSString).utf8String, -1, nil)
         } else {
-            sqlite3_bind_null(stmt, 5)
+            sqlite3_bind_null(stmt, 6)
         }
-        sqlite3_bind_text(stmt, 6, (notice.status as NSString).utf8String, -1, nil)
-        sqlite3_bind_text(stmt, 7, (notice.result as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 7, (notice.status as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 8, (notice.result as NSString).utf8String, -1, nil)
         if let files = notice.filesPath {
-            sqlite3_bind_text(stmt, 8, (files as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 9, (files as NSString).utf8String, -1, nil)
         } else {
-            sqlite3_bind_null(stmt, 8)
+            sqlite3_bind_null(stmt, 9)
         }
-        sqlite3_bind_double(stmt, 9, notice.createdAt.timeIntervalSince1970)
-        sqlite3_bind_int(stmt, 10, notice.isDelivered ? 1 : 0)
+        sqlite3_bind_double(stmt, 10, notice.createdAt.timeIntervalSince1970)
+        sqlite3_bind_int(stmt, 11, notice.isDelivered ? 1 : 0)
         if let delivered = notice.deliveredAt {
-            sqlite3_bind_double(stmt, 11, delivered.timeIntervalSince1970)
+            sqlite3_bind_double(stmt, 12, delivered.timeIntervalSince1970)
         } else {
-            sqlite3_bind_null(stmt, 11)
+            sqlite3_bind_null(stmt, 12)
         }
         sqlite3_step(stmt)
         sqlite3_finalize(stmt)
@@ -4642,7 +4767,7 @@ actor ChatStore {
 
     func pendingAsyncTaskNotices(for sessionId: String) -> [AsyncTaskNotice] {
         let sql = """
-            SELECT id, source_session_id, task_type, task_id, title, status, result, files_path, created_at, is_delivered, delivered_at
+            SELECT id, source_session_id, task_type, task_id, agent_id, title, status, result, files_path, created_at, is_delivered, delivered_at
             FROM async_task_notices
             WHERE source_session_id = ? AND is_delivered = 0
             ORDER BY created_at ASC
@@ -4656,19 +4781,21 @@ actor ChatStore {
             let sourceSessionId = String(cString: sqlite3_column_text(stmt, 1))
             let taskType = String(cString: sqlite3_column_text(stmt, 2))
             let taskId = String(cString: sqlite3_column_text(stmt, 3))
-            let title: String? = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 4)) : nil
-            let status = String(cString: sqlite3_column_text(stmt, 5))
-            let result = String(cString: sqlite3_column_text(stmt, 6))
-            let filesPath: String? = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 7)) : nil
-            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8))
-            let isDelivered = sqlite3_column_int(stmt, 9) != 0
-            let deliveredAt: Date? = sqlite3_column_type(stmt, 10) != SQLITE_NULL ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 10)) : nil
+            let agentId: String? = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 4)) : nil
+            let title: String? = sqlite3_column_type(stmt, 5) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 5)) : nil
+            let status = String(cString: sqlite3_column_text(stmt, 6))
+            let result = String(cString: sqlite3_column_text(stmt, 7))
+            let filesPath: String? = sqlite3_column_type(stmt, 8) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 8)) : nil
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 9))
+            let isDelivered = sqlite3_column_int(stmt, 10) != 0
+            let deliveredAt: Date? = sqlite3_column_type(stmt, 11) != SQLITE_NULL ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 11)) : nil
 
             notices.append(AsyncTaskNotice(
                 id: id,
                 sourceSessionId: sourceSessionId,
                 taskType: taskType,
                 taskId: taskId,
+                agentId: agentId,
                 title: title,
                 status: status,
                 result: result,
@@ -4680,6 +4807,25 @@ actor ChatStore {
         }
         sqlite3_finalize(stmt)
         return notices
+    }
+
+    func sessionsWithPendingAsyncTaskNotices() -> [String] {
+        let sql = """
+            SELECT source_session_id
+            FROM async_task_notices
+            WHERE is_delivered = 0
+            GROUP BY source_session_id
+            ORDER BY MIN(created_at) ASC
+        """
+        var stmt: OpaquePointer?
+        var sessionIds: [String] = []
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        while sqlite3_step(stmt) == SQLITE_ROW,
+              let value = sqlite3_column_text(stmt, 0) {
+            sessionIds.append(String(cString: value))
+        }
+        sqlite3_finalize(stmt)
+        return sessionIds
     }
 
     func markAsyncTaskNoticesDelivered(ids: [String]) {
@@ -4697,9 +4843,108 @@ actor ChatStore {
         sqlite3_finalize(stmt)
     }
 
+    func markAsyncTaskNoticesPending(ids: [String]) {
+        guard !ids.isEmpty else { return }
+        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+        let sql = "UPDATE async_task_notices SET is_delivered = 0, delivered_at = NULL WHERE id IN (\(placeholders))"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        for (index, id) in ids.enumerated() {
+            sqlite3_bind_text(stmt, Int32(index + 1), (id as NSString).utf8String, -1, nil)
+        }
+        sqlite3_step(stmt)
+        sqlite3_finalize(stmt)
+    }
+
+    /// Persist a complete synthetic tool-use/tool-result notice group and mark
+    /// the source notices delivered in the same SQLite transaction. Message
+    /// ids are deterministic and inserted with OR IGNORE, so retrying the
+    /// exact claim cannot duplicate either half of the pair.
+    @discardableResult
+    func injectAsyncTaskNoticeMessages(_ messages: [RawMessage], noticeIds: [String]) -> Bool {
+        guard !messages.isEmpty, !noticeIds.isEmpty,
+              let sessionId = messages.first?.sessionId,
+              messages.allSatisfy({ $0.sessionId == sessionId }) else { return false }
+
+        invalidateSessionListCache()
+        exec("BEGIN IMMEDIATE TRANSACTION")
+        var succeeded = true
+        var insertedMessageIds: [String] = []
+
+        let insertSQL = """
+            INSERT OR IGNORE INTO messages
+            (id, session_id, role, parts_json, created_at, token_usage, sort_order,
+             reasoning_content, stream_interrupt_count, updated_at, error_info,
+             part_flags, sender_agent_id)
+            VALUES (?, ?, ?, ?, ?, NULL, ?, NULL, 0, ?, NULL, ?, NULL)
+        """
+
+        for message in messages {
+            guard let data = try? JSONEncoder().encode(message.parts),
+                  let partsJSON = String(data: data, encoding: .utf8) else {
+                succeeded = false
+                break
+            }
+
+            var stmt: OpaquePointer?
+            guard sqlite3_prepare_v2(db, insertSQL, -1, &stmt, nil) == SQLITE_OK else {
+                sqlite3_finalize(stmt)
+                succeeded = false
+                break
+            }
+            sqlite3_bind_text(stmt, 1, (message.id as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 2, (message.sessionId as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 3, (message.role.rawValue as NSString).utf8String, -1, nil)
+            sqlite3_bind_text(stmt, 4, (partsJSON as NSString).utf8String, -1, nil)
+            sqlite3_bind_double(stmt, 5, message.createdAt.timeIntervalSince1970)
+            sqlite3_bind_int64(stmt, 6, Int64(nextSortOrder(sessionId: sessionId)))
+            sqlite3_bind_double(stmt, 7, message.createdAt.timeIntervalSince1970)
+            sqlite3_bind_int64(stmt, 8, Int64(Self.partFlags(for: message.parts)))
+            let rc = sqlite3_step(stmt)
+            let inserted = rc == SQLITE_DONE && sqlite3_changes(db) > 0
+            sqlite3_finalize(stmt)
+            guard rc == SQLITE_DONE else {
+                succeeded = false
+                break
+            }
+            if inserted { insertedMessageIds.append(message.id) }
+        }
+
+        if succeeded {
+            let placeholders = noticeIds.map { _ in "?" }.joined(separator: ",")
+            let updateSQL = "UPDATE async_task_notices SET is_delivered = 1, delivered_at = ? WHERE id IN (\(placeholders))"
+            var stmt: OpaquePointer?
+            if sqlite3_prepare_v2(db, updateSQL, -1, &stmt, nil) == SQLITE_OK {
+                sqlite3_bind_double(stmt, 1, Date().timeIntervalSince1970)
+                for (index, id) in noticeIds.enumerated() {
+                    sqlite3_bind_text(stmt, Int32(index + 2), (id as NSString).utf8String, -1, nil)
+                }
+                succeeded = sqlite3_step(stmt) == SQLITE_DONE
+            } else {
+                succeeded = false
+            }
+            sqlite3_finalize(stmt)
+        }
+
+        if succeeded {
+            for messageId in insertedMessageIds {
+                markDirty(recordType: "Message", recordId: messageId)
+            }
+            touchSession(sessionId)
+            markDirty(recordType: "Session", recordId: sessionId)
+            pendingSyncSessionIds.insert(sessionId)
+            exec("COMMIT")
+            NotificationCenter.default.post(name: .sessionDidUpdate, object: sessionId)
+            return true
+        }
+
+        exec("ROLLBACK")
+        return false
+    }
+
     func getAsyncTaskNotice(id: String) -> AsyncTaskNotice? {
         let sql = """
-            SELECT id, source_session_id, task_type, task_id, title, status, result, files_path, created_at, is_delivered, delivered_at
+            SELECT id, source_session_id, task_type, task_id, agent_id, title, status, result, files_path, created_at, is_delivered, delivered_at
             FROM async_task_notices
             WHERE id = ?
         """
@@ -4712,19 +4957,21 @@ actor ChatStore {
             let sourceSessionId = String(cString: sqlite3_column_text(stmt, 1))
             let taskType = String(cString: sqlite3_column_text(stmt, 2))
             let taskId = String(cString: sqlite3_column_text(stmt, 3))
-            let title: String? = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 4)) : nil
-            let status = String(cString: sqlite3_column_text(stmt, 5))
-            let result = String(cString: sqlite3_column_text(stmt, 6))
-            let filesPath: String? = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 7)) : nil
-            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8))
-            let isDelivered = sqlite3_column_int(stmt, 9) != 0
-            let deliveredAt: Date? = sqlite3_column_type(stmt, 10) != SQLITE_NULL ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 10)) : nil
+            let agentId: String? = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 4)) : nil
+            let title: String? = sqlite3_column_type(stmt, 5) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 5)) : nil
+            let status = String(cString: sqlite3_column_text(stmt, 6))
+            let result = String(cString: sqlite3_column_text(stmt, 7))
+            let filesPath: String? = sqlite3_column_type(stmt, 8) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 8)) : nil
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 9))
+            let isDelivered = sqlite3_column_int(stmt, 10) != 0
+            let deliveredAt: Date? = sqlite3_column_type(stmt, 11) != SQLITE_NULL ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 11)) : nil
 
             notice = AsyncTaskNotice(
                 id: nid,
                 sourceSessionId: sourceSessionId,
                 taskType: taskType,
                 taskId: taskId,
+                agentId: agentId,
                 title: title,
                 status: status,
                 result: result,

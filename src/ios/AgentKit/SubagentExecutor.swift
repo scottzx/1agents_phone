@@ -54,15 +54,14 @@ protocol SubagentExecutor {
     /// completion.
     @discardableResult
     func spawn(_ task: SubagentTask) async throws -> String
-    /// Current snapshot. Cheap; safe to call in a poll loop.
+    /// Current snapshot. Cheap and non-blocking.
     func status(taskId: String) async -> SubagentStatus
-    /// Park until the task reaches a terminal state or `seconds` elapse.
-    /// Returns the status either way.
-    func wait(taskId: String, seconds: Int) async -> SubagentStatus
     /// Push a new instruction into a running task, keeping its context.
     func message(taskId: String, text: String) async throws
-    /// Abort for good.
-    func stop(taskId: String) async
+    /// Abort for good. Returns whether it actually cancelled something: a task
+    /// that had already finished is left with the outcome it earned.
+    @discardableResult
+    func stop(taskId: String) async -> Bool
 }
 
 enum SubagentError: LocalizedError {

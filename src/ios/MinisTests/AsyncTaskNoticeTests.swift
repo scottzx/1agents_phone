@@ -9,6 +9,7 @@ final class AsyncTaskNoticeTests: XCTestCase {
             sourceSessionId: "session_abc",
             taskType: "shell",
             taskId: "cmd_456",
+            agentId: "agent_789",
             title: "ls -la",
             status: "done",
             result: "total 0\n-rw-r--r-- 1 root root 0 test.txt",
@@ -29,6 +30,7 @@ final class AsyncTaskNoticeTests: XCTestCase {
         XCTAssertEqual(decoded.sourceSessionId, "session_abc")
         XCTAssertEqual(decoded.taskType, "shell")
         XCTAssertEqual(decoded.taskId, "cmd_456")
+        XCTAssertEqual(decoded.agentId, "agent_789")
         XCTAssertEqual(decoded.title, "ls -la")
         XCTAssertEqual(decoded.status, "done")
         XCTAssertEqual(decoded.result, "total 0\n-rw-r--r-- 1 root root 0 test.txt")
@@ -41,7 +43,7 @@ final class AsyncTaskNoticeTests: XCTestCase {
             id: "raw_1",
             sessionId: "s_1",
             role: .assistant,
-            parts: [.toolUse(ToolUse(toolUseId: "call_1", name: ChatPersistenceSchema.asyncTaskNoticeToolName, input: "{}"))],
+            parts: [.toolUse(ToolUse(toolUseId: "async-notice:n1", name: ChatPersistenceSchema.asyncTaskNoticeToolName, input: "{}"))],
             createdAt: Date()
         )
         XCTAssertTrue(toolUseRaw.isAsyncTaskNotice)
@@ -50,7 +52,7 @@ final class AsyncTaskNoticeTests: XCTestCase {
             id: "raw_2",
             sessionId: "s_1",
             role: .user,
-            parts: [.toolResult(ToolResult(toolUseId: "call_1", output: "done", success: true))],
+            parts: [.toolResult(ToolResult(toolUseId: "async-notice:n1", output: "done", success: true))],
             createdAt: Date()
         )
         XCTAssertTrue(toolResultRaw.isAsyncTaskNotice)
@@ -63,6 +65,15 @@ final class AsyncTaskNoticeTests: XCTestCase {
             createdAt: Date()
         )
         XCTAssertFalse(normalAssistantRaw.isAsyncTaskNotice)
+
+        let normalToolResultRaw = RawMessage(
+            id: "raw_4",
+            sessionId: "s_1",
+            role: .user,
+            parts: [.toolResult(ToolResult(toolUseId: "ordinary-call", output: "done", success: true))],
+            createdAt: Date()
+        )
+        XCTAssertFalse(normalToolResultRaw.isAsyncTaskNotice)
     }
 
     func testChatMessageIsAsyncTaskNotice() {
@@ -111,6 +122,7 @@ final class AsyncTaskNoticeTests: XCTestCase {
             sourceSessionId: testSession,
             taskType: "subagent",
             taskId: "task_2",
+            agentId: "agent_2",
             title: "research competitors",
             status: "done",
             result: "Found 3 competitors",
@@ -135,11 +147,76 @@ final class AsyncTaskNoticeTests: XCTestCase {
         pending = await store.pendingAsyncTaskNotices(for: testSession)
         XCTAssertEqual(pending.count, 1)
         XCTAssertEqual(pending.first?.id, notice2.id)
+        XCTAssertEqual(pending.first?.agentId, "agent_2")
 
         await store.deleteAsyncTaskNotice(id: notice1.id)
         await store.deleteAsyncTaskNotice(id: notice2.id)
 
         pending = await store.pendingAsyncTaskNotices(for: testSession)
         XCTAssertEqual(pending.count, 0)
+    }
+
+    func testAtomicNoticeInjectionIsPairedAndIdempotent() async throws {
+        let baseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("AsyncTaskNoticeTests-\(UUID().uuidString)", isDirectory: true)
+        let store = ChatStore(baseURL: baseURL)
+        let session = await store.createSession(modelId: "test-model", title: "notice test")
+        let noticeId = "async:a2a:delivery-1"
+        let toolUseId = ChatPersistenceSchema.asyncTaskNoticeToolUseIdPrefix + noticeId
+        let notice = AsyncTaskNotice(
+            id: noticeId,
+            sourceSessionId: session.id,
+            taskType: "a2a",
+            taskId: "delivery-1",
+            agentId: "agent-target",
+            status: "done",
+            result: "reply",
+            isDelivered: false
+        )
+        await store.saveAsyncTaskNotice(notice)
+
+        let messages = [
+            RawMessage(
+                id: "async-notice-use:\(noticeId)",
+                sessionId: session.id,
+                role: .assistant,
+                parts: [.toolUse(ToolUse(
+                    toolUseId: toolUseId,
+                    name: ChatPersistenceSchema.asyncTaskNoticeToolName,
+                    input: "{}"
+                ))],
+                createdAt: Date()
+            ),
+            RawMessage(
+                id: "async-notice-result:\(noticeId)",
+                sessionId: session.id,
+                role: .user,
+                parts: [.toolResult(ToolResult(
+                    toolUseId: toolUseId,
+                    output: "reply",
+                    success: true
+                ))],
+                createdAt: Date().addingTimeInterval(0.001)
+            ),
+        ]
+
+        let firstInjection = await store.injectAsyncTaskNoticeMessages(messages, noticeIds: [noticeId])
+        let firstPending = await store.pendingAsyncTaskNotices(for: session.id)
+        let firstMessages = await store.loadMessages(sessionId: session.id)
+        XCTAssertTrue(firstInjection)
+        XCTAssertTrue(firstPending.isEmpty)
+        XCTAssertEqual(firstMessages.count, 2)
+
+        // A crash retry uses the same ids and must not duplicate either half.
+        await store.markAsyncTaskNoticesPending(ids: [noticeId])
+        let retryInjection = await store.injectAsyncTaskNoticeMessages(messages, noticeIds: [noticeId])
+        let retryMessages = await store.loadMessages(sessionId: session.id)
+        let retryPending = await store.pendingAsyncTaskNotices(for: session.id)
+        XCTAssertTrue(retryInjection)
+        XCTAssertEqual(retryMessages.count, 2)
+        XCTAssertTrue(retryPending.isEmpty)
+
+        await store.closeDatabase()
+        try? FileManager.default.removeItem(at: baseURL)
     }
 }

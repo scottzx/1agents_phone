@@ -497,6 +497,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		BB10000B0F700000000000AA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E51000060 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E51000040;
+			remoteInfo = Minis;
+		};
 		AA8A56912F6FBB7A00A3E54E /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = E51000060 /* Project object */;
@@ -2283,6 +2290,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				BB10000C0F700000000000AA /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BB1000012F700000000000AA /* MinisTests */,
@@ -3169,6 +3177,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		BB10000C0F700000000000AA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E51000040 /* Minis */;
+			targetProxy = BB10000B0F700000000000AA /* PBXContainerItemProxy */;
+		};
 		AA8A56922F6FBB7A00A3E54E /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E51000040 /* Minis */;

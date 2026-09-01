@@ -89,25 +89,12 @@ final class GroupChatOrchestrator {
         group: GroupProfile,
         sender: GroupMember,
         members: [GroupMember],
-        canonicalText: String,
-        callerSessionId: String? = nil
+        canonicalText: String
     ) async {
         await repository.appendPersistedMember(roomID: group.id, memberID: sender.id, text: canonicalText)
         deliverToHardware(canonicalText, group: group, members: members, from: sender)
         let trigger = GroupMessage.member(sender.id, canonicalText)
-        Task {
-            let result = await self.resume(group: group, members: members, seed: trigger)
-            if let callerSessionId, callerSessionId != group.sessionId, let result, !result.isEmpty {
-                await AsyncTaskNoticeManager.shared.postNotice(
-                    sourceSessionId: callerSessionId,
-                    taskType: "group",
-                    taskId: group.id,
-                    title: group.title,
-                    status: "done",
-                    result: result
-                )
-            }
-        }
+        Task { _ = await self.resume(group: group, members: members, seed: trigger) }
     }
 
     /// Stop the shared room loop and discard queued blocks. The epoch gate

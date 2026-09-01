@@ -304,7 +304,7 @@ final class MinisDesktopCoreTests: XCTestCase {
         await client.shutdown()
     }
 
-    func testRuntimeGroupCallsMembersStrictlyInRosterOrder() async throws {
+    func testRuntimeGroupStartsEveryMentionedMember() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let store = try DesktopStore(baseURL: directory)
         let credentials = InMemoryCredentialStore()
@@ -323,7 +323,7 @@ final class MinisDesktopCoreTests: XCTestCase {
             guard case .object(let object)? = event.payload, case .string(let id)? = object["agentId"] else { return nil }
             return id
         }
-        XCTAssertEqual(started, [first.id, second.id])
+        XCTAssertEqual(Set(started), Set([first.id, second.id]))
         let callCount = await provider.callCount
         let groupMessageCount = try await store.messages(sessionID: group.sessionID).count
         XCTAssertEqual(callCount, 2)

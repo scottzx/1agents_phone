@@ -34,7 +34,7 @@ struct MinisMacApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Minis") {
+        WindowGroup("Yima") {
             DesktopRootView(model: model)
                 .frame(minWidth: 1160, minHeight: 720)
                 .task { await model.start() }

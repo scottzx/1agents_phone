@@ -1980,17 +1980,17 @@ struct ToolLiveSheet: View {
 
     private var toolTitle: String {
         switch block.kind {
-        case .shellTool: return "Minis is using Shell"
-        case .fileReadTool: return "Minis is reading File"
-        case .fileWriteTool: return "Minis is using Editor"
-        case .fileEditTool: return "Minis is editing File"
-        case .browserTool: return "Minis is using Browser"
-        case .readImageTool: return "Minis is reading Image"
-        case .memoryTool: return "Minis is using Memory"
-        case .subagentTool: return "Minis is running a task"
-        case .info: return "Minis"
-        case .text: return "Minis"
-        case .thinking: return "Minis"
+        case .shellTool: return "Yima is using Shell"
+        case .fileReadTool: return "Yima is reading File"
+        case .fileWriteTool: return "Yima is using Editor"
+        case .fileEditTool: return "Yima is editing File"
+        case .browserTool: return "Yima is using Browser"
+        case .readImageTool: return "Yima is reading Image"
+        case .memoryTool: return "Yima is using Memory"
+        case .subagentTool: return "Yima is running a task"
+        case .info: return "Yima"
+        case .text: return "Yima"
+        case .thinking: return "Yima"
         }
     }
 

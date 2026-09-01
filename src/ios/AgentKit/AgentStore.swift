@@ -51,7 +51,7 @@ final class AgentStore: ObservableObject {
             let name = soul?.metadata.name.trimmingCharacters(in: .whitespacesAndNewlines)
             let seeded = AgentProfile(
                 id: AgentProfile.defaultAgentId,
-                name: (name?.isEmpty == false ? name! : "Minis"),
+                name: (name?.isEmpty == false ? name! : "Yima"),
                 emoji: "✨",
                 title: "",
                 summary: String(localized: "默认会话"),

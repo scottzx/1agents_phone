@@ -17,13 +17,21 @@ import Foundation
 @MainActor
 enum AgentTurnAwaiter {
 
-    /// Park until `vm` finishes its turn or `seconds` elapse.
-    /// Returns false when the wait ran out with the turn still going.
+    /// Park until `vm` finishes its turn or `seconds` elapse. A non-positive
+    /// value disables the deadline and waits until completion or cancellation.
+    /// Returns false when the wait ran out or the caller was cancelled.
     ///
     /// One-second granularity on purpose: the caller is suspended inside a tool
     /// call or an orchestration step for the whole wait, so a tighter poll buys
     /// nothing and a looser one adds latency to short turns.
     static func awaitTurn(vm: AIChatViewModel, seconds: TimeInterval) async -> Bool {
+        if seconds <= 0 {
+            while vm.isProcessing {
+                if Task.isCancelled { return false }
+                do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return false }
+            }
+            return true
+        }
         let deadline = Date().addingTimeInterval(max(0, seconds))
         while vm.isProcessing && Date() < deadline {
             if Task.isCancelled { return false }

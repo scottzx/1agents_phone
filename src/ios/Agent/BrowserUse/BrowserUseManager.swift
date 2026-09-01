@@ -226,7 +226,7 @@ final class BrowserUseManager: NSObject, ObservableObject {
         let printController = UIPrintInteractionController.shared
         let printInfo = UIPrintInfo.printInfo()
         printInfo.outputType = .general
-        printInfo.jobName = pageTitle.isEmpty ? "Minis" : pageTitle
+        printInfo.jobName = pageTitle.isEmpty ? "Yima" : pageTitle
         printController.printInfo = printInfo
         printController.printFormatter = webView.viewPrintFormatter()
         printController.present(animated: true) { _, completed, error in

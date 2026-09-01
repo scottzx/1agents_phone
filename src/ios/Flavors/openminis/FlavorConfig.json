@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "flavor_id": "openminis",
-  "display_name": "Minis",
+  "display_name": "Yima",
   "pack": {
     "resource_dir": "RolePack",
     "id": "openminis-default",

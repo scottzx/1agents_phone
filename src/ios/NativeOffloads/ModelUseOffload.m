@@ -356,7 +356,7 @@ static int cmd_run(int argc, char **argv, int stdin_fd, int stdout_fd, int stder
     // invoked from the parent agent loop. Plain explicit empty `--system ""`
     // is preserved (no default).
     if (!systemPrompt) {
-        systemPrompt = @"You are Minis, an on-device AI assistant running on iOS. "
+        systemPrompt = @"You are Yima, an on-device AI assistant running on iOS. "
                        @"You are being invoked as a sub-call from the parent agent loop "
                        @"to handle a focused task — answer the user's request directly and "
                        @"concisely, without restating the request or wrapping your answer in "

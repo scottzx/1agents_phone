@@ -472,20 +472,17 @@ public enum GroupMentionRouter {
         public static let quiet = Resolution(responderIds: [], reason: .none)
     }
 
-    /// Resolve one round of responders.
+    /// Resolve the responders for one FIFO message block.
     ///
     /// - Parameters:
-    ///   - newMessages: what was said since the last time this was called — the
-    ///     user's message on round 0, the previous round's member messages
-    ///     after that.
+    ///   - newMessages: the message block being processed. The shared engine
+    ///     passes one public message at a time.
     ///   - history: the full transcript, `newMessages` included. Only used for
     ///     the "no mention" fallback.
     ///
-    /// The window is the NEW messages, not everything back to the last user
-    /// message as in grok. grok can accumulate because its default is broadcast
-    /// and its only stop condition is the round cap; here a mention is the sole
-    /// wake-up signal, so re-reading an already-answered `@市场专家` every round
-    /// would keep re-waking that member until the cap ran out.
+    /// The window is the current block, not everything back to the last user
+    /// message as in grok. Re-reading an already-answered `@市场专家` from an
+    /// earlier block would incorrectly wake that member again.
     ///
     /// The rules, in order:
     ///

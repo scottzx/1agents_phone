@@ -17,44 +17,63 @@ import SwiftUI
 /// meaning of "group" that predates this feature.
 struct AgentGroupRow: View {
     let group: GroupProfile
+    var session: ChatSession? = nil
     /// Resolved members, for the avatar strip and the subtitle.
     let members: [GroupMember]
     let isTalking: Bool
+    let hasUnread: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Text(group.emoji.isEmpty ? "👥" : group.emoji)
-                .font(.system(size: 24))
-                .frame(width: 46, height: 46)
+                .font(.system(size: 20))
+                .frame(width: 44, height: 44)
                 .background(AgentAccent.color(group.accentColor).opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .clipShape(Circle())
+                .overlay(alignment: .topTrailing) {
+                    if hasUnread {
+                        Circle().fill(Color.red)
+                            .frame(width: 9, height: 9)
+                            .offset(x: 2, y: -2)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if isTalking {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(.white)
+                            .frame(width: 16, height: 16)
+                            .background(Color.accentColor, in: Circle())
+                            .offset(x: 3, y: 3)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(group.title).font(.headline).lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(group.title)
+                        .font(.system(size: 15, weight: .medium))
+                        .lineLimit(1)
                     Text(group.mode.displayName)
-                        .font(.caption2)
-                        .padding(.horizontal, 6).padding(.vertical, 2)
-                        .background(Color.secondary.opacity(0.12))
-                        .clipShape(Capsule())
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                    Spacer(minLength: 8)
+                    if let date = session?.updatedAt {
+                        ConversationTimestamp(date: date)
+                    }
                 }
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(.system(size: 13))
                     .foregroundStyle(isTalking ? Color.accentColor : .secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
         .contentShape(Rectangle())
     }
 
     private var subtitle: String {
         if isTalking { return String(localized: "正在讨论…") }
+        if let lastMessage = session?.lastMessage, !lastMessage.isEmpty { return lastMessage }
         guard !members.isEmpty else { return String(localized: "还没有成员") }
         return members.map(\.name).joined(separator: "、")
     }

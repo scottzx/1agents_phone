@@ -359,25 +359,23 @@ final class GroupChatRoutingTests: XCTestCase {
         XCTAssertEqual(result.reason, .mentioned)
     }
 
-    // MARK: - Caps
+    // MARK: - Sustained routing
 
-    func testEveryoneAskingEveryoneStillTerminates() {
-        // Simulates the worst case the caps exist for: every member ends every
-        // turn by @-ing every other member. The orchestrator's loop shape is
-        // reproduced here so the caps are asserted independently of it.
+    func testEveryoneAskingEveryoneRemainsRoutablePastLegacyCaps() {
+        // Fixed rounds and turn caps no longer end an active collaboration.
+        // Keep routing a deliberately chatty room well past the former limits.
         var history: [GroupMessage] = [.user("@所有人 讨论一下")]
         var newMessages = history
         var total = 0
         var rounds = 0
 
-        for round in 0..<GroupChatLimits.maxRounds {
+        for round in 0..<12 {
             let result = GroupMentionRouter.resolveResponders(
                 members: cast, newMessages: newMessages, history: history, ownerAgentId: host.id)
-            if result.responderIds.isEmpty { break }
+            XCTAssertFalse(result.responderIds.isEmpty)
             rounds += 1
             var produced: [GroupMessage] = []
             for id in GroupMentionRouter.orderRoundSpeakers(result.responderIds, round: round) {
-                guard total < GroupChatLimits.maxMemberTurns else { break }
                 let everyoneElse = cast.filter { $0.id != id }.map { "@\($0.name)" }.joined(separator: " ")
                 let message = GroupMessage.member(id, "我的看法。\(everyoneElse)")
                 produced.append(message)
@@ -387,8 +385,8 @@ final class GroupChatRoutingTests: XCTestCase {
             newMessages = produced
         }
 
-        XCTAssertLessThanOrEqual(total, GroupChatLimits.maxMemberTurns)
-        XCTAssertLessThanOrEqual(rounds, GroupChatLimits.maxRounds)
+        XCTAssertGreaterThan(total, 10)
+        XCTAssertGreaterThan(rounds, 3)
     }
 
     // MARK: - Projection
@@ -544,4 +542,5 @@ final class GroupChatRoutingTests: XCTestCase {
         XCTAssertEqual(try? result.get(), nil)
     }
 }
+
 #endif

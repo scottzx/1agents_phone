@@ -1,14 +1,17 @@
-# OpenMinis
+# Yima / 一伴
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20Android-lightgrey.svg)](#beta-programme)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20Android%20%7C%20macOS-lightgrey.svg)](#beta-programme)
 
-**Your private, on-device AI agent.**
+**Your Intelligence Mates** — 全面打造 A2A 智能体协作网络。
 
-OpenMinis brings leading models — Claude, GPT, Gemini and more — into a native
-mobile experience, and gives them a real computer to work with: a full Linux
-shell running on your device, browser automation, extensible skills, persistent
-memory, and deep system integration.
+> 💡 **项目声明 / Fork Notice**  
+> 本项目基于 [OpenMinis](https://github.com/OpenMinis/OpenMinis) 开源项目 Fork 开发。我们在此优秀的基础上，持续演进并致力于打造 **A2A（Agent-to-Agent）多智能体协作网络**。  
+> Forked from [OpenMinis](https://github.com/OpenMinis/OpenMinis). Building upon this foundation, Yima is dedicated to creating an open A2A (Agent-to-Agent) collaboration network.
+
+---
+
+Yima / 一伴 将领先的大模型（Claude、GPT、Gemini、DeepSeek 等）带入原生移动与桌面体验，并为它们提供真实的计算环境：运行在设备本地的完整 Linux 环境、浏览器自动化、可扩展技能（Skills）、持久化记忆（Memory）以及多智能体协同运行环境。
 
 It is free, and fully open source.
 
@@ -17,7 +20,7 @@ where a product's advantage lies. The best agent emerges from a tight feedback
 loop with the people who use it — their expectations and their reports are
 what converge on the product.**
 
-Official website: **[openminis.app](https://openminis.app)**
+Official upstream: **[openminis.app](https://openminis.app)**
 
 <a href="https://apps.apple.com/app/id6759188481">
   <img alt="Download on the App Store" height="48" src="assets/badge-appstore.svg" />
@@ -27,7 +30,7 @@ Official website: **[openminis.app](https://openminis.app)**
   <img alt="Get the APK on GitHub" height="48" src="assets/badge-android.svg" />
 </a>
 
-![Minis on iOS — deep research, chat, agent runtime, integrations, iCloud sync and granular permissions](assets/screenshots.png)
+![Yima on iOS — deep research, chat, agent runtime, integrations, iCloud sync and granular permissions](assets/screenshots.png)
 
 ---
 
@@ -45,19 +48,19 @@ Official website: **[openminis.app](https://openminis.app)**
 
 ---
 
-## What you can do with Minis
+## What you can do with Yima / 一伴
 
 A few things people actually use it for:
 
-- **Photograph a meal, log the nutrition** — Minis identifies the dishes, estimates
+- **Photograph a meal, log the nutrition** — Yima identifies the dishes, estimates
   calories and macros, and writes them to Apple Health.
-- **Wake up to your timeline** — Shortcuts triggers Minis to fetch your X timeline,
+- **Wake up to your timeline** — Shortcuts triggers Yima to fetch your X timeline,
   summarise it, synthesise speech, and play it as your alarm.
 - **Turn group chatter into tasks** — pull messages from a Telegram group, extract
   bugs and action items, deduplicate them, and file them into Apple Reminders.
 - **Mount your Obsidian vault** — research, clean up and write Markdown notes back
   into the vault as a normal workspace.
-- **Share anything into a calendar event** — send a page or message to Minis via the
+- **Share anything into a calendar event** — send a page or message to Yima via the
   iOS Share Sheet and it creates the event, time and place included.
 
 **→ [OpenMinis/AwesomeMinis](https://github.com/OpenMinis/AwesomeMinis)** — a curated,
@@ -73,13 +76,13 @@ references and assets — that the agent loads on demand when a request matches 
 Metadata stays in context for triggering; the body and bundled resources load only
 when the skill is actually used.
 
-Minis has its own tool system, but it does not require skills written specifically
+Yima has its own tool system, but it does not require skills written specifically
 for it: **skills built for Claude, Codex, OpenClaw or Hermes Agent generally run in
-Minis as-is.** Skills that have been adapted to Minis' tools simply run better —
+Yima as-is.** Skills that have been adapted to Yima's tools simply run better —
 they can reach the Linux shell, device integrations and native offloads directly.
 
 **→ [OpenMinis/MinisSkills](https://github.com/OpenMinis/MinisSkills)** — skills
-adapted for Minis alongside ones built for it from scratch, covering TTS, search,
+adapted for the agent runtime alongside ones built for it from scratch, covering TTS, search,
 media downloads, health analysis, cloud APIs and more.
 
 ---

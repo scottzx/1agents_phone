@@ -98,8 +98,6 @@ enum GroupChatDebugRPC {
             "responders": resolution.responderIds.compactMap { id in members.first { $0.id == id }?.name },
             "downgradedEveryoneBy": resolution.downgradedEveryoneBy,
             "usedLooseNamesBy": resolution.usedLooseNamesBy,
-            "rounds": GroupChatLimits.maxRounds,
-            "maxMemberTurns": GroupChatLimits.maxMemberTurns,
             "prompts": prompts,
         ]
     }

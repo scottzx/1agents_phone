@@ -213,7 +213,7 @@ enum DebugMethodRegistry {
                 ParamSpec(name: "history", type: "array", required: true, default: nil, description: "Transcript, oldest first, as \"user:文本\" or \"<agentId>:文本\" strings. Mentions may be written readably as @名字 — they are encoded to the canonical <@id> form the way the composer does, before routing."),
                 ParamSpec(name: "newCount", type: "int", required: false, default: 1, description: "How many trailing history entries count as this round's new messages."),
             ],
-            returns: "{members:[{id, name, slot, token, looseHandles}], everyoneToken, ownerAgentId, newMessages, reason, responders, downgradedEveryoneBy, usedLooseNamesBy, rounds, maxMemberTurns, prompts:[{member, systemBlock, turnPrompt}]}",
+            returns: "{members:[{id, name, slot, token, looseHandles}], everyoneToken, ownerAgentId, newMessages, reason, responders, downgradedEveryoneBy, usedLooseNamesBy, prompts:[{member, systemBlock, turnPrompt}]}",
             example: ["agentIds": ["agent-default"], "history": ["user:@所有人 说说看"]]
         ),
         MethodSpec(

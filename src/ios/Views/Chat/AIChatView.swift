@@ -401,7 +401,7 @@ struct AIChatView: View {
     /// Default chat title for sessions without a generated title. Sourced
     /// from SOUL.md (`name`), falls back to "Minis". Refreshed on .soulMdChanged.
     @State private var soulName: String = SoulStore.cachedMetadata.name.isEmpty
-        ? "Minis" : SoulStore.cachedMetadata.name
+        ? "Yima" : SoulStore.cachedMetadata.name
 
     /// True when any sheet or fullScreenCover is presented (suppress auto-focus to avoid keyboard bugs).
     private var hasOverlayPresented: Bool {
@@ -636,6 +636,7 @@ struct AIChatView: View {
         // UINavigationBar. Back, title and actions therefore share one frame
         // from the first render and travel together during interactive pop.
         .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .top, spacing: 0) {
             if showsPageHeader {
                 chatPageHeader
@@ -1745,7 +1746,7 @@ struct AIChatView: View {
         )
         .onReceive(NotificationCenter.default.publisher(for: .soulMdChanged)) { _ in
             let name = SoulStore.cachedMetadata.name
-            soulName = name.isEmpty ? "Minis" : name
+            soulName = name.isEmpty ? "Yima" : name
         }
         .animation(.easeInOut(duration: 0.15), value: titleIsVisuallyLocked)
     }
@@ -1887,7 +1888,7 @@ struct AIChatView: View {
         )
         .onReceive(NotificationCenter.default.publisher(for: .soulMdChanged)) { _ in
             let name = SoulStore.cachedMetadata.name
-            soulName = name.isEmpty ? "Minis" : name
+            soulName = name.isEmpty ? "Yima" : name
         }
         // iOS 26+: fix height to match liquid-glass navbar; older OS: let it size naturally
         .modifier(NavTitleFrameModifier())

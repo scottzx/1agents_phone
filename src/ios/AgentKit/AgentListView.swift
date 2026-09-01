@@ -25,12 +25,40 @@ enum AgentRoute: Hashable {
     case group(String)
 }
 
-enum HomeTab: String, CaseIterable, Identifiable {
-    case sessions = "会话"
-    case agents = "伙伴"
-    case groups = "群聊"
+enum ChatListMode: String, CaseIterable, Identifiable {
+    /// Long-lived conversations with agents and groups, shown together.
+    case chats = "聊天"
+    /// Standalone, historical sessions that do not belong to an agent/group.
+    case sessions = "对话"
 
     var id: String { rawValue }
+
+    var systemImage: String {
+        switch self {
+        case .chats: return "bubble.left.and.bubble.right"
+        case .sessions: return "clock.arrow.circlepath"
+        }
+    }
+}
+
+private enum AppRootTab: Hashable {
+    case chats
+    case contacts
+    case discover
+    case me
+}
+
+private enum UnifiedChatItem: Identifiable {
+    case direct(AgentProfile)
+    case group(GroupProfile)
+
+    var id: String {
+        switch self {
+        case .direct(let agent): return "direct:\(agent.id)"
+        case .group(let group): return "group:\(group.id)"
+        }
+    }
+
 }
 
 struct AgentListView: View {
@@ -42,25 +70,76 @@ struct AgentListView: View {
     @ObservedObject private var badges = SessionBadgeStore.shared
     @ObservedObject private var groups = GroupStore.shared
 
-    @AppStorage("home.selectedTab") private var selectedTab: HomeTab = .sessions
+    @AppStorage("home.chatListMode") private var selectedMode: ChatListMode = .chats
+    @State private var selectedRootTab: AppRootTab = .chats
     @State private var searchText = ""
     @State private var sessions: [ChatSession] = []
+    @State private var sessionsById: [String: ChatSession] = [:]
     @State private var searchResults: [ChatStore.SearchResult] = []
     @State private var searchTask: Task<Void, Never>?
 
-    @State private var path: [AgentRoute] = []
+    @State private var chatPath: [AgentRoute] = []
+    @State private var contactsPath: [AgentRoute] = []
     @State private var showingCreate = false
     @State private var showingCreateGroup = false
     /// Members per group, resolved once when the roster loads so each row can
     /// show who is in it without an async lookup per redraw.
     @State private var groupMembers: [String: [GroupMember]] = [:]
-    @State private var showingSettings = false
-    /// Owned here because SettingsSheet can hand control to the iSH terminal,
-    /// the same way ContentView drives it.
-    @State private var showTerminal = false
-
     var body: some View {
-        NavigationStack(path: $path) {
+        TabView(selection: $selectedRootTab) {
+            chatRoot
+                .tabItem { Label(String(localized: "聊天"), systemImage: "bubble.left.and.bubble.right") }
+                .tag(AppRootTab.chats)
+
+            contactsRoot
+                .tabItem { Label(String(localized: "通讯录"), systemImage: "person.2") }
+                .tag(AppRootTab.contacts)
+
+            DiscoveryHubView()
+                .tabItem { Label(String(localized: "发现"), systemImage: "safari") }
+                .tag(AppRootTab.discover)
+
+            MySettingsHubView()
+                .tabItem { Label(String(localized: "我的"), systemImage: "person.crop.circle") }
+                .tag(AppRootTab.me)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openSessionFromIntent)) { note in
+            guard let sessionId = (note.userInfo as? [String: String])?["sessionId"] else { return }
+            NotificationNavigationStore.shared.markHandled()
+            selectedRootTab = .chats
+            openSession(sessionId)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidCreate)) { _ in
+            Task { await loadSessions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { _ in
+            Task { await loadSessions() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { _ in
+            selectedRootTab = .chats
+            startNewSession()
+        }
+        .onChange(of: groups.groups) { _ in
+            Task { await resolveGroupMembers() }
+        }
+        .onChange(of: selectedRootTab) { _ in
+            searchText = ""
+            searchResults = []
+        }
+        .task {
+            await store.bootstrap()
+            await groups.bootstrap()
+            await resolveGroupMembers()
+            await loadSessions()
+            if let pending = NotificationNavigationStore.shared.takePending() {
+                selectedRootTab = .chats
+                openSession(pending)
+            }
+        }
+    }
+
+    private var chatRoot: some View {
+        NavigationStack(path: $chatPath) {
             Group {
                 if !store.isReady {
                     ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -71,27 +150,37 @@ struct AgentListView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    MinisNavigationHeader(title: String(localized: "一芥伙伴"))
-                }
-                // Settings used to live several taps deep inside the session
-                // list. The roster is the app root now, so it owns the shortcut.
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { showingSettings = true } label: {
-                        Image(systemName: "line.3.horizontal")
+                    Menu {
+                        ForEach(ChatListMode.allCases) { mode in
+                            Button {
+                                selectedMode = mode
+                                searchText = ""
+                            } label: {
+                                Label(mode.rawValue, systemImage: selectedMode == mode ? "checkmark" : mode.systemImage)
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(selectedMode.rawValue)
+                                .font(.headline)
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                        }
+                        .foregroundStyle(.primary)
                     }
-                    .accessibilityLabel(String(localized: "设置"))
+                    .accessibilityLabel(String(localized: "切换聊天列表"))
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {
                             startNewSession()
                         } label: {
-                            Label(String(localized: "新建会话"), systemImage: "square.and.pencil")
+                            Label(String(localized: "新建对话"), systemImage: "square.and.pencil")
                         }
                         Button {
                             showingCreate = true
                         } label: {
-                            Label(String(localized: "新建伙伴"), systemImage: "person.badge.plus")
+                            Label(String(localized: "新建智能体"), systemImage: "person.badge.plus")
                         }
                         Button {
                             showingCreateGroup = true
@@ -106,73 +195,39 @@ struct AgentListView: View {
                 }
             }
             .navigationDestination(for: AgentRoute.self) { route in
-                switch route {
-                case .agent(let agentId):
-                    AgentMainSessionView(agentId: agentId)
-                case .session(let sessionId):
-                    let destination = AgentSessionDestination(routeId: sessionId)
-                    AIChatView(
-                        sessionId: destination.sessionId,
-                        draftId: destination.draftId,
-                        initialSession: destination.sessionId.flatMap { id in
-                            sessions.first(where: { $0.id == id })
-                        }
-                    )
-                case .group(let groupId):
-                    GroupSessionView(groupId: groupId)
+                Group {
+                    switch route {
+                    case .agent(let agentId):
+                        AgentMainSessionView(agentId: agentId)
+                    case .session(let sessionId):
+                        let destination = AgentSessionDestination(routeId: sessionId)
+                        AIChatView(
+                            sessionId: destination.sessionId,
+                            draftId: destination.draftId,
+                            initialSession: destination.sessionId.flatMap { id in
+                                sessions.first(where: { $0.id == id })
+                            }
+                        )
+                    case .group(let groupId):
+                        GroupSessionView(groupId: groupId)
+                    }
                 }
+                .toolbar(.hidden, for: .tabBar)
             }
             .sheet(isPresented: $showingCreate) {
                 AgentCreateView { newAgentId in
                     showingCreate = false
-                    path.append(.agent(newAgentId))
+                    chatPath.append(.agent(newAgentId))
                 }
             }
             .sheet(isPresented: $showingCreateGroup) {
                 GroupCreateView { newGroupId in
                     showingCreateGroup = false
-                    path.append(.group(newGroupId))
-                }
-            }
-            .sheet(isPresented: $showingSettings) {
-                SettingsSheet(showTerminal: $showTerminal)
-            }
-            .fullScreenCover(isPresented: $showTerminal) {
-                NavigationStack {
-                    ISHTerminalView(showCloseButton: true)
+                    chatPath.append(.group(newGroupId))
                 }
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .openSessionFromIntent)) { note in
-            guard let sessionId = (note.userInfo as? [String: String])?["sessionId"] else { return }
-            NotificationNavigationStore.shared.markHandled()
-            openSession(sessionId)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sessionDidCreate)) { _ in
-            Task { await loadSessions() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sessionDidUpdate)) { _ in
-            Task { await loadSessions() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .newChatRequested)) { _ in
-            startNewSession()
-        }
-        .onChange(of: groups.groups) { _ in
-            // A group created or edited elsewhere in this launch changes the
-            // roster, and each row's subtitle is its member list.
-            Task { await resolveGroupMembers() }
-        }
-        .task {
-            await store.bootstrap()
-            await groups.bootstrap()
-            await resolveGroupMembers()
-            await loadSessions()
-            // Cold launch: the tap that started the app posted its event before
-            // this view existed, so the id was buffered instead. Drain it.
-            if let pending = NotificationNavigationStore.shared.takePending() {
-                openSession(pending)
-            }
-        }
+        .toolbar(chatPath.isEmpty ? .visible : .hidden, for: .tabBar)
     }
 
     /// Navigate to a session that arrived from outside the roster. Routed
@@ -185,85 +240,57 @@ struct AgentListView: View {
                agentId != AgentProfile.defaultAgentId,
                let agent = await store.loadAgent(agentId),
                agent.mainSessionId == sessionId {
-                path = [.agent(agentId)]
+                chatPath = [.agent(agentId)]
             } else {
-                path = [.session(sessionId)]
+                chatPath = [.session(sessionId)]
             }
         }
     }
 
     private var filterAndSearchBar: some View {
         HStack(spacing: 8) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                TextField(searchPlaceholder, text: $searchText)
-                    .textFieldStyle(.plain)
-                    .autocorrectionDisabled()
-                    .onChange(of: searchText) { _ in
-                        scheduleSearch()
-                    }
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                        scheduleSearch()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 15))
-                            .foregroundStyle(.secondary)
-                    }
-                    .buttonStyle(.plain)
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+            TextField(searchPlaceholder, text: $searchText)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .onChange(of: searchText) { _ in
+                    scheduleSearch()
                 }
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 38)
-            .background(Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.secondarySystemGroupedBackground : UIColor.white }))
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            Menu {
-                ForEach(HomeTab.allCases) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        HStack {
-                            Text(tab.rawValue)
-                            if selectedTab == tab {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    scheduleSearch()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(.secondary)
                 }
-            } label: {
-                Image(systemName: "line.3.horizontal.decrease")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.primary)
-                    .frame(width: 38, height: 38)
-                    .background(Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.secondarySystemGroupedBackground : UIColor.white }))
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .buttonStyle(.plain)
             }
-            .accessibilityLabel(String(localized: "切换模式"))
         }
+        .padding(.horizontal, 10)
+        .frame(height: 38)
+        .background(Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor.secondarySystemGroupedBackground : UIColor.white }))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private var searchPlaceholder: String {
-        switch selectedTab {
-        case .sessions: return String(localized: "搜索会话...")
-        case .agents:   return String(localized: "搜索伙伴...")
-        case .groups:   return String(localized: "搜索群聊...")
+        switch selectedMode {
+        case .chats: return String(localized: "搜索私聊和群聊...")
+        case .sessions: return String(localized: "搜索对话...")
         }
     }
 
     private var roster: some View {
         List {
             Section {
-                switch selectedTab {
+                switch selectedMode {
+                case .chats:
+                    chatsList
                 case .sessions:
                     sessionsList
-                case .agents:
-                    agentsList
-                case .groups:
-                    groupsList
                 }
             } header: {
                 filterAndSearchBar
@@ -281,14 +308,98 @@ struct AgentListView: View {
         }
     }
 
+    private var contactsRoot: some View {
+        NavigationStack(path: $contactsPath) {
+            List {
+                Section(String(localized: "智能体")) {
+                    agentsList(path: $contactsPath)
+                }
+                Section(String(localized: "群聊")) {
+                    groupsList(path: $contactsPath)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle(String(localized: "通讯录"))
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: AgentRoute.self) { route in
+                Group {
+                    switch route {
+                    case .agent(let agentId): AgentMainSessionView(agentId: agentId)
+                    case .group(let groupId): GroupSessionView(groupId: groupId)
+                    case .session(let sessionId): AIChatView(sessionId: sessionId)
+                    }
+                }
+                .toolbar(.hidden, for: .tabBar)
+            }
+        }
+        .toolbar(contactsPath.isEmpty ? .visible : .hidden, for: .tabBar)
+    }
+
     // MARK: - Tab Views
+
+    @ViewBuilder
+    private var chatsList: some View {
+        if unifiedChats.isEmpty {
+            Text(searchText.isEmpty ? String(localized: "暂无聊天，点击右上角 + 创建") : String(localized: "未找到匹配聊天"))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 24)
+        } else {
+            ForEach(unifiedChats) { item in
+                switch item {
+                case .direct(let agent):
+                    Button {
+                        chatPath.append(.agent(agent.id))
+                    } label: {
+                        AgentRow(
+                            agent: agent,
+                            session: agent.mainSessionId.flatMap { sessionsById[$0] },
+                            runningTasks: runningTasks(for: agent),
+                            isRunning: isAgentRunning(agent),
+                            hasUnread: agent.mainSessionId.map { badges.hasUnread(for: $0) } ?? false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task { await store.archive(agent.id) }
+                        } label: {
+                            Label(String(localized: "归档"), systemImage: "archivebox")
+                        }
+                    }
+
+                case .group(let group):
+                    Button {
+                        chatPath.append(.group(group.id))
+                    } label: {
+                        AgentGroupRow(
+                            group: group,
+                            session: sessionsById[group.sessionId],
+                            members: groupMembers[group.id] ?? [],
+                            isTalking: isGroupRunning(group),
+                            hasUnread: badges.hasUnread(for: group.sessionId)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task { await groups.archive(group.id) }
+                        } label: {
+                            Label(String(localized: "归档"), systemImage: "archivebox")
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     @ViewBuilder
     private var sessionsList: some View {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !query.isEmpty {
             if searchResults.isEmpty {
-                Text(String(localized: "未找到匹配会话"))
+                Text(String(localized: "未找到匹配对话"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -296,7 +407,7 @@ struct AgentListView: View {
             } else {
                 ForEach(searchResults, id: \.session.id) { result in
                     Button {
-                        path.append(.session(result.session.id))
+                        chatPath.append(.session(result.session.id))
                     } label: {
                         SessionRowView(
                             session: result.session,
@@ -315,7 +426,7 @@ struct AgentListView: View {
             }
         } else {
             if sortedSessions.isEmpty {
-                Text(String(localized: "暂无会话，点击右上角 + 开始新对话"))
+                Text(String(localized: "暂无对话，点击右上角 + 开始"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
@@ -323,7 +434,7 @@ struct AgentListView: View {
             } else {
                 ForEach(sortedSessions) { session in
                     Button {
-                        path.append(.session(session.id))
+                        chatPath.append(.session(session.id))
                     } label: {
                         SessionRowView(
                             session: session,
@@ -351,9 +462,9 @@ struct AgentListView: View {
     }
 
     @ViewBuilder
-    private var agentsList: some View {
+    private func agentsList(path: Binding<[AgentRoute]>) -> some View {
         if filteredAgents.isEmpty {
-            Text(searchText.isEmpty ? String(localized: "暂无伙伴，点击右上角 + 创建") : String(localized: "未找到匹配伙伴"))
+            Text(String(localized: "暂无智能体"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -361,11 +472,12 @@ struct AgentListView: View {
         } else {
             ForEach(filteredAgents) { agent in
                 Button {
-                    path.append(.agent(agent.id))
+                    path.wrappedValue.append(.agent(agent.id))
                 } label: {
                     AgentRow(
                         agent: agent,
                         runningTasks: runningTasks(for: agent),
+                        isRunning: isAgentRunning(agent),
                         hasUnread: agent.mainSessionId.map { badges.hasUnread(for: $0) } ?? false
                     )
                 }
@@ -382,9 +494,9 @@ struct AgentListView: View {
     }
 
     @ViewBuilder
-    private var groupsList: some View {
+    private func groupsList(path: Binding<[AgentRoute]>) -> some View {
         if filteredGroups.isEmpty {
-            Text(searchText.isEmpty ? String(localized: "暂无群聊，点击右上角 + 创建") : String(localized: "未找到匹配群聊"))
+            Text(String(localized: "暂无群聊"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -392,12 +504,13 @@ struct AgentListView: View {
         } else {
             ForEach(filteredGroups) { group in
                 Button {
-                    path.append(.group(group.id))
+                    path.wrappedValue.append(.group(group.id))
                 } label: {
                     AgentGroupRow(
                         group: group,
                         members: groupMembers[group.id] ?? [],
-                        isTalking: GroupChatOrchestrator.shared.isRunning(groupId: group.id)
+                        isTalking: isGroupRunning(group),
+                        hasUnread: badges.hasUnread(for: group.sessionId)
                     )
                 }
                 .buttonStyle(.plain)
@@ -427,6 +540,21 @@ struct AgentListView: View {
         }
     }
 
+    private var unifiedChats: [UnifiedChatItem] {
+        let direct = filteredAgents.map(UnifiedChatItem.direct)
+        let group = filteredGroups.map(UnifiedChatItem.group)
+        return (direct + group).sorted { chatUpdatedAt($0) > chatUpdatedAt($1) }
+    }
+
+    private func chatUpdatedAt(_ item: UnifiedChatItem) -> Date {
+        switch item {
+        case .direct(let agent):
+            return agent.mainSessionId.flatMap { sessionsById[$0]?.updatedAt } ?? agent.updatedAt
+        case .group(let group):
+            return sessionsById[group.sessionId]?.updatedAt ?? group.updatedAt
+        }
+    }
+
     private var filteredAgents: [AgentProfile] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return displayAgents }
@@ -447,13 +575,14 @@ struct AgentListView: View {
     }
 
     private func startNewSession() {
-        selectedTab = .sessions
+        selectedMode = .sessions
         let draftId = "__new__\(UUID().uuidString)"
-        path.append(.session(draftId))
+        chatPath.append(.session(draftId))
     }
 
     private func loadSessions() async {
         let all = await ChatStore.shared.listSessions()
+        sessionsById = Dictionary(uniqueKeysWithValues: all.map { ($0.id, $0) })
         sessions = all.filter { s in
             let isDefault = s.agentId == nil || s.agentId == AgentProfile.defaultAgentId
             let isNotGroup = s.spawnRole != GroupSessionRole.group
@@ -518,6 +647,16 @@ struct AgentListView: View {
             activity.activeSessions.contains(sid) && sid != main
         }.count
     }
+
+    private func isAgentRunning(_ agent: AgentProfile) -> Bool {
+        let mainIsRunning = agent.mainSessionId.map(activity.isActive) ?? false
+        return mainIsRunning || runningTasks(for: agent) > 0
+    }
+
+    private func isGroupRunning(_ group: GroupProfile) -> Bool {
+        activity.isActive(group.sessionId)
+            || GroupChatOrchestrator.shared.isRunning(groupId: group.id)
+    }
 }
 
 // MARK: - Session Row
@@ -527,51 +666,59 @@ private struct SessionRowView: View {
     let matchSnippet: String?
 
     @ObservedObject private var badges = SessionBadgeStore.shared
+    @ObservedObject private var activity = SessionActivityTracker.shared
+
+    private var isRunning: Bool { activity.isActive(session.id) }
+    private var hasUnread: Bool { badges.hasUnread(for: session.id) }
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(systemName: "bubble.left.fill")
-                .font(.system(size: 20))
+                .font(.system(size: 19))
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 46, height: 46)
-                .background(Color.accentColor.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .frame(width: 44, height: 44)
+                .background(Color.accentColor.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(alignment: .topTrailing) {
-                    if badges.hasUnread(for: session.id) {
-                        Circle()
-                            .fill(Color.red)
+                    if hasUnread {
+                        Circle().fill(Color.red)
                             .frame(width: 9, height: 9)
-                            .offset(x: 3, y: -3)
+                            .offset(x: 2, y: -2)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if isRunning {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(.white)
+                            .frame(width: 16, height: 16)
+                            .background(Color.accentColor, in: Circle())
+                            .offset(x: 3, y: 3)
                     }
                 }
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(session.title?.isEmpty == false ? session.title! : String(localized: "新会话"))
-                        .font(.headline)
+                        .font(.system(size: 15, weight: .medium))
                         .lineLimit(1)
                     if session.isPinned {
                         Image(systemName: "pin.fill")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
                     }
+                    Spacer(minLength: 8)
+                    Text(relativeDate(session.updatedAt))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.tertiary)
                 }
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
-            VStack(alignment: .trailing, spacing: 3) {
-                Text(relativeDate(session.updatedAt))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
-            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
         .contentShape(Rectangle())
     }
 
@@ -605,50 +752,58 @@ private struct SessionRowView: View {
 
 private struct AgentRow: View {
     let agent: AgentProfile
+    var session: ChatSession? = nil
     let runningTasks: Int
+    let isRunning: Bool
     let hasUnread: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Text(agent.emoji.isEmpty ? "🤖" : agent.emoji)
-                .font(.system(size: 26))
-                .frame(width: 46, height: 46)
+                .font(.system(size: 22))
+                .frame(width: 44, height: 44)
                 .background(AgentAccent.color(agent.accentColor).opacity(0.15))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                // Same top-trailing red dot SessionRow uses, for the same
-                // meaning: unread content, cleared the moment it is opened.
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(alignment: .topTrailing) {
                     if hasUnread {
-                        Circle()
-                            .fill(Color.red)
+                        Circle().fill(Color.red)
                             .frame(width: 9, height: 9)
-                            .offset(x: 3, y: -3)
+                            .offset(x: 2, y: -2)
+                    }
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    if isRunning {
+                        ProgressView()
+                            .controlSize(.mini)
+                            .tint(.white)
+                            .frame(width: 16, height: 16)
+                            .background(Color.accentColor, in: Circle())
+                            .offset(x: 3, y: 3)
                     }
                 }
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    Text(agent.name).font(.headline).lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(agent.name)
+                        .font(.system(size: 15, weight: .medium))
+                        .lineLimit(1)
                     if !agent.title.isEmpty {
                         Text(agent.title)
-                            .font(.caption2)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(Color.secondary.opacity(0.12))
-                            .clipShape(Capsule())
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 8)
+                    if let date = session?.updatedAt {
+                        ConversationTimestamp(date: date)
                     }
                 }
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(.system(size: 13))
                     .foregroundStyle(runningTasks > 0 ? Color.accentColor : .secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 0)
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
         .contentShape(Rectangle())
     }
 
@@ -656,7 +811,34 @@ private struct AgentRow: View {
         if runningTasks > 0 {
             return String(localized: "\(runningTasks) 个任务运行中")
         }
+        if let lastMessage = session?.lastMessage, !lastMessage.isEmpty {
+            return lastMessage
+        }
         return agent.summary.isEmpty ? String(localized: "空闲") : agent.summary
+    }
+}
+
+struct ConversationTimestamp: View {
+    let date: Date
+
+    var body: some View {
+        Text(relativeDate)
+            .font(.system(size: 12))
+            .foregroundStyle(.tertiary)
+    }
+
+    private var relativeDate: String {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        if calendar.isDateInToday(date) {
+            formatter.dateFormat = "HH:mm"
+            return formatter.string(from: date)
+        }
+        if calendar.isDateInYesterday(date) {
+            return String(localized: "昨天")
+        }
+        formatter.dateFormat = "M/d"
+        return formatter.string(from: date)
     }
 }
 

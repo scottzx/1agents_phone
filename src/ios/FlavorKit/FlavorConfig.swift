@@ -78,7 +78,7 @@ struct FlavorConfig: Codable, Equatable, Sendable {
     static let openMinisFallback = FlavorConfig(
         schemaVersion: 1,
         flavorId: "openminis",
-        displayName: "Minis",
+        displayName: "Yima",
         pack: PackRef(resourceDir: "RolePack", id: "openminis-default", minInstallerApi: 1),
         rootExperience: .agentRoster,
         sceneModuleId: nil,

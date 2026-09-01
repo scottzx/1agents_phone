@@ -168,7 +168,7 @@ struct ContentView: View {
     /// Soul name shown as the sidebar title. Sourced from SOUL.md, falls
     /// back to "Minis". Refreshed whenever SoulStore posts .soulMdChanged.
     @State private var soulName: String = SoulStore.cachedMetadata.name.isEmpty
-        ? "Minis" : SoulStore.cachedMetadata.name
+        ? "Yima" : SoulStore.cachedMetadata.name
     /// Subtitle state shown under the "Minis" sidebar title. nil hides the
     /// row; otherwise it renders as small capsules per type or a single
     /// status string. Refreshed by a 5s timer.
@@ -1193,7 +1193,7 @@ struct ContentView: View {
         // and can't drop a .soulMdChanged notification arriving during reconstruction.
         .onReceive(NotificationCenter.default.publisher(for: .soulMdChanged)) { _ in
             let n = SoulStore.cachedMetadata.name
-            soulName = n.isEmpty ? "Minis" : n
+            soulName = n.isEmpty ? "Yima" : n
         }
     }
 
@@ -3135,7 +3135,7 @@ struct ContentView: View {
                 done += 1
                 if msg.isToolResultOnly { continue }
 
-                let role = msg.role == .user ? "User" : "Minis"
+                let role = msg.role == .user ? "User" : "Yima"
                 let time = timeFmt.string(from: msg.createdAt)
                 var parts: [String] = []
                 for part in msg.parts {
@@ -4801,6 +4801,176 @@ private struct InteractivePopGestureDisabler: UIViewRepresentable {
     }
 }
 
+// MARK: - Root tab hubs
+
+/// Settings that describe what Minis can do, promoted into the Discover tab.
+struct DiscoveryHubView: View {
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(String(localized: "智能体运行时")) {
+                    HubLink(title: String(localized: "技能"), systemImage: "puzzlepiece.extension", color: .blue) {
+                        SkillsManagementView()
+                    }
+                    HubLink(title: String(localized: "灵魂"), systemImage: "sparkles", color: .pink) {
+                        SoulSettingsView()
+                    }
+                    HubLink(title: String(localized: "记忆"), systemImage: "brain.head.profile", color: .purple) {
+                        MemoryManagementView()
+                    }
+                    HubLink(title: "MCP Integrations", systemImage: "square.stack.3d.up", color: .teal) {
+                        MCPIntegrationsView()
+                    }
+                    HubLink(title: String(localized: "环境变量"), systemImage: "terminal", color: .green) {
+                        EnvironmentVariablesView()
+                    }
+                }
+
+                Section(String(localized: "存储")) {
+                    HubLink(title: String(localized: "存储管理"), systemImage: "archivebox", color: .blue) {
+                        StorageManagementView()
+                    }
+                    HubLink(title: String(localized: "共享文件夹"), systemImage: "folder.fill.badge.person.crop", color: .green) {
+                        SharedFoldersSettingsView()
+                    }
+                    HubLink(title: String(localized: "挂载外部文件夹"), systemImage: "externaldrive.badge.plus", color: .orange) {
+                        MountedFoldersSettingsView()
+                    }
+                    if #available(iOS 17.0, *) {
+                        HubLink(title: "iCloud Sync", systemImage: "icloud", color: .cyan) {
+                            CloudSyncSettingsV2View()
+                        }
+                    }
+                }
+
+                Section(String(localized: "硬件")) {
+                    HubLink(title: String(localized: "硬件设备"), systemImage: "antenna.radiowaves.left.and.right", color: .blue) {
+                        HardwareBridgeSettingsView()
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle(String(localized: "发现"))
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+/// Personal preferences and app administration that remain after Discover's
+/// capability-oriented sections have been extracted.
+struct MySettingsHubView: View {
+    @State private var showFeedbackDialog = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("LLM Providers") {
+                    HubLink(title: "Manage Providers", systemImage: "lock.circle.fill", color: .blue) {
+                        ProviderInstancesView()
+                    }
+                    HubLink(title: "Model Groups", systemImage: "gearshape.circle.fill", color: .indigo) {
+                        ModelGroupsView()
+                    }
+                    HubLink(title: "Token Usage", systemImage: "chart.line.uptrend.xyaxis", color: .green) {
+                        UsageStatsView()
+                    }
+                }
+
+                Section(String(localized: "外观")) {
+                    HubLink(title: String(localized: "外观"), systemImage: "paintbrush.fill", color: .indigo) {
+                        AppearanceSettingsView()
+                    }
+                }
+
+                Section(String(localized: "权限")) {
+                    HubLink(title: String(localized: "权限"), systemImage: "lock.shield", color: .red) {
+                        OffloadPermissionSettingsView()
+                    }
+                    if BiometricAuth.isAvailable {
+                        HubLink(
+                            title: "\(BiometricAuth.biometryDisplayName) Protection",
+                            systemImage: BiometricAuth.biometryIconName,
+                            color: .teal
+                        ) {
+                            FaceIDProtectionSettingsView()
+                        }
+                    }
+                }
+
+                Section(String(localized: "诊断")) {
+                    HubLink(title: "Logs", systemImage: "doc.text", color: .gray) {
+                        LogManagementView()
+                    }
+                }
+
+                Section(String(localized: "关于")) {
+                    HubLink(title: "About Yima", systemImage: "info", color: .indigo) {
+                        AboutView()
+                    }
+                    Link(destination: URL(string: "https://openminis.github.io/privacy-policy.html")!) {
+                        SettingsHubLabel(title: "Privacy Policy", systemImage: "hand.raised", color: .teal)
+                    }
+                    Button {
+                        showFeedbackDialog = true
+                    } label: {
+                        SettingsHubLabel(title: "Feedback", systemImage: "bubble.left.and.bubble.right.fill", color: .indigo)
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .navigationTitle(String(localized: "我的"))
+            .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog("Feedback", isPresented: $showFeedbackDialog, titleVisibility: .visible) {
+                Button("Report a Bug (GitHub)") {
+                    if let url = SettingsSheet.makeBugReportURL() { UIApplication.shared.open(url) }
+                }
+                Button("Feedback (Telegram)") {
+                    if let url = URL(string: "https://t.me/+2NzhOJuzRyI1YmM1") { UIApplication.shared.open(url) }
+                }
+                Button("Feedback (Email)") {
+                    if let url = SettingsSheet.makeFeedbackEmailURL() { UIApplication.shared.open(url) }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+    }
+}
+
+private struct HubLink<Destination: View>: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+    @ViewBuilder let destination: () -> Destination
+
+    var body: some View {
+        NavigationLink {
+            destination()
+                .toolbar(.hidden, for: .tabBar)
+        } label: {
+            SettingsHubLabel(title: title, systemImage: systemImage, color: color)
+        }
+    }
+}
+
+private struct SettingsHubLabel: View {
+    let title: String
+    let systemImage: String
+    let color: Color
+
+    var body: some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(color, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+    }
+}
+
 // MARK: - Settings Sheet
 
 private enum SettingsDestination: Hashable {
@@ -5077,7 +5247,7 @@ struct SettingsSheet: View {
                         AboutView()
                     } label: {
                         Label {
-                            Text("About Minis")
+                            Text("About Yima")
                         } icon: {
                             Image(systemName: "info")
                                 .font(.system(size: 9))

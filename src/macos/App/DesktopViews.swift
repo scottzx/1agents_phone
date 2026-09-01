@@ -27,7 +27,7 @@ struct DesktopRootView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text("Minis for Mac")
+                Text("Yima for Mac")
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
@@ -98,7 +98,7 @@ struct DesktopRootView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("Minis")
+        .navigationTitle("Yima")
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button { Task { await model.createConversation() } } label: { Image(systemName: "square.and.pencil") }
@@ -228,7 +228,7 @@ private struct ChatColumn: View {
                 .foregroundStyle(.tint)
             Text("What would you like to work on?")
                 .font(.title3.weight(.semibold))
-            Text("Give Minis a goal, add file context, or drop a folder anywhere in the window to switch workspaces.")
+            Text("Give Yima a goal, add file context, or drop a folder anywhere in the window to switch workspaces.")
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -481,7 +481,7 @@ private struct WorkspaceDropConfirmation: View {
             Text(workspaceDrop.url.path)
                 .font(.body.monospaced())
                 .textSelection(.enabled)
-            Text("Minis will explicitly grant this folder and switch the current conversation to it. No files will be run or read by dropping the folder.")
+            Text("Yima will explicitly grant this folder and switch the current conversation to it. No files will be run or read by dropping the folder.")
                 .foregroundStyle(.secondary)
             HStack {
                 Spacer()

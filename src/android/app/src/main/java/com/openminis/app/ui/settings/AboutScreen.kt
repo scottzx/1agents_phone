@@ -74,7 +74,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 )
             }
             Text(
-                stringResource(R.string.app_name),
+                "Yima / 一伴",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -88,11 +88,18 @@ fun AboutScreen(onBack: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                stringResource(R.string.about_minis_tagline),
-                style = MaterialTheme.typography.bodyMedium,
+                "Your Intelligence Mates",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                "本项目基于 openminis (OpenMinis) 开源项目 Fork 开发。我们在此基础上，致力于打造 A2A（Agent-to-Agent）智能体协作网络。",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 24.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
 
@@ -100,13 +107,24 @@ fun AboutScreen(onBack: () -> Unit) {
             SettingsRow(
                 icon = Icons.Outlined.Code,
                 iconColor = tileBlue,
-                title = stringResource(R.string.about_github_repository),
-                // Settings → ABOUT siblings (Privacy Policy / Submit GitHub
-                // Issues) all use openExternalUrl directly. The
-                // LocalInAppBrowserLauncher ambient defaults to a no-op when
-                // no InAppBrowserHost is in the tree above this screen — and
-                // nothing wraps Settings, so the row used to be a dead tap.
+                title = "Yima (GitHub)",
+                onClick = { openExternalUrl(context, "https://github.com/scottzx/1agents_phone") },
+                trailing = { ExternalLinkIcon() },
+                showDivider = true,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Code,
+                iconColor = tileBlue,
+                title = "Upstream (OpenMinis)",
                 onClick = { openExternalUrl(context, "https://github.com/OpenMinis/OpenMinis") },
+                trailing = { ExternalLinkIcon() },
+                showDivider = true,
+            )
+            SettingsRow(
+                icon = Icons.Outlined.Code,
+                iconColor = tileBlue,
+                title = "Report an Issue",
+                onClick = { openExternalUrl(context, "https://github.com/scottzx/1agents_phone/issues") },
                 trailing = { ExternalLinkIcon() },
                 showDivider = false,
             )

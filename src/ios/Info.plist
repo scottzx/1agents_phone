@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDisplayName</key>
+	<string>Yima</string>
+	<key>CFBundleName</key>
+	<string>Yima</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
 		<key>iCloud.com.1agents.phone</key>
@@ -9,7 +13,7 @@
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
 			<key>NSUbiquitousContainerName</key>
-			<string>Minis</string>
+			<string>Yima</string>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>
 			<string>Any</string>
 		</dict>
@@ -158,7 +162,7 @@
 		</dict>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>Minis Share</string>
+			<string>Yima Share</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>minis</string>
@@ -174,14 +178,14 @@
 		</dict>
 	</array>
 	<key>NSAlarmKitUsageDescription</key>
-	<string>Minis uses AlarmKit so the AI agent can set alarms and timers on your behalf.</string>
+	<string>Yima uses AlarmKit so the AI agent can set alarms and timers on your behalf.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Minis uses Bluetooth to connect to your voice-input hardware device and relay its requests to the AI agent.</string>
+	<string>Yima uses Bluetooth to connect to your voice-input hardware device and relay its requests to the AI agent.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

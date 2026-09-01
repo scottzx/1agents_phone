@@ -7440,7 +7440,8 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack(path: $navPath) {
             List {
-                Section {\n                    NavigationLink {
+                Section {
+                    NavigationLink {
                         ProviderInstancesView()
                     } label: {
                         if #available(iOS 26, *) {

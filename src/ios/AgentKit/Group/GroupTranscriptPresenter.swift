@@ -52,11 +52,6 @@ protocol GroupTranscriptPresenting: AnyObject {
 final class IOSGroupTranscriptPresenter: GroupTranscriptPresenting {
     static let shared = IOSGroupTranscriptPresenter()
 
-    /// A structured tool call is projected before its readable public line.
-    /// Remember that line briefly so `append` does not also create a legacy
-    /// mention-fallback receipt for the same delivery.
-    private var structuredA2AMessages: [String: Int] = [:]
-
     private init() {}
 
     func append(sessionId: String, senderAgentId: String?, text: String, isUser: Bool) {
@@ -66,23 +61,6 @@ final class IOSGroupTranscriptPresenter: GroupTranscriptPresenting {
             if !isUser { message.blocks = [AssistantBlock(kind: .text, content: text)] }
             vm.messages.append(message)
         }
-
-        guard !isUser, let senderAgentId else { return }
-        let key = a2aKey(sessionId: sessionId, senderAgentId: senderAgentId, message: text)
-        if let count = structuredA2AMessages[key], count > 0 {
-            structuredA2AMessages[key] = count == 1 ? nil : count - 1
-            return
-        }
-
-        // Compatibility path for models which ignore the tool requirement and
-        // emit plain @name text. The router already honors that text; surface
-        // the same delivery as a debuggable card instead of making it look as
-        // though nothing happened.
-        Task { await appendMentionFallbackIfNeeded(
-            groupSessionId: sessionId,
-            senderAgentId: senderAgentId,
-            message: text
-        ) }
     }
 
     /// Add a user-visible delivery receipt to the shared room. The actual
@@ -95,8 +73,7 @@ final class IOSGroupTranscriptPresenter: GroupTranscriptPresenting {
         recipients: [GroupA2ADeliveryDestination],
         message: String,
         requestedAgentIds: [String],
-        deliveryMode: String = "tool",
-        projectedMessage: String? = nil
+        deliveryMode: String = "tool"
     ) async {
         let names = recipients.map(\.name).joined(separator: "、")
         let title = names.isEmpty ? "发送群聊消息" : "发送给 \(names)"
@@ -119,14 +96,6 @@ final class IOSGroupTranscriptPresenter: GroupTranscriptPresenting {
             output = "检测到普通 @ 文本，已按兼容路由投递给 \(names)。点击卡片可查看对应成员会话。"
         } else {
             output = "已投递给 \(names)。点击卡片可查看对应成员会话。"
-        }
-        if let projectedMessage {
-            let key = a2aKey(
-                sessionId: groupSessionId,
-                senderAgentId: senderAgentId,
-                message: projectedMessage
-            )
-            structuredA2AMessages[key, default: 0] += 1
         }
         var raw = RawMessage(
             id: UUID().uuidString,
@@ -164,50 +133,6 @@ final class IOSGroupTranscriptPresenter: GroupTranscriptPresenting {
         visible.senderAgentId = senderAgentId
         visible.blocks = [block]
         vm.messages.append(visible)
-    }
-
-    private func appendMentionFallbackIfNeeded(
-        groupSessionId: String,
-        senderAgentId: String,
-        message: String
-    ) async {
-        guard let group = await GroupStore.shared.groupForSession(groupSessionId) else { return }
-        let members = await GroupStore.shared.members(of: group)
-        let scan = GroupMentionRouter.parseMentions(in: message, members: members)
-        let targetIds: [String]
-        let requestedIds: [String]
-        if scan.isEveryone, senderAgentId == group.ownerAgentId {
-            targetIds = members.map(\.id).filter { $0 != senderAgentId }
-            requestedIds = [GroupMentionRouter.everyoneId]
-        } else {
-            targetIds = scan.memberIds.filter { $0 != senderAgentId }
-            requestedIds = targetIds
-        }
-        guard !targetIds.isEmpty else { return }
-
-        let targetSet = Set(targetIds)
-        var destinations: [GroupA2ADeliveryDestination] = []
-        for recipient in members where targetSet.contains(recipient.id) {
-            let sessionId = await GroupStore.shared.openMemberSession(group: group, agentId: recipient.id)
-            destinations.append(GroupA2ADeliveryDestination(
-                agentId: recipient.id,
-                name: recipient.name,
-                sessionId: sessionId
-            ))
-        }
-        await appendA2ADelivery(
-            groupSessionId: groupSessionId,
-            senderAgentId: senderAgentId,
-            groupId: group.id,
-            recipients: destinations,
-            message: message,
-            requestedAgentIds: requestedIds,
-            deliveryMode: "mention_fallback"
-        )
-    }
-
-    private func a2aKey(sessionId: String, senderAgentId: String, message: String) -> String {
-        "\(sessionId)|\(senderAgentId)|\(message)"
     }
 
     func setBusy(sessionId: String, _ busy: Bool) {

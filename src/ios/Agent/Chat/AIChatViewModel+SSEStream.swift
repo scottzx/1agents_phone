@@ -1328,8 +1328,8 @@ extension AIChatViewModel {
         return dict[key] as? String
     }
 
-    /// Parse tool use JSON into command, optional timeout, and optional delay.
-    func parseToolInput(from json: String) -> (command: String, timeout: TimeInterval, delay: TimeInterval) {
+    /// Parse tool use JSON into command, optional timeout, optional delay, and optional is_background.
+    func parseToolInput(from json: String) -> (command: String, timeout: TimeInterval, delay: TimeInterval, isBackground: Bool) {
         // Two failure modes are folded together: (a) JSON itself is invalid
         // (rare; would mean the provider's accumulated tool args were
         // truncated mid-stream) and (b) JSON parses fine but is missing the
@@ -1342,11 +1342,12 @@ extension AIChatViewModel {
         guard let data = json.data(using: .utf8),
               let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let command = dict["command"] as? String else {
-            return ("", defaultCommandTimeout, 0)
+            return ("", defaultCommandTimeout, 0, false)
         }
         let timeout = (dict["timeout"] as? NSNumber).map { TimeInterval($0.doubleValue) } ?? defaultCommandTimeout
         let delay = (dict["delay"] as? NSNumber).map { TimeInterval($0.doubleValue) } ?? 0
-        return (command, timeout, delay)
+        let isBackground = (dict["is_background"] as? Bool) ?? false
+        return (command, timeout, delay, isBackground)
     }
 
 }

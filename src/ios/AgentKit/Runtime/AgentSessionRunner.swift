@@ -117,6 +117,7 @@ public struct AgentSessionStatus: Sendable, Equatable {
 public protocol AgentSessionRunning: AnyObject {
     func createSession(_ request: AgentSessionCreateRequest) async -> String?
     func run(_ request: AgentSessionRunRequest) async -> AgentSessionRunResult
+    func resumeAfterAsyncToolResults(sessionId: String) async -> AgentSessionRunResult
     func status(sessionId: String) async -> AgentSessionStatus
     func isRunning(sessionId: String) async -> Bool
     func cancel(sessionId: String)

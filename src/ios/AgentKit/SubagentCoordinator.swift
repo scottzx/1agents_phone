@@ -22,6 +22,7 @@ final class LocalSubagentExecutor: SubagentExecutor {
     private let sessionRunner: any AgentSessionRunning
     private var runTasks: [String: Task<Void, Never>] = [:]
     private var runGenerations: [String: UUID] = [:]
+    private var tasks: [String: SubagentTask] = [:]
 
     /// Dispatch times, used to tell "not started yet" from "finished".
     /// SessionActivityTracker only flips to active once the loop is genuinely
@@ -47,6 +48,14 @@ final class LocalSubagentExecutor: SubagentExecutor {
             toolPolicy: AgentToolPolicy.standalone.rawValue,
             inheritModelFromSessionId: task.parentSessionId
         )), !sid.isEmpty else { throw SubagentError.sessionUnavailable }
+        tasks[sid] = SubagentTask(
+            id: sid,
+            parentSessionId: task.parentSessionId,
+            agentId: task.agentId,
+            title: task.title,
+            prompt: task.prompt,
+            createdAt: task.createdAt
+        )
         dispatchedAt[sid] = Date()
         startRun(sessionId: sid, prompt: task.prompt)
         logger.info("spawned subagent task=\(sid.prefix(8)) parent=\(task.parentSessionId.prefix(8))")
@@ -150,6 +159,17 @@ final class LocalSubagentExecutor: SubagentExecutor {
         runGenerations.removeValue(forKey: taskId)
         let partial = await sessionRunner.status(sessionId: taskId).lastAssistantText
         await ChatStore.shared.updateSpawnOutcome(taskId, status: "stopped", result: partial)
+        if let parentSessionId = tasks[taskId]?.parentSessionId, !parentSessionId.isEmpty {
+            await AsyncTaskNoticeManager.shared.postNotice(
+                sourceSessionId: parentSessionId,
+                taskType: "subagent",
+                taskId: taskId,
+                title: tasks[taskId]?.title,
+                status: "stopped",
+                result: partial ?? String(localized: "任务已被终止。"),
+                filesPath: OrchestratorPrompt.taskDeliveryDir(taskId: taskId)
+            )
+        }
         dispatchedAt[taskId] = nil
     }
 
@@ -172,13 +192,36 @@ final class LocalSubagentExecutor: SubagentExecutor {
             runGenerations[sessionId] = nil
             dispatchedAt[sessionId] = nil
             if result.cancelled { return }
+
+            let taskInfo = tasks[sessionId]
+            let parentSessionId = taskInfo?.parentSessionId
+            let taskTitle = taskInfo?.title
+            let filesDir = OrchestratorPrompt.taskDeliveryDir(taskId: sessionId)
+
+            let statusStr: String
+            let resultText: String
             if result.accepted, !result.timedOut, let text = result.text, !text.isEmpty {
+                statusStr = "done"
+                resultText = text
                 await ChatStore.shared.updateSpawnOutcome(sessionId, status: "done", result: text)
             } else {
-                let reason = result.timedOut
+                statusStr = "failed"
+                resultText = result.timedOut
                     ? String(localized: "子任务执行超时。")
                     : String(localized: "子任务没有产生任何结果就结束了。")
-                await ChatStore.shared.updateSpawnOutcome(sessionId, status: "failed", result: reason)
+                await ChatStore.shared.updateSpawnOutcome(sessionId, status: "failed", result: resultText)
+            }
+
+            if let parentSessionId, !parentSessionId.isEmpty {
+                await AsyncTaskNoticeManager.shared.postNotice(
+                    sourceSessionId: parentSessionId,
+                    taskType: "subagent",
+                    taskId: sessionId,
+                    title: taskTitle,
+                    status: statusStr,
+                    result: resultText,
+                    filesPath: filesDir
+                )
             }
         }
     }
@@ -223,6 +266,7 @@ final class SubagentCoordinator {
     private func handleSpawn(input: [String: Any], parentSessionId: String, agentId: String?) async -> String {
         let title = (input["task_title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let prompt = (input["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let runInBackground = (input["run_in_background"] as? Bool) ?? true
         guard !prompt.isEmpty else {
             return "Error: `prompt` is required and must describe the task in full. The subagent starts with no context."
         }
@@ -243,18 +287,40 @@ final class SubagentCoordinator {
             return "Failed to start the task: \(error.localizedDescription)"
         }
 
-        return """
-            Task started.
-            task_id: \(taskId)
-            title: \(task.title)
-            status: running
-            files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
+        if runInBackground {
+            return """
+                Task started.
+                task_id: \(taskId)
+                title: \(task.title)
+                status: running
+                files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
 
-            It is working in the background now. Call check_subagent with this \
-            task_id (use wait_seconds to park until it lands) and deliver the \
-            result to the user in this same turn — nothing runs once your turn ends. \
-            Any files it produces land in the directory above, which you can file_read.
-            """
+                It is working in the background now. You will be automatically notified via async_task_notice when it finishes. Any files it produces land in the directory above, which you can file_read. You may end your turn now.
+                """
+        } else {
+            let snapshot = await executor.wait(taskId: taskId, seconds: 30)
+            if snapshot.isTerminal {
+                return """
+                    task_id: \(taskId)
+                    title: \(task.title)
+                    status: \(snapshot.state.rawValue)
+                    files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
+
+                    Result:
+                    \(snapshot.result ?? "")
+                    """
+            } else {
+                return """
+                    Task started.
+                    task_id: \(taskId)
+                    title: \(task.title)
+                    status: running
+                    files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
+
+                    The task is still running after 30 seconds and has been moved to the background. You will be automatically notified via async_task_notice when it finishes.
+                    """
+            }
+        }
     }
 
     private func handleCheck(input: [String: Any]) async -> String {

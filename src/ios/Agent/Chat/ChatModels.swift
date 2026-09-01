@@ -92,6 +92,9 @@ final class ChatMessage: Identifiable, ObservableObject {
         self.isQueued = isQueued
     }
 
+    /// True when this message is a synthetic async_task_notice that must never render as a chat bubble.
+    var isSyntheticNotice: Bool = false
+
     /// [T-bridge-message-ui-leak] True when this UI message is the internal
     /// role-alternation bridge (#579) that must never render as a chat bubble.
     /// The bridge is filtered out of the DB-reload path (loadSession), but a
@@ -111,6 +114,19 @@ final class ChatMessage: Identifiable, ObservableObject {
             return true
         }
         return false
+    }
+
+    /// True when this UI message is an async task notice (synthetic tool_use) that should be hidden in UI.
+    var isAsyncTaskNotice: Bool {
+        if isSyntheticNotice { return true }
+        guard role == .assistant else { return false }
+        if blocks.isEmpty { return false }
+        return blocks.allSatisfy { block in
+            if case .subagentTool(let action, _) = block.kind {
+                return action == ChatPersistenceSchema.asyncTaskNoticeToolName
+            }
+            return false
+        }
     }
 
     /// [T-ios-typing-indicator-scope] Whether the typing indicator should be

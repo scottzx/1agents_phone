@@ -340,13 +340,18 @@ public actor GroupChatEngine {
             await events.emit(.memberFinished(roomID: room.id, memberID: participant.id, text: nil, skipped: true))
             return nil
         }
-        await repository.appendMember(room: room, memberID: participant.id, text: text)
+        // Models address peers with readable `@agent_name` text. Resolve that
+        // public form once at the message boundary so persistence and every
+        // later queue pass carry stable member ids, while presenters render the
+        // same readable names back to people.
+        let canonical = GroupMentionRouter.encode(text, members: room.members.map(\.member))
+        await repository.appendMember(room: room, memberID: participant.id, text: canonical)
         guard isCurrent(room.id, epoch), !Task.isCancelled else { return nil }
         if enqueueReply {
-            pendingMessages[room.id, default: []].append(.message(.member(participant.id, text)))
+            pendingMessages[room.id, default: []].append(.message(.member(participant.id, canonical)))
         }
-        await events.emit(.memberFinished(roomID: room.id, memberID: participant.id, text: text, skipped: false))
-        return text
+        await events.emit(.memberFinished(roomID: room.id, memberID: participant.id, text: canonical, skipped: false))
+        return canonical
     }
 
     private func materialize(_ pending: PendingMessage, room: GroupChatRoom) async -> GroupMessage? {

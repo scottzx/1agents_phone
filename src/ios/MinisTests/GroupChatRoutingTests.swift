@@ -1,5 +1,6 @@
 #if DEBUG
 import XCTest
+@testable import Minis
 
 /// Routing and projection tests for group chat.
 ///
@@ -423,6 +424,7 @@ final class GroupChatRoutingTests: XCTestCase {
         )
         XCTAssertFalse(addressed.contains("要点名某位同事接着说"),
                        "话是冲着一个人来的，就不该再教它把话头递出去——递了也不会有人接")
+        XCTAssertFalse(addressed.contains("@完整名字"))
         XCTAssertTrue(addressed.contains("这一轮到你为止"))
 
         // `@所有人` is the one case that still relays: the user picked nobody.
@@ -433,7 +435,7 @@ final class GroupChatRoutingTests: XCTestCase {
             allMembers: cast,
             newMessages: [.user("\(GroupMentionRouter.everyoneToken) 大家怎么看？")]
         )
-        XCTAssertTrue(broadcast.contains("要点名某位同事接着说"),
+        XCTAssertTrue(broadcast.contains("要请某位同事接着说"),
                       "@所有人 的场合仍然靠成员之间的 @ 接力往下走")
     }
 
@@ -477,21 +479,22 @@ final class GroupChatRoutingTests: XCTestCase {
         let ownerBlock = GroupChatPrompt.memberSystemBlock(
             member: host, groupId: "g-product", groupTitle: "产品圆桌", mode: .freeform, isOwner: true,
             peers: [market, product, tech])
-        XCTAssertTrue(ownerBlock.contains("[\"at_all\"]"),
-                      "群主要被告知招呼全体的确切 tool 写法")
+        XCTAssertTrue(ownerBlock.contains("`@所有人`"),
+                      "群主要被告知招呼全体的可读写法")
         XCTAssertTrue(ownerBlock.contains("g-product"))
-        // The peer list is the ONLY place a member is shown the ids it needs
-        // in order to send an A2A group message, so every peer must appear.
+        XCTAssertFalse(ownerBlock.contains("send_agent_message"))
+        // The peer list is the source of the exact names a member may copy into
+        // its public final response.
         for peer in [market, product, tech] {
-            XCTAssertTrue(ownerBlock.contains(peer.name), peer.name)
-            XCTAssertTrue(ownerBlock.contains(peer.id), peer.id)
+            XCTAssertTrue(ownerBlock.contains("@\(peer.name)"), peer.name)
+            XCTAssertFalse(ownerBlock.contains(peer.id), peer.id)
         }
 
         let memberBlock = GroupChatPrompt.memberSystemBlock(
             member: tech, groupId: "g-product", groupTitle: "产品圆桌", mode: .freeform, isOwner: false,
             peers: [market, product, host])
         XCTAssertTrue(memberBlock.contains("只有群主能招呼所有人"))
-        XCTAssertFalse(memberBlock.contains("[\"at_all\"]"),
+        XCTAssertFalse(memberBlock.contains("`@所有人`"),
                        "非群主不该被教会一个对它无效的写法")
     }
 

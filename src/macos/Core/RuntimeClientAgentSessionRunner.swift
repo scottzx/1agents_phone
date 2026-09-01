@@ -53,6 +53,10 @@ final class RuntimeClientAgentSessionRunner: AgentSessionRunning {
         }
     }
 
+    func resumeAfterAsyncToolResults(sessionId: String) async -> AgentSessionRunResult {
+        await run(AgentSessionRunRequest(sessionId: sessionId, prompt: ""))
+    }
+
     func cancel(sessionId: String) {
         Task { try? await client.request(RuntimeRequest(method: "session.cancel", sessionID: sessionId)) }
     }

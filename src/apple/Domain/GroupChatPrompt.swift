@@ -125,7 +125,7 @@ public enum GroupChatPrompt {
                 + formatHistory(newMessages, viewerId: member.id, members: allMembers)
 
         let closing = allowHandoff
-            ? "要点名某位同事接着说，用系统提示里说明的 send_agent_message 群聊参数发出这句话——不点名的话没有人会被叫醒，这一轮就结束了。"
+            ? "要请某位同事接着说，直接在最终回复里按 `@完整名字` 点名（例如 `@市场专家`）。系统会解析这个消息块并把对方的会话加入队列；不点名就不会叫醒其他人，这一轮到此结束。"
             : "用户这句是冲着你来的，直接把话说完就行——这一轮到你为止，不用把话头递给别人，也不用 @ 任何人。"
 
         return """
@@ -201,8 +201,9 @@ public enum GroupChatPrompt {
 
     /// Prepended to a member's own persona while it is taking a group turn.
     ///
-    /// Peers are listed by name and id because a member hands off with the
-    /// structured A2A tool and must not guess either identifier.
+    /// Peers are listed with their exact readable mention. A member hands off
+    /// in its final text; the engine resolves that name and canonicalizes it to
+    /// the stable id before persistence and routing.
     public static func memberSystemBlock(
         member: GroupMember,
         groupId: String,
@@ -223,31 +224,30 @@ public enum GroupChatPrompt {
             lines.append("目前群里只有你和用户。")
         } else {
             lines.append("")
-            lines.append("群里的其他人，以及群聊 A2A tool 里要传的 agent_id：")
+            lines.append("群里的其他人（要请对方接话时，请原样使用开头的 @名字）：")
             for peer in peers {
                 let role = peer.title.isEmpty ? "" : "（\(peer.title)）"
                 let about = peer.summary.isEmpty ? "" : " — \(peer.summary)"
-                lines.append("- \(peer.name)\(role)\(about)　→　`\(peer.id)`")
+                lines.append("- @\(peer.name)\(role)\(about)")
             }
         }
 
         lines.append("")
         lines.append("规矩：")
-        lines.append("- 如果你不调用群聊 A2A tool，你这一轮的**最终文字**就是群里看到的全部。工具调用、思考过程、中间步骤都留在你自己这边，别人看不到，所以结论要能独立成立。")
+        lines.append("- 你这一轮的**最终文字**就是群里看到的完整消息。工具调用、思考过程、中间步骤都留在你自己这边，别人看不到，所以结论要能独立成立。")
         lines.append("- 说话简短、像人在聊天。不要复述别人刚说过的话，不要总结全场——那是主持人的事。")
         lines.append("- 没有新东西要补充就只回「(pass)」。在群里保持安静是合格的表现，凑话不是。")
 
         if mode == .freeform {
             lines.append(
-                "- 要让同事接着说，调用 `send_agent_message`："
-                    + "`is_group` 传 true，`group_id` 必须原样传 `\(groupId)`，`agent_id` 以列表传上面一个或多个 id，"
-                    + "`message` 就是你要在共享记录里公开说的话。不要再把 @ 写进 message。"
+                "- 要让同事接着说，直接在最终回复中写 `@完整名字`，后面跟你要公开说的话。"
+                    + "可以同时点名多位同事；系统会按这一个消息块识别目标，创建或打开对应成员会话，再进入消息队列。"
             )
-            lines.append("- 群聊 A2A tool 成功后，`message` 已经作为你本轮的公开发言被发出；最终文字只回「(pass)」，不要重复、改写或追加另一条消息。")
-            lines.append("- 没有在 `agent_id` 列表里的人不会被叫醒。这一轮不调用群聊 A2A tool，讨论就到此为止——这是正常的结束方式。")
+            lines.append("- 群消息只通过最终回复发送，不经过额外的消息工具；也不要在点名后另外回「(pass)」。带 @点名的最终回复本身就是公开发言和路由指令。")
+            lines.append("- 没有被 @点名的人不会被叫醒。这一轮不点名任何人，讨论就到此为止——这是正常的结束方式。")
             if isOwner {
                 lines.append(
-                    "- 你是群主，只有你可以在群聊 A2A tool 里传 `agent_id: [\"at_all\"]` 把全体叫起来。"
+                    "- 你是群主，可以在最终回复里写 `@所有人` 把全体叫起来。"
                         + "用之前想清楚是不是真的每个人都该说话。"
                 )
             } else {

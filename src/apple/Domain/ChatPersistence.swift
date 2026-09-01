@@ -413,6 +413,57 @@ public struct RawMessage: Identifiable, Codable, Hashable, Sendable {
         guard role == .assistant, parts.count == 1, case .text(let value) = parts[0] else { return false }
         return Self.isInternalBridgeText(value)
     }
+
+    public var isAsyncTaskNotice: Bool {
+        guard role == .assistant, !parts.isEmpty else { return false }
+        return parts.allSatisfy {
+            if case .toolUse(let tu) = $0 {
+                return tu.name == ChatPersistenceSchema.asyncTaskNoticeToolName
+            }
+            return false
+        }
+    }
+}
+
+/// A pending or delivered asynchronous background task completion notice.
+public struct AsyncTaskNotice: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public let sourceSessionId: String
+    public let taskType: String       // "shell" | "subagent" | "a2a" | "group"
+    public let taskId: String
+    public let title: String?
+    public let status: String         // "done" | "failed" | "stopped"
+    public let result: String
+    public let filesPath: String?
+    public let createdAt: Date
+    public var isDelivered: Bool
+    public var deliveredAt: Date?
+
+    public init(
+        id: String,
+        sourceSessionId: String,
+        taskType: String,
+        taskId: String,
+        title: String? = nil,
+        status: String = "done",
+        result: String,
+        filesPath: String? = nil,
+        createdAt: Date = Date(),
+        isDelivered: Bool = false,
+        deliveredAt: Date? = nil
+    ) {
+        self.id = id
+        self.sourceSessionId = sourceSessionId
+        self.taskType = taskType
+        self.taskId = taskId
+        self.title = title
+        self.status = status
+        self.result = result
+        self.filesPath = filesPath
+        self.createdAt = createdAt
+        self.isDelivered = isDelivered
+        self.deliveredAt = deliveredAt
+    }
 }
 
 // MARK: - Shared schema contract
@@ -420,8 +471,10 @@ public struct RawMessage: Identifiable, Codable, Hashable, Sendable {
 /// The stable base of the historical iOS SQLite schema. Platform stores may
 /// add indexes and columns, but these names and wire formats cannot be renamed.
 public enum ChatPersistenceSchema {
+    public static let asyncTaskNoticeToolName = "async_task_notice"
     public static let sessionsTable = "sessions"
     public static let messagesTable = "messages"
+    public static let asyncTaskNoticesTable = "async_task_notices"
 
     public static let createSessionsSQL = """
         CREATE TABLE IF NOT EXISTS sessions (
@@ -447,6 +500,25 @@ public enum ChatPersistenceSchema {
 
     public static let createMessageIndexSQL =
         "CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, sort_order)"
+
+    public static let createAsyncTaskNoticesSQL = """
+        CREATE TABLE IF NOT EXISTS async_task_notices (
+            id                TEXT PRIMARY KEY,
+            source_session_id TEXT NOT NULL,
+            task_type         TEXT NOT NULL,
+            task_id           TEXT NOT NULL,
+            title             TEXT,
+            status            TEXT NOT NULL,
+            result            TEXT NOT NULL,
+            files_path        TEXT,
+            created_at        REAL NOT NULL,
+            is_delivered      INTEGER NOT NULL DEFAULT 0,
+            delivered_at      REAL
+        )
+        """
+
+    public static let createAsyncTaskNoticesIndexSQL =
+        "CREATE INDEX IF NOT EXISTS idx_async_notices_session ON async_task_notices(source_session_id, is_delivered)"
 }
 
 // MARK: - Repository contract

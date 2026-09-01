@@ -5331,12 +5331,12 @@ private struct SessionLockGateOverlay: View {
                     .font(.system(size: 56, weight: .light))
                     .foregroundStyle(.secondary)
 
-                Text("This session is locked")
+                Text(String(localized: "This session is locked"))
                     .font(.system(size: 18, weight: .semibold))
 
                 Text(attemptFailed
-                     ? "Authentication failed. Tap to try again."
-                     : "Tap to unlock with \(BiometricAuth.biometryDisplayName)")
+                     ? String(localized: "Authentication failed. Tap to try again.")
+                     : String(format: String(localized: "Tap to unlock with %@"), BiometricAuth.biometryDisplayName))
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

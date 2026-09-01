@@ -2282,12 +2282,10 @@ extension CollectionViewMessageListV3 {
             // [T-bridge-message-ui-leak] Single UI-collection sink for EVERY
             // path that pushes messages to the list (loadSession, live inject,
             // compact rebuild, snapshot reload, rebind…). Filter the internal
-            // role-alternation bridge (#579) here so it can never surface as a
-            // chat bubble regardless of which path produced it — replacing the
-            // former reliance on a single filter inside loadSession, which other
-            // rebuild paths bypassed (the leak seen 2026-07-24).
-            let messages = rawMessages.contains(where: { $0.isInternalBridge })
-                ? rawMessages.filter { !$0.isInternalBridge }
+            // role-alternation bridge (#579) and synthetic async task notices here so they can never surface as a
+            // chat bubble regardless of which path produced it.
+            let messages = rawMessages.contains(where: { $0.isInternalBridge || $0.isAsyncTaskNotice })
+                ? rawMessages.filter { !$0.isInternalBridge && !$0.isAsyncTaskNotice }
                 : rawMessages
 
             // Content changed (new/removed messages) — the up-button's turn-walk

@@ -269,10 +269,14 @@ final class AgentDirectoryCoordinator {
         SessionBadgeStore.shared.pushFront(.unread, for: targetSession)
         logger.info("relayed message to agent=\(targetId.prefix(8)) wait=\(waitSeconds)s interrupt=\(interrupt)")
 
-        guard waitSeconds > 0 else {
+        let isBackground = (input["is_background"] as? Bool) ?? (waitSeconds == 0)
+
+        guard !isBackground && waitSeconds > 0 else {
+            let targetAgentName = target.name
+            let targetAgentId = targetId
             Task { [weak self] in
                 guard let self else { return }
-                _ = await sessionRunner.run(AgentSessionRunRequest(
+                let result = await sessionRunner.run(AgentSessionRunRequest(
                     sessionId: targetSession,
                     prompt: inbound,
                     agentId: targetId,
@@ -282,12 +286,20 @@ final class AgentDirectoryCoordinator {
                     timeoutSeconds: TimeInterval(AgentDirectoryTools.maxWaitSeconds)
                 ))
                 relayOrigin[targetSession] = nil
+
+                let statusStr = (result.accepted && !result.timedOut && result.text?.isEmpty == false) ? "done" : "failed"
+                let replyText = result.text ?? (result.timedOut ? String(localized: "对方回复超时。") : String(localized: "对方未产生有效文本回复。"))
+                await AsyncTaskNoticeManager.shared.postNotice(
+                    sourceSessionId: callerSessionId,
+                    taskType: "a2a",
+                    taskId: targetAgentId,
+                    title: targetAgentName,
+                    status: statusStr,
+                    result: replyText
+                )
             }
             return """
-                Message delivered to \(target.name). You did not wait, so its \
-                reply goes to its own conversation and you will not see it — \
-                send with wait_seconds if you need the answer. Do not tell the \
-                user you will report back on what it says.
+                Message delivered to \(target.name). It is answering in the background; you will be automatically notified via async_task_notice when its reply is ready. You may end your turn now.
                 """
         }
 
@@ -408,8 +420,7 @@ final class AgentDirectoryCoordinator {
             groupId: group.id,
             recipients: destinations,
             message: message,
-            requestedAgentIds: atAll ? [GroupMentionRouter.everyoneId] : targets,
-            projectedMessage: GroupMentionRouter.render(canonical, members: members)
+            requestedAgentIds: atAll ? [GroupMentionRouter.everyoneId] : targets
         )
 
         if callerGroupId == groupId {
@@ -425,7 +436,8 @@ final class AgentDirectoryCoordinator {
             group: group,
             sender: sender,
             members: members,
-            canonicalText: canonical
+            canonicalText: canonical,
+            callerSessionId: callerSessionId
         )
         logger.info("posted external group A2A group=\(groupId.prefix(8)) sender=\(senderId.prefix(8)) targets=\(targets.count) all=\(atAll)")
         return "Message posted to group \(group.title). The group orchestrator will project the updated shared context to the addressed members."

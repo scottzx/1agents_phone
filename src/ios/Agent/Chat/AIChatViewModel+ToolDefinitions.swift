@@ -1,32 +1,5 @@
 import Foundation
 
-/// A group member gets the same public `send_agent_message` verb as a normal
-/// chat, but with a narrower schema. Conditional private/group fields were
-/// easy for smaller OpenAI-compatible models to ignore, producing a visible
-/// `@名字` sentence instead of a tool call. Requiring `group_id` and removing
-/// private-only knobs makes the group contract unambiguous without changing
-/// the unified tool semantics.
-enum GroupA2AToolDefinitions {
-    static func make(from directoryTools: [AgentToolDefinition]) -> [AgentToolDefinition] {
-        guard let list = directoryTools.first(where: { $0.name == "list_agents" }),
-              let send = directoryTools.first(where: { $0.name == "send_agent_message" }) else {
-            return []
-        }
-
-        let groupParameters = send.parameters.filter { key, _ in
-            key != "wait_seconds" && key != "interrupt"
-        }
-        let groupSend = AgentToolDefinition(
-            name: send.name,
-            description: "Send the current public group utterance to one or more group members. In this group session is_group MUST be true, group_id MUST be copied from the group context, agent_id MUST be a JSON list, and message MUST contain plain prose without @ mentions. Use [\"at_all\"] only when the current assistant is the group owner. This tool call, not visible @name text, is what wakes the recipients.",
-            parameters: groupParameters,
-            required: ["tool_title", "is_group", "group_id", "agent_id", "message"],
-            propertyOrdering: ["tool_title", "is_group", "group_id", "agent_id", "message"]
-        )
-        return [list, groupSend]
-    }
-}
-
 // MARK: - Tool Definitions (Canonical)
 
 extension AIChatViewModel {
@@ -104,16 +77,14 @@ extension AIChatViewModel {
         // dispatched task, which is the same unbounded-graph problem that
         // keeps `spawn_subagent` off executors.
         //
-        // A group member keeps list + send. send_agent_message switches to its
-        // explicit `is_group + group_id + agent_id[]` shape there and publishes through the
-        // shared transcript; create_agent stays out because changing the roster
-        // is unrelated to taking a group turn.
-        if agentRole == .main {
-            if groupId == nil {
-                tools.append(contentsOf: AgentDirectoryTools.definitions)
-            } else {
-                tools.append(contentsOf: GroupA2AToolDefinitions.make(from: AgentDirectoryTools.definitions))
-            }
+        // A group-member turn deliberately gets none of these. Its final text
+        // is already a public group message; `@agent_name` mentions in that
+        // text are parsed by GroupChatEngine and create the recipients' queued
+        // member turns. Exposing send_agent_message here would create a second,
+        // tool-shaped path for the same utterance and leak a tool card into the
+        // shared transcript.
+        if agentRole == .main, groupId == nil {
+            tools.append(contentsOf: AgentDirectoryTools.definitions)
         }
 
         // History search — everyone except orchestrators, which is to say every
@@ -136,9 +107,10 @@ extension AIChatViewModel {
                         "command": AgentToolParam(type: .string, description: "The shell command to execute. Supports multi-line commands directly — no special escaping needed. Keep under 1000 chars; for longer scripts, write to a file with file_write first, then run it."),
                         "timeout": AgentToolParam(type: .integer, description: "Timeout in seconds (default: 900). Use a larger value for long-running commands like package installs."),
                         "delay": AgentToolParam(type: .integer, description: "Delay in seconds before execution begins. The tool blocks the agent flow during this wait WITHOUT occupying the iSH shell, so other concurrent tasks can use it. Use this instead of sleep commands to avoid resource contention."),
+                        "is_background": AgentToolParam(type: .boolean, description: "Set to true for long-running commands that should run in the background (e.g. dev servers, long builds, package downloads). Returns a task_id immediately while the command keeps running in the background; you are notified on completion, so do not poll or sleep-wait for it."),
                     ],
                     required: ["tool_title", "command"],
-                    propertyOrdering: ["tool_title", "command", "timeout", "delay"]
+                    propertyOrdering: ["tool_title", "command", "timeout", "delay", "is_background"]
                 )
             )
         }

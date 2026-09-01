@@ -87,10 +87,11 @@ enum AgentDirectoryTools {
                     "agent_id": AgentToolParam(type: .stringArray, description: "Recipients as a list of agent ids. In group mode every id must be a member. Group owners use [\"at_all\"] to address everyone; if it appears alongside ids, at_all wins."),
                     "message": AgentToolParam(type: .string, description: "What you want to say. Self-contained — it starts with none of your context. Write it as one colleague to another, in the user's language, and say plainly what you want back."),
                     "wait_seconds": AgentToolParam(type: .integer, description: "Private mode only: seconds to wait for the reply (default 0, max 240). Group mode is routed by the group orchestrator and does not return peer replies through this tool call."),
+                    "is_background": AgentToolParam(type: .boolean, description: "Private mode only: whether to send asynchronously in the background. Defaults to true. When true, returns immediately with delivery confirmation and notifies you via async_task_notice when the recipient replies; when false (or when wait_seconds > 0), waits in the current turn."),
                     "interrupt": AgentToolParam(type: .boolean, description: "Private mode only: if true, interrupt a busy recipient before delivery. Never applies to group mode."),
                 ],
                 required: ["tool_title", "is_group", "agent_id", "message"],
-                propertyOrdering: ["tool_title", "is_group", "group_id", "agent_id", "message", "wait_seconds", "interrupt"]
+                propertyOrdering: ["tool_title", "is_group", "group_id", "agent_id", "message", "wait_seconds", "is_background", "interrupt"]
             ),
         ]
     }

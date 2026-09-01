@@ -17,7 +17,33 @@ final class GroupChatEngineTests: XCTestCase {
         XCTAssertFalse(AgentInboundMessageClassifier.shouldRenderMarkdown("**human-authored markdown markers**"))
     }
 
-    func testStructuredA2APublishedLineUsesRenderedIdentity() throws {
+    func testGroupPromptUsesReadableMentionsWithoutMessageToolCalls() {
+        let owner = GroupMember(id: "a", name: "产品经理", title: "", emoji: "", accentColor: "", summary: "", slot: 0)
+        let peer = GroupMember(id: "b", name: "市场专家", title: "", emoji: "", accentColor: "", summary: "", slot: 1)
+        let system = GroupChatPrompt.memberSystemBlock(
+            member: owner,
+            groupId: "group",
+            groupTitle: "Room",
+            mode: .freeform,
+            isOwner: true,
+            peers: [peer]
+        )
+        let turn = GroupChatPrompt.turnPrompt(
+            member: owner,
+            groupTitle: "Room",
+            peers: [peer],
+            allMembers: [owner, peer],
+            newMessages: [.user("<@a> 说说")]
+        )
+
+        XCTAssertTrue(system.contains("@市场专家"))
+        XCTAssertTrue(system.contains("`@所有人`"))
+        XCTAssertFalse(system.contains("send_agent_message"))
+        XCTAssertTrue(turn.contains("@完整名字"))
+        XCTAssertFalse(turn.contains("send_agent_message"))
+    }
+
+    func testCanonicalMentionRendersReadableIdentity() throws {
         let market = GroupMember(id: "a-market", name: "市场专家", title: "", emoji: "", accentColor: "", summary: "", slot: 0)
         let product = GroupMember(id: "a-product", name: "产品经理", title: "", emoji: "", accentColor: "", summary: "", slot: 1)
         let host = GroupMember(id: "a-host", name: "主持人", title: "", emoji: "", accentColor: "", summary: "", slot: 2)
@@ -34,7 +60,7 @@ final class GroupChatEngineTests: XCTestCase {
         XCTAssertEqual(
             GroupMentionRouter.render(canonical, members: members),
             "@市场专家 @产品经理 来认识一下",
-            "投递回执的去重 key 必须与 UI 投影后的群聊消息一致"
+            "群聊持久化使用稳定 id，但 UI 始终展示可读名字"
         )
     }
 
@@ -243,6 +269,35 @@ final class GroupChatEngineTests: XCTestCase {
         let result = await repository.snapshot()
         XCTAssertEqual(result.order, ["a", "b"])
         XCTAssertEqual(result.transcriptReadCount, 1)
+    }
+
+    func testReadableAgentNameReplyIsCanonicalizedAndQueued() async {
+        let room = GroupChatRoom(
+            id: "room", sessionID: "session", title: "Room", mode: .freeform,
+            ownerMemberID: "a",
+            members: [
+                GroupChatParticipant(id: "a", name: "产品经理", slot: 0),
+                GroupChatParticipant(id: "b", name: "市场专家", slot: 1),
+            ]
+        )
+        let repository = GroupEngineRepository(
+            room: room,
+            responses: [],
+            responsesByMember: [
+                "a": ["@市场专家 请你接着说"],
+                "b": ["(pass)"],
+            ]
+        )
+        let engine = GroupChatEngine(repository: repository)
+
+        _ = await engine.send(roomID: room.id, text: "<@a> 先说说")
+
+        let result = await repository.snapshot()
+        XCTAssertEqual(result.order, ["a", "b"])
+        XCTAssertEqual(
+            result.messages.filter { $0.speaker.memberId != nil }.map(\.text),
+            ["<@b> 请你接着说"]
+        )
     }
 
     func testFreeformRunContinuesPastLegacyRoundAndTurnCaps() async {

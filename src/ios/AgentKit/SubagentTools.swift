@@ -34,22 +34,23 @@ enum SubagentTools {
         [
             AgentToolDefinition(
                 name: "spawn_subagent",
-                description: "Hand one self-contained chunk of work to a background subagent, and get back a task_id immediately. The subagent has the full execution toolset (shell, file write/edit, browser) that you do not have — this is how anything beyond conversation actually gets done. It starts with NO context from this conversation, so the prompt you write must carry everything it needs. It can read your memory but cannot write to it, and it has no way to talk to the user: it reports its result back to you, and you deliver it (and save anything durable it found). Files it produces go in /var/minis/shared/tasks/<task_id>/, which you can file_read once it is done — its own workspace is private to it. It runs on the same model as this conversation. Returns right away without waiting — call check_subagent to collect the result.",
+                description: "Hand one self-contained chunk of work to a background subagent, and get back a task_id immediately. The subagent has the full execution toolset (shell, file write/edit, browser) that you do not have — this is how anything beyond conversation actually gets done. It starts with NO context from this conversation, so the prompt you write must carry everything it needs. It can read your memory but cannot write to it, and it has no way to talk to the user: it reports its result back to you, and you deliver it (and save anything durable it found). Files it produces go in /var/minis/shared/tasks/<task_id>/, which you can file_read once it is done — its own workspace is private to it. It runs on the same model as this conversation. By default runs in background asynchronously and notifies you via async_task_notice when complete.",
                 parameters: [
                     "tool_title": AgentToolParam(type: .string, description: "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Start market research task', 'Kick off log analysis'). Use the same language as the user."),
                     "task_title": AgentToolParam(type: .string, description: "Short label for this task, shown to the user on the task card (e.g. '查上证指数收盘' / 'Analyze crash logs'). Use the same language as the user."),
                     "prompt": AgentToolParam(type: .string, description: "The full instruction for the subagent. MUST be self-contained: the goal, the specifics, any relevant context from this conversation, explicit success criteria, exactly what to report back, and which files (if any) to leave in its task directory. Never write 'tell the user ...' — the subagent cannot reach the user."),
+                    "run_in_background": AgentToolParam(type: .boolean, description: "Whether to run the subagent asynchronously in the background. Defaults to true. When true, returns immediately with task_id and notifies you via async_task_notice when complete; when false, waits for completion in the current turn."),
                 ],
                 required: ["tool_title", "task_title", "prompt"],
-                propertyOrdering: ["tool_title", "task_title", "prompt"]
+                propertyOrdering: ["tool_title", "task_title", "prompt", "run_in_background"]
             ),
             AgentToolDefinition(
                 name: "check_subagent",
-                description: "Check on a dispatched task. Pass wait_seconds to park here until it finishes (or the wait elapses) — this does NOT occupy the shell, so the subagent keeps working while you wait. Returns the task's status, what it is currently doing, and — once done — its full result. IMPORTANT: you must keep calling this until the task reaches a terminal state and then deliver the result in this same turn. Once your turn ends, nothing runs and nothing is collected until the user messages you again, so never end a turn saying you will 'keep monitoring' or 'report back later'.",
+                description: "Check on a dispatched task without waiting for it to finish. Use this for a quick read-only status inspection. Pass wait_seconds to park and poll if needed. Background tasks notify you automatically upon completion, so manual looping is not required.",
                 parameters: [
                     "tool_title": AgentToolParam(type: .string, description: "A concise 5-10 word summary of what this tool call does, shown to the user. Use the same language as the user."),
                     "task_id": AgentToolParam(type: .string, description: "The task_id returned by spawn_subagent."),
-                    "wait_seconds": AgentToolParam(type: .integer, description: "Seconds to wait for completion before returning (default 0 = poll and return immediately, max 240). Size it to the task: a quick lookup 20-30, a multi-step investigation 90-180."),
+                    "wait_seconds": AgentToolParam(type: .integer, description: "Seconds to wait for completion before returning (default 0 = poll and return immediately, max 240)."),
                 ],
                 required: ["tool_title", "task_id"],
                 propertyOrdering: ["tool_title", "task_id", "wait_seconds"]

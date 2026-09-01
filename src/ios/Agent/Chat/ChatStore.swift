@@ -347,6 +347,10 @@ actor ChatStore {
         exec("CREATE INDEX IF NOT EXISTS idx_group_members_group ON agent_group_members(group_id, sort_order)")
         exec("CREATE INDEX IF NOT EXISTS idx_agent_groups_session ON agent_groups(session_id)")
 
+        // Async task completion notices table
+        exec(ChatPersistenceSchema.createAsyncTaskNoticesSQL)
+        exec(ChatPersistenceSchema.createAsyncTaskNoticesIndexSQL)
+
         // One-shot cleanup: drop legacy v1 dirty rows that have a v2
         // counterpart. Under the V2 engine these have no consumer (the
         // v1 engine is paused, SyncCore filters via v2Only:true) so they
@@ -4597,6 +4601,160 @@ actor ChatStore {
         }
         sqlite3_finalize(stmt)
         return result
+    }
+
+    // MARK: - Async Task Notices
+
+    func saveAsyncTaskNotice(_ notice: AsyncTaskNotice) {
+        let sql = """
+            INSERT OR REPLACE INTO async_task_notices
+            (id, source_session_id, task_type, task_id, title, status, result, files_path, created_at, is_delivered, delivered_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        sqlite3_bind_text(stmt, 1, (notice.id as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 2, (notice.sourceSessionId as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 3, (notice.taskType as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 4, (notice.taskId as NSString).utf8String, -1, nil)
+        if let title = notice.title {
+            sqlite3_bind_text(stmt, 5, (title as NSString).utf8String, -1, nil)
+        } else {
+            sqlite3_bind_null(stmt, 5)
+        }
+        sqlite3_bind_text(stmt, 6, (notice.status as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 7, (notice.result as NSString).utf8String, -1, nil)
+        if let files = notice.filesPath {
+            sqlite3_bind_text(stmt, 8, (files as NSString).utf8String, -1, nil)
+        } else {
+            sqlite3_bind_null(stmt, 8)
+        }
+        sqlite3_bind_double(stmt, 9, notice.createdAt.timeIntervalSince1970)
+        sqlite3_bind_int(stmt, 10, notice.isDelivered ? 1 : 0)
+        if let delivered = notice.deliveredAt {
+            sqlite3_bind_double(stmt, 11, delivered.timeIntervalSince1970)
+        } else {
+            sqlite3_bind_null(stmt, 11)
+        }
+        sqlite3_step(stmt)
+        sqlite3_finalize(stmt)
+    }
+
+    func pendingAsyncTaskNotices(for sessionId: String) -> [AsyncTaskNotice] {
+        let sql = """
+            SELECT id, source_session_id, task_type, task_id, title, status, result, files_path, created_at, is_delivered, delivered_at
+            FROM async_task_notices
+            WHERE source_session_id = ? AND is_delivered = 0
+            ORDER BY created_at ASC
+        """
+        var stmt: OpaquePointer?
+        var notices: [AsyncTaskNotice] = []
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return [] }
+        sqlite3_bind_text(stmt, 1, (sessionId as NSString).utf8String, -1, nil)
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            let id = String(cString: sqlite3_column_text(stmt, 0))
+            let sourceSessionId = String(cString: sqlite3_column_text(stmt, 1))
+            let taskType = String(cString: sqlite3_column_text(stmt, 2))
+            let taskId = String(cString: sqlite3_column_text(stmt, 3))
+            let title: String? = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 4)) : nil
+            let status = String(cString: sqlite3_column_text(stmt, 5))
+            let result = String(cString: sqlite3_column_text(stmt, 6))
+            let filesPath: String? = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 7)) : nil
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8))
+            let isDelivered = sqlite3_column_int(stmt, 9) != 0
+            let deliveredAt: Date? = sqlite3_column_type(stmt, 10) != SQLITE_NULL ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 10)) : nil
+
+            notices.append(AsyncTaskNotice(
+                id: id,
+                sourceSessionId: sourceSessionId,
+                taskType: taskType,
+                taskId: taskId,
+                title: title,
+                status: status,
+                result: result,
+                filesPath: filesPath,
+                createdAt: createdAt,
+                isDelivered: isDelivered,
+                deliveredAt: deliveredAt
+            ))
+        }
+        sqlite3_finalize(stmt)
+        return notices
+    }
+
+    func markAsyncTaskNoticesDelivered(ids: [String]) {
+        guard !ids.isEmpty else { return }
+        let placeholders = ids.map { _ in "?" }.joined(separator: ",")
+        let sql = "UPDATE async_task_notices SET is_delivered = 1, delivered_at = ? WHERE id IN (\(placeholders))"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        let now = Date().timeIntervalSince1970
+        sqlite3_bind_double(stmt, 1, now)
+        for (index, id) in ids.enumerated() {
+            sqlite3_bind_text(stmt, Int32(index + 2), (id as NSString).utf8String, -1, nil)
+        }
+        sqlite3_step(stmt)
+        sqlite3_finalize(stmt)
+    }
+
+    func getAsyncTaskNotice(id: String) -> AsyncTaskNotice? {
+        let sql = """
+            SELECT id, source_session_id, task_type, task_id, title, status, result, files_path, created_at, is_delivered, delivered_at
+            FROM async_task_notices
+            WHERE id = ?
+        """
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
+        sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+        var notice: AsyncTaskNotice?
+        if sqlite3_step(stmt) == SQLITE_ROW {
+            let nid = String(cString: sqlite3_column_text(stmt, 0))
+            let sourceSessionId = String(cString: sqlite3_column_text(stmt, 1))
+            let taskType = String(cString: sqlite3_column_text(stmt, 2))
+            let taskId = String(cString: sqlite3_column_text(stmt, 3))
+            let title: String? = sqlite3_column_type(stmt, 4) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 4)) : nil
+            let status = String(cString: sqlite3_column_text(stmt, 5))
+            let result = String(cString: sqlite3_column_text(stmt, 6))
+            let filesPath: String? = sqlite3_column_type(stmt, 7) != SQLITE_NULL ? String(cString: sqlite3_column_text(stmt, 7)) : nil
+            let createdAt = Date(timeIntervalSince1970: sqlite3_column_double(stmt, 8))
+            let isDelivered = sqlite3_column_int(stmt, 9) != 0
+            let deliveredAt: Date? = sqlite3_column_type(stmt, 10) != SQLITE_NULL ? Date(timeIntervalSince1970: sqlite3_column_double(stmt, 10)) : nil
+
+            notice = AsyncTaskNotice(
+                id: nid,
+                sourceSessionId: sourceSessionId,
+                taskType: taskType,
+                taskId: taskId,
+                title: title,
+                status: status,
+                result: result,
+                filesPath: filesPath,
+                createdAt: createdAt,
+                isDelivered: isDelivered,
+                deliveredAt: deliveredAt
+            )
+        }
+        sqlite3_finalize(stmt)
+        return notice
+    }
+
+    func hasDeliveredNotice(id: String) -> Bool {
+        let sql = "SELECT 1 FROM async_task_notices WHERE id = ? AND is_delivered = 1 LIMIT 1"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return false }
+        sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+        let exists = sqlite3_step(stmt) == SQLITE_ROW
+        sqlite3_finalize(stmt)
+        return exists
+    }
+
+    func deleteAsyncTaskNotice(id: String) {
+        let sql = "DELETE FROM async_task_notices WHERE id = ?"
+        var stmt: OpaquePointer?
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return }
+        sqlite3_bind_text(stmt, 1, (id as NSString).utf8String, -1, nil)
+        sqlite3_step(stmt)
+        sqlite3_finalize(stmt)
     }
 
     // MARK: - Private Helpers

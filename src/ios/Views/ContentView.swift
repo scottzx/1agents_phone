@@ -3635,7 +3635,7 @@ struct ContentView: View {
                 SessionLockStore.shared.lock(sid)
             case .unlockSession(let sid):
                 Task {
-                    let reason = String(localized: "Unlock this session to remove \(BiometricAuth.biometryDisplayName) protection")
+                    let reason = String(format: String(localized: "Unlock this session to remove %@ protection"), BiometricAuth.biometryDisplayName)
                     let ok = await BiometricAuth.authenticate(reason: reason)
                     if ok { SessionLockStore.shared.unlockPermanently(sid) }
                 }
@@ -5978,7 +5978,7 @@ private struct SessionContextMenu: View, Equatable {
                 Button {
                     actions.send(.unlockSession(key.sid))
                 } label: {
-                    Label("Remove \(BiometricAuth.biometryDisplayName) Lock", systemImage: "lock.open")
+                    Label(String(format: String(localized: "Remove %@ Lock"), BiometricAuth.biometryDisplayName), systemImage: "lock.open")
                 }
             } else if SessionLockStore.shared.globalEnabled {
                 Button {
@@ -7242,49 +7242,49 @@ struct DiscoveryHubView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section(String(localized: "智能体运行时")) {
-                    HubLink(title: String(localized: "技能"), systemImage: "puzzlepiece.extension", color: .blue) {
+                Section(String(localized: "Agent Runtime")) {
+                    HubLink(title: String(localized: "Skills"), systemImage: "puzzlepiece.extension", color: .blue) {
                         SkillsManagementView()
                     }
-                    HubLink(title: String(localized: "灵魂"), systemImage: "sparkles", color: .pink) {
+                    HubLink(title: String(localized: "Soul"), systemImage: "sparkles", color: .pink) {
                         SoulSettingsView()
                     }
-                    HubLink(title: String(localized: "记忆"), systemImage: "brain.head.profile", color: .purple) {
+                    HubLink(title: String(localized: "Memory"), systemImage: "brain.head.profile", color: .purple) {
                         MemoryManagementView()
                     }
-                    HubLink(title: "MCP Integrations", systemImage: "square.stack.3d.up", color: .teal) {
+                    HubLink(title: String(localized: "MCP Integrations"), systemImage: "square.stack.3d.up", color: .teal) {
                         MCPIntegrationsView()
                     }
-                    HubLink(title: String(localized: "环境变量"), systemImage: "terminal", color: .green) {
+                    HubLink(title: String(localized: "Environment Variables"), systemImage: "terminal", color: .green) {
                         EnvironmentVariablesView()
                     }
                 }
 
-                Section(String(localized: "存储")) {
-                    HubLink(title: String(localized: "存储管理"), systemImage: "archivebox", color: .blue) {
+                Section(String(localized: "Storage")) {
+                    HubLink(title: String(localized: "Storage Management"), systemImage: "archivebox", color: .blue) {
                         StorageManagementView()
                     }
-                    HubLink(title: String(localized: "共享文件夹"), systemImage: "folder.fill.badge.person.crop", color: .green) {
+                    HubLink(title: String(localized: "Shared Folders"), systemImage: "folder.fill.badge.person.crop", color: .green) {
                         SharedFoldersSettingsView()
                     }
-                    HubLink(title: String(localized: "挂载外部文件夹"), systemImage: "externaldrive.badge.plus", color: .orange) {
+                    HubLink(title: String(localized: "Mount External Folders"), systemImage: "externaldrive.badge.plus", color: .orange) {
                         MountedFoldersSettingsView()
                     }
                     if #available(iOS 17.0, *) {
-                        HubLink(title: "iCloud Sync", systemImage: "icloud", color: .cyan) {
+                        HubLink(title: String(localized: "iCloud Sync"), systemImage: "icloud", color: .cyan) {
                             CloudSyncSettingsV2View()
                         }
                     }
                 }
 
-                Section(String(localized: "硬件")) {
-                    HubLink(title: String(localized: "硬件设备"), systemImage: "antenna.radiowaves.left.and.right", color: .blue) {
+                Section(String(localized: "Hardware")) {
+                    HubLink(title: String(localized: "Hardware Devices"), systemImage: "antenna.radiowaves.left.and.right", color: .blue) {
                         HardwareBridgeSettingsView()
                     }
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle(String(localized: "发现"))
+            .navigationTitle(String(localized: "Discover"))
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -7298,31 +7298,31 @@ struct MySettingsHubView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("LLM Providers") {
-                    HubLink(title: "Manage Providers", systemImage: "lock.circle.fill", color: .blue) {
+                Section(String(localized: "LLM Providers")) {
+                    HubLink(title: String(localized: "Manage Providers"), systemImage: "lock.circle.fill", color: .blue) {
                         ProviderInstancesView()
                     }
-                    HubLink(title: "Model Groups", systemImage: "gearshape.circle.fill", color: .indigo) {
+                    HubLink(title: String(localized: "Model Groups"), systemImage: "gearshape.circle.fill", color: .indigo) {
                         ModelGroupsView()
                     }
-                    HubLink(title: "Token Usage", systemImage: "chart.line.uptrend.xyaxis", color: .green) {
+                    HubLink(title: String(localized: "Token Usage"), systemImage: "chart.line.uptrend.xyaxis", color: .green) {
                         UsageStatsView()
                     }
                 }
 
-                Section(String(localized: "外观")) {
-                    HubLink(title: String(localized: "外观"), systemImage: "paintbrush.fill", color: .indigo) {
+                Section(String(localized: "Appearance")) {
+                    HubLink(title: String(localized: "Appearance"), systemImage: "paintbrush.fill", color: .indigo) {
                         AppearanceSettingsView()
                     }
                 }
 
-                Section(String(localized: "权限")) {
-                    HubLink(title: String(localized: "权限"), systemImage: "lock.shield", color: .red) {
+                Section(String(localized: "Permissions")) {
+                    HubLink(title: String(localized: "Permissions"), systemImage: "lock.shield", color: .red) {
                         OffloadPermissionSettingsView()
                     }
                     if BiometricAuth.isAvailable {
                         HubLink(
-                            title: "\(BiometricAuth.biometryDisplayName) Protection",
+                            title: String(format: String(localized: "%@ Protection"), BiometricAuth.biometryDisplayName),
                             systemImage: BiometricAuth.biometryIconName,
                             color: .teal
                         ) {
@@ -7331,41 +7331,41 @@ struct MySettingsHubView: View {
                     }
                 }
 
-                Section(String(localized: "诊断")) {
-                    HubLink(title: "Logs", systemImage: "doc.text", color: .gray) {
+                Section(String(localized: "Diagnostics")) {
+                    HubLink(title: String(localized: "Logs"), systemImage: "doc.text", color: .gray) {
                         LogManagementView()
                     }
                 }
 
-                Section(String(localized: "关于")) {
-                    HubLink(title: "About Yima", systemImage: "info", color: .indigo) {
+                Section(String(localized: "About")) {
+                    HubLink(title: String(localized: "About Yima"), systemImage: "info", color: .indigo) {
                         AboutView()
                     }
                     Link(destination: URL(string: "https://openminis.github.io/privacy-policy.html")!) {
-                        SettingsHubLabel(title: "Privacy Policy", systemImage: "hand.raised", color: .teal)
+                        SettingsHubLabel(title: String(localized: "Privacy Policy"), systemImage: "hand.raised", color: .teal)
                     }
                     Button {
                         showFeedbackDialog = true
                     } label: {
-                        SettingsHubLabel(title: "Feedback", systemImage: "bubble.left.and.bubble.right.fill", color: .indigo)
+                        SettingsHubLabel(title: String(localized: "Feedback"), systemImage: "bubble.left.and.bubble.right.fill", color: .indigo)
                     }
                     .foregroundStyle(.primary)
                 }
             }
             .listStyle(.insetGrouped)
-            .navigationTitle(String(localized: "我的"))
+            .navigationTitle(String(localized: "Me"))
             .navigationBarTitleDisplayMode(.inline)
-            .confirmationDialog("Feedback", isPresented: $showFeedbackDialog, titleVisibility: .visible) {
-                Button("Report a Bug (GitHub)") {
+            .confirmationDialog(String(localized: "Feedback"), isPresented: $showFeedbackDialog, titleVisibility: .visible) {
+                Button(String(localized: "Report a Bug (GitHub)")) {
                     if let url = SettingsSheet.makeBugReportURL() { UIApplication.shared.open(url) }
                 }
-                Button("Feedback (Telegram)") {
+                Button(String(localized: "Feedback (Telegram)")) {
                     if let url = URL(string: "https://t.me/+2NzhOJuzRyI1YmM1") { UIApplication.shared.open(url) }
                 }
-                Button("Feedback (Email)") {
+                Button(String(localized: "Feedback (Email)")) {
                     if let url = SettingsSheet.makeFeedbackEmailURL() { UIApplication.shared.open(url) }
                 }
-                Button("Cancel", role: .cancel) {}
+                Button(String(localized: "Cancel"), role: .cancel) {}
             }
         }
     }
@@ -7440,40 +7440,39 @@ struct SettingsSheet: View {
     var body: some View {
         NavigationStack(path: $navPath) {
             List {
-                Section {
-                    NavigationLink {
+                Section {\n                    NavigationLink {
                         ProviderInstancesView()
                     } label: {
                         if #available(iOS 26, *) {
-                            Label("Manage Providers", systemImage: "key.circle.fill")
+                            Label(String(localized: "Manage Providers"), systemImage: "key.circle.fill")
                         } else {
-                            Label("Manage Providers", systemImage: "lock.circle.fill")
+                            Label(String(localized: "Manage Providers"), systemImage: "lock.circle.fill")
                         }
                     }
 
                     NavigationLink {
                         ModelGroupsView()
                     } label: {
-                        Label("Model Groups", systemImage: "gearshape.circle.fill")
+                        Label(String(localized: "Model Groups"), systemImage: "gearshape.circle.fill")
                     }
 
                     NavigationLink {
                         UsageStatsView()
                     } label: {
-                        Label("Token Usage", systemImage: "chart.line.uptrend.xyaxis.circle.fill")
+                        Label(String(localized: "Token Usage"), systemImage: "chart.line.uptrend.xyaxis.circle.fill")
                     }
                 } header: {
-                    Text("LLM Providers")
+                    Text(String(localized: "LLM Providers"))
                 } footer: {
                     Text("Configure which models the agent uses, manage API keys & OAuth for each provider, and create model groups for fallback or load balancing.")
                 }
 
-                Section("Appearance") {
+                Section(String(localized: "Appearance")) {
                     NavigationLink {
                         AppearanceSettingsView()
                     } label: {
                         Label {
-                            Text("Appearance")
+                            Text(String(localized: "Appearance"))
                         } icon: {
                             Image(systemName: "paintbrush.fill")
                                 .font(.system(size: 9))
@@ -7484,12 +7483,12 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("Agent Runtime") {
+                Section(String(localized: "Agent Runtime")) {
                     NavigationLink {
                         SkillsManagementView()
                     } label: {
                         Label {
-                            Text("Skills")
+                            Text(String(localized: "Skills"))
                         } icon: {
                             Image(systemName: "puzzlepiece.extension")
                                 .font(.system(size: 9))
@@ -7502,7 +7501,7 @@ struct SettingsSheet: View {
                         SoulSettingsView()
                     } label: {
                         Label {
-                            Text("Soul")
+                            Text(String(localized: "Soul"))
                         } icon: {
                             Image(systemName: "sparkles")
                                 .font(.system(size: 11))
@@ -7515,7 +7514,7 @@ struct SettingsSheet: View {
                         MemoryManagementView()
                     } label: {
                         Label {
-                            Text("Memory")
+                            Text(String(localized: "Memory"))
                         } icon: {
                             Image(systemName: "brain.head.profile")
                                 .font(.system(size: 9))
@@ -7528,7 +7527,7 @@ struct SettingsSheet: View {
                         MCPIntegrationsView()
                     } label: {
                         Label {
-                            Text("MCP Integrations")
+                            Text(String(localized: "MCP Integrations"))
                         } icon: {
                             Image(systemName: "square.stack.3d.up")
                                 .font(.system(size: 9))
@@ -7541,7 +7540,7 @@ struct SettingsSheet: View {
                         EnvironmentVariablesView()
                     } label: {
                         Label {
-                            Text("Environment Variables")
+                            Text(String(localized: "Environment Variables"))
                         } icon: {
                             Image(systemName: "terminal")
                                 .font(.system(size: 9))
@@ -7552,12 +7551,12 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("Storage") {
+                Section(String(localized: "Storage")) {
                     NavigationLink {
                         StorageManagementView()
                     } label: {
                         Label {
-                            Text("Storage")
+                            Text(String(localized: "Storage"))
                         } icon: {
                             Image(systemName: "archivebox")
                                 .font(.system(size: 9))
@@ -7570,7 +7569,7 @@ struct SettingsSheet: View {
                         SharedFoldersSettingsView()
                     } label: {
                         Label {
-                            Text("Shared Folders")
+                            Text(String(localized: "Shared Folders"))
                         } icon: {
                             Image(systemName: "folder.fill.badge.person.crop")
                                 .font(.system(size: 9))
@@ -7583,7 +7582,7 @@ struct SettingsSheet: View {
                         MountedFoldersSettingsView()
                     } label: {
                         Label {
-                            Text("Mount External Folders")
+                            Text(String(localized: "Mount External Folders"))
                         } icon: {
                             Image(systemName: "externaldrive.badge.plus")
                                 .font(.system(size: 9))
@@ -7599,7 +7598,7 @@ struct SettingsSheet: View {
                             CloudSyncSettingsV2View()
                         } label: {
                             Label {
-                                Text("iCloud Sync")
+                                Text(String(localized: "iCloud Sync"))
                             } icon: {
                                 Image(systemName: "icloud")
                                     .font(.system(size: 9))
@@ -7611,12 +7610,12 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("Permissions") {
+                Section(String(localized: "Permissions")) {
                     NavigationLink {
                         OffloadPermissionSettingsView()
                     } label: {
                         Label {
-                            Text("Permissions")
+                            Text(String(localized: "Permissions"))
                         } icon: {
                             Image(systemName: "lock.shield")
                                 .font(.system(size: 9))
@@ -7630,7 +7629,7 @@ struct SettingsSheet: View {
                             FaceIDProtectionSettingsView()
                         } label: {
                             Label {
-                                Text("\(BiometricAuth.biometryDisplayName) Protection")
+                                Text(String(format: String(localized: "%@ Protection"), BiometricAuth.biometryDisplayName))
                             } icon: {
                                 // Match SF Symbol to the device's actual sensor — Touch ID
                                 // devices showed a Face ID glyph here before.
@@ -7644,12 +7643,12 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("Hardware") {
+                Section(String(localized: "Hardware")) {
                     NavigationLink {
                         HardwareBridgeSettingsView()
                     } label: {
                         Label {
-                            Text("硬件设备")
+                            Text(String(localized: "Hardware Devices"))
                         } icon: {
                             Image(systemName: "antenna.radiowaves.left.and.right")
                                 .font(.system(size: 9))
@@ -7660,12 +7659,12 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("Logs") {
+                Section(String(localized: "Diagnostics")) {
                     NavigationLink {
                         LogManagementView()
                     } label: {
                         Label {
-                            Text("Logs")
+                            Text(String(localized: "Logs"))
                         } icon: {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 9))
@@ -7676,12 +7675,12 @@ struct SettingsSheet: View {
                     }
                 }
 
-                Section("About") {
+                Section(String(localized: "About")) {
                     NavigationLink {
                         AboutView()
                     } label: {
                         Label {
-                            Text("About Yima")
+                            Text(String(localized: "About Yima"))
                         } icon: {
                             Image(systemName: "info")
                                 .font(.system(size: 9))
@@ -7692,7 +7691,7 @@ struct SettingsSheet: View {
                     }
                     Link(destination: URL(string: "https://openminis.github.io/privacy-policy.html")!) {
                         Label {
-                            Text("Privacy Policy")
+                            Text(String(localized: "Privacy Policy"))
                         } icon: {
                             Image(systemName: "hand.raised")
                                 .font(.system(size: 9))
@@ -7705,7 +7704,7 @@ struct SettingsSheet: View {
                         showFeedbackDialog = true
                     } label: {
                         Label {
-                            Text("Feedback")
+                            Text(String(localized: "Feedback"))
                         } icon: {
                             Image(systemName: "bubble.left.and.bubble.right.fill")
                                 .font(.system(size: 9))
@@ -7715,22 +7714,22 @@ struct SettingsSheet: View {
                         }
                     }
                     .foregroundStyle(.primary)
-                    .confirmationDialog("Feedback", isPresented: $showFeedbackDialog, titleVisibility: .visible) {
-                        Button("Report a Bug (GitHub)") {
+                    .confirmationDialog(String(localized: "Feedback"), isPresented: $showFeedbackDialog, titleVisibility: .visible) {
+                        Button(String(localized: "Report a Bug (GitHub)")) {
                             if let url = Self.makeBugReportURL() { UIApplication.shared.open(url) }
                         }
-                        Button("Feedback (Telegram)") {
+                        Button(String(localized: "Feedback (Telegram)")) {
                             if let url = URL(string: "https://t.me/+2NzhOJuzRyI1YmM1") { UIApplication.shared.open(url) }
                         }
-                        Button("Feedback (Email)") {
+                        Button(String(localized: "Feedback (Email)")) {
                             if let url = Self.makeFeedbackEmailURL() { UIApplication.shared.open(url) }
                         }
-                        Button("Cancel", role: .cancel) {}
+                        Button(String(localized: "Cancel"), role: .cancel) {}
                     }
                 }
 
             }
-            .navigationTitle("Settings")
+            .navigationTitle(String(localized: "Settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

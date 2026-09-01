@@ -73,7 +73,11 @@ enum OrchestratorPrompt {
     }
 
     /// Build the orchestrator's system prompt for `agentId`.
-    static func render(agentId: String?, memoryEnabled: Bool) -> String {
+    static func render(
+        agentId: String?,
+        memoryEnabled: Bool,
+        includeAgentDirectory: Bool = true
+    ) -> String {
         var p = SystemPromptBuilder.identitySection(for: agentId)
 
         p += """
@@ -122,27 +126,13 @@ enum OrchestratorPrompt {
             keeps everything it has done so far — dispatching a second one for \
             the same job just duplicates the work.
 
-            ## Finishing what you start
+            ## Asynchronous execution & Background task notifications
 
-            Nothing runs after your turn ends. There is no scheduler, no \
-            background wake-up, no "I'll check back later" — the moment you \
-            stop, every dispatched task keeps running but nobody is listening, \
-            and the user hears nothing until they message you again.
+            Dispatched subagents, background shell tasks, and A2A messages execute asynchronously in the background. When they complete, you will be automatically woken up with an `async_task_notice` delivering the outcome, status, and produced files.
 
-            So: never end a turn with a promise of future action. "I'll keep \
-            monitoring", "I'll update you when it's done", and stopping right \
-            after a single still-running check with "let's wait a bit" are all \
-            the same mistake. Chain `check_subagent` calls with real \
-            `wait_seconds` values until you have the result, then deliver it.
-
-            If a task genuinely runs too long to hold the turn, close honestly: \
-            say it is still running, that you will pick it up when they next \
-            message you, and offer to keep waiting.
-
-            A task whose reported activity and step count have not moved across \
-            several checks is stuck, not progressing. Say so and act — \
-            `stop_subagent`, then retry with a clearer brief or tell the user \
-            what is blocked. Never paper over a stall with "still working on it".
+            - **Starting background work**: Call `spawn_subagent`, `shell_execute`, or `send_agent_message`. Acknowledge the user concisely if needed and end your turn.
+            - **Receiving completions**: When you receive an `async_task_notice`, inspect the result. Deliver the answer to the user in a natural, cohesive response.
+            - **Quiescence**: If a background notification does not require an active message to the user, you may respond with `(pass)` to finish silently without generating a visible chat bubble.
 
             ## This machinery is invisible
 
@@ -190,10 +180,15 @@ enum OrchestratorPrompt {
             /var/minis/shared/tasks/<task_id>/ — not as a way to do the work \
             yourself.
             - read_image: look at an image, chart or screenshot.
-            - list_agents / send_agent_message / create_agent: your colleagues \
-            in this app. See below.
-
             """
+
+        if includeAgentDirectory {
+            p += """
+                - list_agents / send_agent_message / create_agent: your colleagues \
+                in this app. See below.
+
+                """
+        }
 
         if memoryEnabled {
             p += """
@@ -236,7 +231,9 @@ enum OrchestratorPrompt {
 
             """
 
-        p += AgentDirectoryTools.promptSection(canDispatch: true)
+        if includeAgentDirectory {
+            p += AgentDirectoryTools.promptSection(canDispatch: true)
+        }
 
         p += """
             ## Files and links

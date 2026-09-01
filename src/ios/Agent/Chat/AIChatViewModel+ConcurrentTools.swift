@@ -280,7 +280,7 @@ extension AIChatViewModel {
         do {
         switch tu.name {
         case "shell_execute":
-            let (command, timeout, delay) = parseToolInput(from: argsJson)
+            let (command, timeout, delay, isBackground) = parseToolInput(from: argsJson)
 
             if command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 ctLogger.warning("[ToolArgsProbe] shell_execute called with empty command — argsJson=<<<\(argsJson)>>>")
@@ -288,6 +288,46 @@ extension AIChatViewModel {
                 toolSuccess = false
                 if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
                     messages[msgIdx].blocks[blockIdx].content = toolOutput
+                }
+                break
+            }
+
+            // Explicit background task requested
+            if isBackground {
+                let taskId = "cmd_\(UUID().uuidString.prefix(8))"
+                let targetSid = self.sessionId ?? ""
+                let title = command
+
+                Task { [weak self] in
+                    guard let self else { return }
+                    let bgResult: CommandResult
+                    do {
+                        bgResult = try await self.executeCommand(command, timeout: timeout) { _ in }
+                    } catch {
+                        bgResult = CommandResult(output: "Error: \(error.localizedDescription)", exitCode: -1)
+                    }
+                    let statusStr = (bgResult.exitCode == 0) ? "done" : "failed"
+                    await AsyncTaskNoticeManager.shared.postNotice(
+                        sourceSessionId: targetSid,
+                        taskType: "shell",
+                        taskId: taskId,
+                        title: title,
+                        status: statusStr,
+                        result: bgResult.output
+                    )
+                }
+
+                toolOutput = """
+                [Background Command Started]
+                task_id: \(taskId)
+                command: \(command)
+                status: running
+
+                The command is executing in the background. You will receive an async_task_notice when it completes. You may end your turn now.
+                """
+                toolSuccess = true
+                if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+                    messages[msgIdx].blocks[blockIdx].content = "[Background Command Started]\ntask_id: \(taskId)"
                 }
                 break
             }
@@ -317,16 +357,6 @@ extension AIChatViewModel {
             if delay > 0 {
                 toolDelayWaitCount += 1
                 defer { toolDelayWaitCount -= 1 }
-                // [T-delay-stop-latency] The stop button during the countdown
-                // sets `commandCancelledByUser` (stopCurrentCommand guards on
-                // `toolDelayWaitActive`), but the old loop only re-checked that
-                // flag once per whole second and then slept a FULL second — a
-                // tap landing just after a check waited up to ~1s before the
-                // next check, which read as "stop does nothing" during the
-                // delay phase (the user report). Poll on a short tick instead so
-                // both the button flag AND Task cancellation are honored within
-                // ~100ms, while the visible countdown still refreshes once per
-                // whole second.
                 let totalSeconds = Int(delay)
                 let tickNanos: UInt64 = 100_000_000 // 100ms
                 let ticksPerSecond = 10
@@ -347,8 +377,6 @@ extension AIChatViewModel {
                     }
                     try await Task.sleep(nanoseconds: tickNanos)
                 }
-                // Final cancellation check after the last tick so a tap in the
-                // final 100ms window still aborts before we launch the process.
                 if commandCancelledByUser || Task.isCancelled {
                     throw CancellationError()
                 }
@@ -380,14 +408,6 @@ extension AIChatViewModel {
                         self.scrollToBottomSignal.send()
                     }
                 }
-                // [T-tool-exec-breadcrumb] Durable, written BEFORE the command
-                // launches. `[ToolLifecycle] COMPLETED` only lands after a tool
-                // returns, so a process killed mid-execution (watchdog SIGKILL,
-                // Jetsam, SIGABRT) left no record of what was running. This line
-                // is on disk (O_SYNC) before executeCommand is entered, so the
-                // last breadcrumb after a kill names the command that was live.
-                // Command is truncated — enough to identify it, not enough to
-                // bloat the file with a large heredoc.
                 #if DEBUG
                 CrashReporter.writeToolBreadcrumb(
                     "[ToolExec] STARTING shell_execute id=\(tu.id.prefix(20)) sid=\(sessionId?.prefix(8) ?? "nil") timeout=\(timeout)s command=\"\(command.prefix(500))\""
@@ -416,11 +436,6 @@ extension AIChatViewModel {
             } catch {
                 result = CommandResult(output: "Error: \(error.localizedDescription)", exitCode: -1)
             }
-            // [T-tool-exec-breadcrumb] Pair for the STARTING line above. The
-            // existing `[ToolLifecycle] COMPLETED` covers every tool, but it
-            // travels the droppable NSLog pipe; this one shares the STARTING
-            // line's durable file so a STARTING with no matching FINISHED is
-            // unambiguous evidence that the process died inside this command.
             #if DEBUG
             CrashReporter.writeToolBreadcrumb(
                 "[ToolExec] FINISHED shell_execute id=\(tu.id.prefix(20)) exit=\(result.exitCode)"

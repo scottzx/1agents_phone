@@ -718,13 +718,12 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                     }
                     logger.info("[BlocksLost] DEFERRED retrySnapshot — \(reason) at loop end. sid=\(sessionId?.prefix(8) ?? "nil") vm=\(vmInstanceId) transitionWindow=\(inTransitionWindow) totalBlocks=\(totalBlocks) lastMsgBlocks=\(lastBlocks) msgCount=\(messages.count)")
                 }
-                // [T-ios-detached-vm-loop-end] When an agent loop finishes on
-                // a VM that is NOT the currently-displayed one (user navigated
-                // away mid-loop), the final DB writes are invisible to the
-                // displayed VM. Post a notification so the active VM for this
-                // session reloads from DB and picks up the new data.
-                if let sid = sessionId, Self.activeSessionId != sid {
-                    logger.info("[BlocksLost] DETACHED loop end — posting reload for sid=\(sid.prefix(8)) (active=\(Self.activeSessionId?.prefix(8) ?? "nil"))")
+                // When an agent loop finishes, post .sessionAgentLoopDidEnd
+                // so AsyncTaskNoticeManager and other listeners can drain pending notices.
+                if let sid = sessionId {
+                    if Self.activeSessionId != sid {
+                        logger.info("[BlocksLost] DETACHED loop end — posting reload for sid=\(sid.prefix(8)) (active=\(Self.activeSessionId?.prefix(8) ?? "nil"))")
+                    }
                     NotificationCenter.default.post(name: .sessionAgentLoopDidEnd, object: sid)
                 }
                 // Also drain any skill-filesystem rescan that the AI's
@@ -737,6 +736,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             }
         }
     }
+    @Published var isNoticeDriven = false
     @Published var canResume = false {
         didSet {
             // [T-session-paused-badge-active-false-positive] Drive the session-
@@ -1843,7 +1843,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         """ : ""
         switch effectiveToolPolicy {
         case .orchestrator:
-            return groupBlock + OrchestratorPrompt.render(agentId: agentId, memoryEnabled: memoryEnabled) + hardwareBlock
+            return groupBlock + OrchestratorPrompt.render(
+                agentId: agentId,
+                memoryEnabled: memoryEnabled,
+                includeAgentDirectory: groupId == nil
+            ) + hardwareBlock
         case .standalone:
             // Executors get the full operator prompt below — it was always
             // written for the thing that does the work — plus a short preamble
@@ -1853,7 +1857,9 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // makeAgentTools), and never to an executor that could not act on it.
             return agentRole == .executor
                 ? OrchestratorPrompt.executorPreamble(taskId: sessionId ?? "") + executorAndStandalonePrompt + hardwareBlock
-                : groupBlock + executorAndStandalonePrompt + "\n\n" + AgentDirectoryTools.promptSection(canDispatch: false) + hardwareBlock
+                : groupBlock + executorAndStandalonePrompt
+                    + (groupId == nil ? "\n\n" + AgentDirectoryTools.promptSection(canDispatch: false) : "")
+                    + hardwareBlock
         }
     }
 
@@ -2830,6 +2836,105 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             self.isProcessing = false
             self.endBackgroundProcessing()
         }
+    }
+
+    /// Resume the agent loop after synthetic async tool results (e.g. background task completion)
+    /// have been injected into the session's history in the DB.
+    @discardableResult
+    func resumeNoticeDrivenLoop() async -> Bool {
+        guard !isProcessing else { return false }
+        guard let sid = sessionId else { return false }
+
+        autoRetryAttempt = 0
+        autoRetryCountdown = 0
+        canResume = false
+        committedBlockCount = 0
+        prevCommittedBlockCount = 0
+        userDidCancel = false
+        isNoticeDriven = true
+        isProcessing = true
+        errorMessage = nil
+
+        logger.info("🔄SESSION [vm=\(self.vmInstanceId)] resumeNoticeDrivenLoop START session=\(sid)")
+
+        ensureKernelBooted()
+        beginBackgroundProcessing()
+
+        currentTask = Task { [weak self] in
+            guard let self else { return }
+
+            while self.kernelStatus == .booting {
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+
+            if case .failed(let msg) = self.kernelStatus {
+                self.errorMessage = "Kernel not available: \(msg)"
+                self.isNoticeDriven = false
+                self.isProcessing = false
+                self.endBackgroundProcessing()
+                return
+            }
+
+            let concurrency = SessionConcurrencyManager.shared
+            self.isSuspended = concurrency.isAtCapacity
+            do {
+                try await concurrency.acquireSlot(sessionId: sid)
+                self.isSuspended = false
+            } catch {
+                self.isSuspended = false
+                self.isNoticeDriven = false
+                self.isProcessing = false
+                self.endBackgroundProcessing()
+                return
+            }
+            defer {
+                concurrency.releaseSlot(sessionId: sid)
+            }
+
+            do {
+                try await self.runAgentLoop()
+            } catch is CancellationError {
+                logger.info("[NoticeLoop] Agent loop cancelled")
+                self.handleUserCancelledCleanup()
+            } catch {
+                let rawDesc = String(describing: error)
+                logger.error("[NoticeLoop] Agent loop error: \(rawDesc)")
+                if self.userDidCancel {
+                    self.handleUserCancelledCleanup()
+                } else {
+                    let displayDesc = Self.friendlyErrorMessage((error as? LocalizedError)?.errorDescription ?? rawDesc)
+                    if let last = self.messages.last(where: { $0.role == .assistant }) {
+                        last.error = displayDesc
+                    } else {
+                        self.errorMessage = displayDesc
+                    }
+                }
+            }
+
+            if self.userDidCancel { self.handleUserCancelledCleanup() }
+
+            guard !Task.isCancelled else {
+                self.isNoticeDriven = false
+                self.isProcessing = false
+                self.endBackgroundProcessing()
+                return
+            }
+
+            await self.drainQueuedPrompts()
+
+            if let fingerprint = await ChatStore.shared.sessionMessageFingerprint(sessionId: sid) {
+                self.lastKnownDbSortOrder = fingerprint.maxSortOrder
+                self.lastKnownDbCount = fingerprint.count
+                self.lastKnownDbOrderHash = fingerprint.orderHash
+            }
+
+            self.isNoticeDriven = false
+            self.isProcessing = false
+            self.endBackgroundProcessing()
+            logger.info("🔄SESSION [vm=\(self.vmInstanceId)] resumeNoticeDrivenLoop DONE session=\(sid)")
+        }
+
+        return true
     }
 
     /// Retry the next agent loop iteration (continue from where the error occurred,
@@ -5523,6 +5628,23 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 } else {
                     remainingSpeak = ""
                 }
+                // Notice-driven turn quiescence check: if the agent answered with (pass)
+                // and called no tools, drop the temporary message, stop speech, and skip persistence.
+                if isNoticeDriven && GroupMentionRouter.isPass(streamResult.assistantText) {
+                    logger.info("[NoticeLoop] Agent returned (pass) for notice-driven turn — suppressing visible message and skipping persistence.")
+                    stopSpeech()
+                    await MainActor.run {
+                        if msgIdx < messages.count {
+                            messages.remove(at: msgIdx)
+                        }
+                    }
+                    if assistantAgentIdx < agentHistory.count {
+                        agentHistory.remove(at: assistantAgentIdx)
+                    }
+                    hitTurnLimit = false
+                    break
+                }
+
                 if !remainingSpeak.isEmpty { speakQueued(remainingSpeak) }
                 let interruptCount = await MainActor.run { messages[msgIdx].streamInterruptCount }
                 let uiBlockCount = await MainActor.run { msgIdx < messages.count ? messages[msgIdx].blocks.count : -1 }

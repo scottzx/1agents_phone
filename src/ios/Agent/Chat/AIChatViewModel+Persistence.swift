@@ -329,6 +329,13 @@ extension AIChatViewModel {
                 continue
             }
 
+            // Synthetic async_task_notice tool-use is LLM-context-only.
+            // It stays in loadedHistory but is hidden in the UI message list.
+            if raw.isAsyncTaskNotice {
+                currentAssistant = nil
+                continue
+            }
+
             if raw.role == .user && raw.isToolResultOnly {
                 // Tool-result user messages: apply results to the current assistant's tool blocks
                 if let assistant = currentAssistant {

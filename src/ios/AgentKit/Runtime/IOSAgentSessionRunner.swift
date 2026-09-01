@@ -113,6 +113,24 @@ final class IOSAgentSessionRunner: AgentSessionRunning {
         return AgentSessionRunResult(text: text, accepted: true, timedOut: false, cancelled: false)
     }
 
+    func resumeAfterAsyncToolResults(sessionId: String) async -> AgentSessionRunResult {
+        let (vm, isFresh) = ViewModelCache.shared.getOrCreate(for: sessionId)
+        if isFresh {
+            await vm.loadSession()
+        } else {
+            await vm.reloadMessagesFromDB(reason: "asyncToolResults")
+        }
+        guard !vm.isProcessing else { return .rejected }
+        let countBefore = vm.messages.count
+        let accepted = await vm.resumeNoticeDrivenLoop()
+        guard accepted else { return .rejected }
+        guard await AgentTurnAwaiter.awaitTurn(vm: vm, seconds: 120) else {
+            return AgentSessionRunResult(text: nil, accepted: true, timedOut: true, cancelled: false)
+        }
+        let text = AgentTurnAwaiter.lastAssistantText(vm: vm, after: countBefore)
+        return AgentSessionRunResult(text: text, accepted: true, timedOut: false, cancelled: false)
+    }
+
     func cancel(sessionId: String) {
         ViewModelCache.shared.get(for: sessionId)?.cancel()
     }

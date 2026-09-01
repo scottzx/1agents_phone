@@ -318,6 +318,24 @@ final class DesktopViewModel: ObservableObject {
         } catch { status = error.localizedDescription }
     }
 
+    func deleteConversation(_ sessionID: String) async {
+        do {
+            _ = try await client.request(RuntimeRequest(method: "session.delete", sessionID: sessionID))
+            try await refreshSnapshot()
+            if selectedSessionID == sessionID {
+                selectedSessionID = conversations.first?.id
+                if let next = selectedSessionID {
+                    await open(next)
+                } else {
+                    messages = []
+                }
+            }
+            status = "Conversation deleted"
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
     func createAgent(name: String, title: String, summary: String, emoji: String) async {
         do {
             let agent = RuntimeAgentRecord(name: name, emoji: emoji.isEmpty ? "🤖" : emoji, title: title, summary: summary)

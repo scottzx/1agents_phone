@@ -220,11 +220,10 @@ public enum GroupMentionRouter {
         var isEveryone: Bool
         /// Member ids in roster order, not in the order they appear in the text.
         var memberIds: [String]
-        /// True when something was matched by NAME rather than by token — an
-        /// agent that wrote `@市场专家` instead of copying `<@id>`. Routed the
-        /// same way, but surfaced so the bridge log can say the model is not
-        /// following the format, which is the only symptom before the day a
-        /// rename makes it address nobody.
+    /// True when something was matched by NAME rather than by token. Agent
+    /// replies intentionally use readable `@市场专家` text, but the engine encodes
+    /// those replies before routing; seeing a loose match here means an older
+    /// or external caller skipped that message-boundary normalization.
         var usedLooseNameMatch: Bool
 
         init(isEveryone: Bool, memberIds: [String], usedLooseNameMatch: Bool = false) {
@@ -305,11 +304,10 @@ public enum GroupMentionRouter {
     ///    is what an agent is told to emit and what `encode` writes for the
     ///    user. An id that is not in this room is ignored rather than guessed
     ///    at, so a mention either addresses the right member or nobody.
-    /// 2. **Bare names**, over whatever text the tokens did not claim. Purely a
-    ///    safety net for a model that wrote `@市场专家` instead of copying the
-    ///    token: it cannot change where a correct token routes, only rescue a
-    ///    message that would otherwise wake no one. Reported via
-    ///    `usedLooseNameMatch`.
+    /// 2. **Bare names**, over whatever text the tokens did not claim. This is
+    ///    a safety net for older or external callers which skipped `encode`:
+    ///    it cannot change where a correct token routes, only rescue a message
+    ///    that would otherwise wake no one. Reported via `usedLooseNameMatch`.
     ///
     /// The name pass carries two departures from grok's `hasMentionAt`, both
     /// forced by Chinese:
@@ -437,9 +435,9 @@ public enum GroupMentionRouter {
         /// broadcast was ignored (their named mentions still count). Surfaced
         /// rather than swallowed so the bridge log can explain a quiet room.
         public var downgradedEveryoneBy: [String]
-        /// Members that addressed someone by NAME instead of by `<@id>` token.
-        /// It worked, but only by the fallback in `parseMentions` — worth a log
-        /// line, because the day one of them is renamed it stops working.
+        /// Member messages which reached routing without first having readable
+        /// names normalized to `<@id>` tokens. It worked via the parser's
+        /// compatibility fallback, but is worth a diagnostic line.
         public var usedLooseNamesBy: [String]
 
         public enum Reason: String, Equatable, Sendable {
@@ -521,9 +519,8 @@ public enum GroupMentionRouter {
                 if scan.isEveryone { isEveryone = true }
             case .member(let senderId):
                 senders.insert(senderId)
-                // A member writing a bare name is the signal that it is not
-                // copying the token; the user's composer is encoded on send, so
-                // this only ever fires for an agent.
+                // Normal member replies are encoded at the engine boundary.
+                // A loose name here means an older/external path skipped it.
                 if scan.usedLooseNameMatch, !loose.contains(senderId) {
                     loose.append(senderId)
                 }

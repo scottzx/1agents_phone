@@ -15,17 +15,17 @@ struct AppLockOverlay: View {
                         .font(.system(size: 48))
                         .foregroundStyle(.secondary)
 
-                    Text("Minis is Locked")
+                    Text(String(localized: "Minis is Locked"))
                         .font(.title2.bold())
 
-                    Text("Tap to unlock with \(BiometricAuth.biometryDisplayName)")
+                    Text(String(format: String(localized: "Tap to unlock with %@"), BiometricAuth.biometryDisplayName))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
                     Button {
                         authenticate()
                     } label: {
-                        Label("Unlock", systemImage: BiometricAuth.biometryIconName)
+                        Label(String(localized: "Unlock"), systemImage: BiometricAuth.biometryIconName)
                             .font(.headline)
                             .padding(.horizontal, 28)
                             .padding(.vertical, 12)

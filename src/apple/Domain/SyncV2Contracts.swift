@@ -160,7 +160,7 @@ public extension SyncTransport {
 
 public struct SyncedSession: Codable, Equatable, Sendable {
     public static let recordType = "SessionV2"
-    public static let fieldKeys: Set<String> = ["sessionId", "title", "category", "modelId", "createdAt", "updatedAt", "memoryEnabled", "modelBinding", "pinnedAt"]
+    public static let fieldKeys: Set<String> = ["sessionId", "title", "category", "modelId", "createdAt", "updatedAt", "memoryEnabled", "modelBinding", "pinnedAt", "folderId"]
 
     public var id: String
     public var title: String?
@@ -171,15 +171,16 @@ public struct SyncedSession: Codable, Equatable, Sendable {
     public var memoryEnabled: Int
     public var modelBinding: String?
     public var pinnedAt: Date?
+    public var folderId: String?
 
-    public init(id: String, title: String? = nil, category: String? = nil, modelId: String, createdAt: Date, updatedAt: Date, memoryEnabled: Int, modelBinding: String? = nil, pinnedAt: Date? = nil) {
+    public init(id: String, title: String? = nil, category: String? = nil, modelId: String, createdAt: Date, updatedAt: Date, memoryEnabled: Int, modelBinding: String? = nil, pinnedAt: Date? = nil, folderId: String? = nil) {
         self.id = id; self.title = title; self.category = category; self.modelId = modelId
         self.createdAt = createdAt; self.updatedAt = updatedAt; self.memoryEnabled = memoryEnabled
-        self.modelBinding = modelBinding; self.pinnedAt = pinnedAt
+        self.modelBinding = modelBinding; self.pinnedAt = pinnedAt; self.folderId = folderId
     }
 
     public static func from(_ session: ChatSession, memoryEnabled: Bool, modelBinding: String?) -> SyncedSession {
-        SyncedSession(id: session.id, title: session.title, category: session.category, modelId: session.modelId, createdAt: session.createdAt, updatedAt: session.updatedAt, memoryEnabled: memoryEnabled ? 1 : 0, modelBinding: modelBinding, pinnedAt: session.pinnedAt)
+        SyncedSession(id: session.id, title: session.title, category: session.category, modelId: session.modelId, createdAt: session.createdAt, updatedAt: session.updatedAt, memoryEnabled: memoryEnabled ? 1 : 0, modelBinding: modelBinding, pinnedAt: session.pinnedAt, folderId: session.folderId)
     }
 
     public func portableRecord(unknownFields: [String: PortableFieldValue] = [:]) -> PortableRecord {
@@ -190,7 +191,11 @@ public struct SyncedSession: Codable, Equatable, Sendable {
                 "category": category.map(PortableFieldValue.string) ?? .null, "modelId": .string(modelId),
                 "createdAt": .date(createdAt), "updatedAt": .date(updatedAt), "memoryEnabled": .int(memoryEnabled),
                 "modelBinding": modelBinding.map(PortableFieldValue.string) ?? .null,
-                "pinnedAt": pinnedAt.map(PortableFieldValue.date) ?? .null
+                "pinnedAt": pinnedAt.map(PortableFieldValue.date) ?? .null,
+                // Optional field added the same way pinnedAt was (no schema
+                // bump): a peer that predates folders ignores the unknown key
+                // on read and omits it on write, both decoding as nil here.
+                "folderId": folderId.map(PortableFieldValue.string) ?? .null
             ], schemaVersion: 1, unknownFields: unknownFields, updatedAt: updatedAt
         )
     }
@@ -204,7 +209,8 @@ public struct SyncedSession: Codable, Equatable, Sendable {
             id: id, title: record.fields.optionalString("title"), category: record.fields.optionalString("category"),
             modelId: modelId, createdAt: createdAt, updatedAt: record.fields.date("updatedAt") ?? record.updatedAt,
             memoryEnabled: record.fields.int("memoryEnabled") ?? 1,
-            modelBinding: record.fields.optionalString("modelBinding"), pinnedAt: record.fields.optionalDate("pinnedAt")
+            modelBinding: record.fields.optionalString("modelBinding"), pinnedAt: record.fields.optionalDate("pinnedAt"),
+            folderId: record.fields.optionalString("folderId")
         )
     }
 }

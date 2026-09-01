@@ -17,6 +17,7 @@ public struct ChatSession: Identifiable, Codable, Hashable, Sendable {
     public var remoteDeviceId: String?
     public var remoteDeviceName: String?
     public var pinnedAt: Date?
+    public var folderId: String?   // non-nil if filed into a folder; NULL = ungrouped
     public var agentId: String?
     public var parentSessionId: String?
     public var spawnRole: String?
@@ -42,7 +43,8 @@ public struct ChatSession: Identifiable, Codable, Hashable, Sendable {
         spawnRole: String? = nil,
         spawnTitle: String? = nil,
         spawnStatus: String? = nil,
-        spawnResult: String? = nil
+        spawnResult: String? = nil,
+        folderId: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -62,16 +64,24 @@ public struct ChatSession: Identifiable, Codable, Hashable, Sendable {
         self.spawnTitle = spawnTitle
         self.spawnStatus = spawnStatus
         self.spawnResult = spawnResult
+        self.folderId = folderId
     }
 
     public var isSubagent: Bool { spawnRole == "subagent" }
     public var isRemote: Bool { remoteDeviceId != nil }
     public var isPinned: Bool { pinnedAt != nil }
+    /// Whether this session belongs to a folder.
+    public var isFiled: Bool { folderId != nil }
 
     public static func == (lhs: ChatSession, rhs: ChatSession) -> Bool {
         lhs.id == rhs.id
             && lhs.updatedAt == rhs.updatedAt
             && lhs.pinnedAt == rhs.pinnedAt
+            // `folderId` MUST be compared: moving a session between folders
+            // changes neither `updatedAt` nor any other compared field, so
+            // without this the sidebar would keep rendering the row in its old
+            // section until some unrelated mutation bumped the diff.
+            && lhs.folderId == rhs.folderId
             && lhs.title == rhs.title
             && lhs.category == rhs.category
             && lhs.source == rhs.source
@@ -84,6 +94,71 @@ public struct ChatSession: Identifiable, Codable, Hashable, Sendable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
         hasher.combine(updatedAt)
+    }
+}
+
+/// A user-created folder that groups sessions on the home list.
+///
+/// Named "Folder" rather than "Group" on purpose: the codebase already has
+/// three other "group"s — `ModelGroup` (the LLM provider fallback group behind
+/// the home FAB's "New Chat with Group"), the `__grp__` draft-session id
+/// encoding (which embeds a ModelGroup id), and SwiftUI's `Group {}`.
+///
+/// Identity is a locally generated UUID, and `name` deliberately carries no
+/// uniqueness constraint:
+///
+/// - **Why not key on the name.** Renaming would stop being a single-field
+///   edit and become an identity change (delete old key, create new key,
+///   migrate every member). That multi-row operation tears across devices: if
+///   device A renames while device B files sessions under the old name, B's
+///   sessions end up referencing a key that no longer exists and silently fall
+///   back to ungrouped. With a UUID, a rename is one LWW field on `FolderV2`
+///   and members are untouched.
+/// - **Why duplicate names are allowed.** Two devices each creating "Work"
+///   offline produce two distinct UUIDs, and both are kept. Auto-merging is
+///   irreversible and two same-named folders are not necessarily the same
+///   thing; the user can always move sessions across and dissolve the leftover.
+///   Consequence: any *name-based* lookup must tolerate multiple matches (see
+///   `findFolderByName`).
+public struct ChatFolder: Identifiable, Codable, Hashable, Sendable {
+    public let id: String
+    public var name: String
+    public var icon: String?         // SF Symbol name; nil = use the composed icon
+    public var color: String?        // theme color token
+    public var origin: String        // "manual" | "ai" — provenance only, no behavior
+    public var sortIndex: Int        // reserved for V2 drag-reorder
+    public var pinnedAt: Date?       // non-nil = folder pinned above unpinned folders
+    /// One-sentence description (≤100 chars). Auto-grouping context; never
+    /// rendered in the home list, but shown as the Move-to-Group picker row
+    /// subtitle and surfaced for editing in the rename dialog.
+    public var desc: String?
+    public let createdAt: Date
+    public var updatedAt: Date
+
+    public var isPinned: Bool { pinnedAt != nil }
+
+    public init(
+        id: String = UUID().uuidString,
+        name: String,
+        icon: String? = nil,
+        color: String? = nil,
+        origin: String = "manual",
+        sortIndex: Int = 0,
+        pinnedAt: Date? = nil,
+        desc: String? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.name = name
+        self.icon = icon
+        self.color = color
+        self.origin = origin
+        self.sortIndex = sortIndex
+        self.pinnedAt = pinnedAt
+        self.desc = desc
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 

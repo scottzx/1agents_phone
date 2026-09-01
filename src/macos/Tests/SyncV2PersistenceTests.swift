@@ -12,7 +12,10 @@ final class SyncV2PersistenceTests: XCTestCase {
         XCTAssertEqual(session.id, SyncRecordID(type: "SessionV2", id: "session-1"))
         XCTAssertEqual(Set(session.fields.keys), [
             "sessionId", "title", "category", "modelId", "createdAt",
-            "updatedAt", "memoryEnabled", "modelBinding", "pinnedAt"
+            // folderId joined SessionV2 with upstream's session folders, the
+            // same way pinnedAt did: an optional field, no schema bump, absent
+            // on peers that predate it.
+            "updatedAt", "memoryEnabled", "modelBinding", "pinnedAt", "folderId"
         ])
 
         let message = SyncedMessage(

@@ -1,21 +1,23 @@
 import SwiftUI
 import UIKit
 
+enum MinisNavigationHeaderAlignment {
+    case center
+    case leading
+
+    fileprivate var frameAlignment: SwiftUI.Alignment {
+        switch self {
+        case .center: return .center
+        case .leading: return .leading
+        }
+    }
+}
+
 /// Shared inline-navigation title used by the app home and conversation pages.
 /// Callers choose placement/alignment; an optional accessory slot supports
 /// compact status badges or actions without duplicating title typography.
 struct MinisNavigationHeader<Accessory: View>: View {
-    enum Alignment {
-        case center
-        case leading
-
-        fileprivate var frameAlignment: SwiftUI.Alignment {
-            switch self {
-            case .center: return .center
-            case .leading: return .leading
-            }
-        }
-    }
+    typealias Alignment = MinisNavigationHeaderAlignment
 
     let title: String
     var alignment: Alignment
@@ -90,11 +92,51 @@ extension MinisNavigationHeader where Accessory == EmptyView {
     }
 }
 
+/// A page-owned navigation header container that hosts custom Leading, Center and Trailing slots.
+struct MinisCustomPageHeader<Leading: View, Center: View, Trailing: View>: View {
+    private let leading: Leading
+    private let center: Center
+    private let trailing: Trailing
+
+    init(
+        @ViewBuilder leading: () -> Leading,
+        @ViewBuilder center: () -> Center,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.leading = leading()
+        self.center = center()
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        ZStack {
+            center
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 88)
+
+            HStack(spacing: 0) {
+                leading
+                    .fixedSize()
+                Spacer(minLength: 0)
+                trailing
+                    .fixedSize()
+            }
+        }
+        .frame(height: 52)
+        .padding(.horizontal, 12)
+        .background(Color(uiColor: .systemBackground))
+        .overlay(alignment: .bottom) {
+            Divider().opacity(0.35)
+        }
+    }
+}
+
 /// A page-owned navigation header. Unlike a system `.toolbar`, this view is
 /// part of the destination's own hierarchy, so its back button, title and
 /// actions travel together during push/pop and interactive swipe transitions.
 struct MinisPageHeader<Leading: View, Trailing: View>: View {
     let title: String
+    var alignment: MinisNavigationHeaderAlignment
     var onTitleTap: (() -> Void)?
     var titleBlurRadius: CGFloat
     private let leading: Leading
@@ -102,12 +144,14 @@ struct MinisPageHeader<Leading: View, Trailing: View>: View {
 
     init(
         title: String,
+        alignment: MinisNavigationHeaderAlignment = .center,
         onTitleTap: (() -> Void)? = nil,
         titleBlurRadius: CGFloat = 0,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder trailing: () -> Trailing
     ) {
         self.title = title
+        self.alignment = alignment
         self.onTitleTap = onTitleTap
         self.titleBlurRadius = titleBlurRadius
         self.leading = leading()
@@ -115,21 +159,45 @@ struct MinisPageHeader<Leading: View, Trailing: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            leading
-                .fixedSize()
+        Group {
+            if alignment == .center {
+                ZStack {
+                    MinisNavigationHeader(
+                        title: title,
+                        alignment: .center,
+                        onTitleTap: onTitleTap
+                    )
+                    .blur(radius: titleBlurRadius)
+                    .allowsHitTesting(titleBlurRadius == 0)
+                    .padding(.horizontal, 88)
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-            MinisNavigationHeader(
-                title: title,
-                alignment: .leading,
-                onTitleTap: onTitleTap
-            )
-            .blur(radius: titleBlurRadius)
-            .allowsHitTesting(titleBlurRadius == 0)
-            .layoutPriority(1)
+                    HStack(spacing: 0) {
+                        leading
+                            .fixedSize()
+                        Spacer(minLength: 0)
+                        trailing
+                            .fixedSize()
+                    }
+                }
+            } else {
+                HStack(spacing: 10) {
+                    leading
+                        .fixedSize()
 
-            trailing
-                .fixedSize()
+                    MinisNavigationHeader(
+                        title: title,
+                        alignment: .leading,
+                        onTitleTap: onTitleTap
+                    )
+                    .blur(radius: titleBlurRadius)
+                    .allowsHitTesting(titleBlurRadius == 0)
+                    .layoutPriority(1)
+
+                    trailing
+                        .fixedSize()
+                }
+            }
         }
         .frame(height: 52)
         .padding(.horizontal, 12)

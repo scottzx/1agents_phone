@@ -147,52 +147,9 @@ struct AgentListView: View {
                     roster
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Menu {
-                        ForEach(ChatListMode.allCases) { mode in
-                            Button {
-                                selectedMode = mode
-                                searchText = ""
-                            } label: {
-                                Label(mode.rawValue, systemImage: selectedMode == mode ? "checkmark" : mode.systemImage)
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(selectedMode.rawValue)
-                                .font(.headline)
-                            Image(systemName: "chevron.down")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .foregroundStyle(.primary)
-                    }
-                    .accessibilityLabel(String(localized: "切换聊天列表"))
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button {
-                            startNewSession()
-                        } label: {
-                            Label(String(localized: "新建对话"), systemImage: "square.and.pencil")
-                        }
-                        Button {
-                            showingCreate = true
-                        } label: {
-                            Label(String(localized: "新建智能体"), systemImage: "person.badge.plus")
-                        }
-                        Button {
-                            showingCreateGroup = true
-                        } label: {
-                            Label(String(localized: "新建群聊"), systemImage: "person.2.badge.plus")
-                        }
-                        .disabled(displayAgents.count < 2)
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel(String(localized: "新建"))
-                }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                chatRootHeader
             }
             .navigationDestination(for: AgentRoute.self) { route in
                 Group {
@@ -228,6 +185,65 @@ struct AgentListView: View {
             }
         }
         .toolbar(chatPath.isEmpty ? .visible : .hidden, for: .tabBar)
+    }
+
+    private var chatRootHeader: some View {
+        MinisCustomPageHeader(
+            leading: {
+                Color.clear.frame(width: 40, height: 40)
+            },
+            center: {
+                Menu {
+                    ForEach(ChatListMode.allCases) { mode in
+                        Button {
+                            selectedMode = mode
+                            searchText = ""
+                        } label: {
+                            Label(mode.rawValue, systemImage: selectedMode == mode ? "checkmark" : mode.systemImage)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(selectedMode.rawValue)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Image(systemName: "chevron.down")
+                            .font(.caption2.weight(.semibold))
+                    }
+                    .foregroundStyle(Color(UIColor.label))
+                }
+                .tint(Color(UIColor.label))
+                .accessibilityLabel(String(localized: "切换聊天列表"))
+            },
+            trailing: {
+                Menu {
+                    Button {
+                        startNewSession()
+                    } label: {
+                        Label(String(localized: "新建对话"), systemImage: "square.and.pencil")
+                    }
+                    Button {
+                        showingCreate = true
+                    } label: {
+                        Label(String(localized: "新建智能体"), systemImage: "person.badge.plus")
+                    }
+                    Button {
+                        showingCreateGroup = true
+                    } label: {
+                        Label(String(localized: "新建群聊"), systemImage: "person.2.badge.plus")
+                    }
+                    .disabled(displayAgents.count < 2)
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color(UIColor.label))
+                        .frame(width: 40, height: 40)
+                        .contentShape(Circle())
+                }
+                .tint(Color(UIColor.label))
+                .accessibilityLabel(String(localized: "新建"))
+            }
+        )
     }
 
     /// Navigate to a session that arrived from outside the roster. Routed
@@ -294,7 +310,7 @@ struct AgentListView: View {
                 }
             } header: {
                 filterAndSearchBar
-                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
                     .textCase(nil)
             }
         }

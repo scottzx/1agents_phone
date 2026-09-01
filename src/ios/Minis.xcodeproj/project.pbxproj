@@ -193,6 +193,9 @@
 		E5D00037 /* AgentLoopModelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00038 /* AgentLoopModelsView.swift */; };
 		E5D00050 /* models-dev-api.json in Resources */ = {isa = PBXBuildFile; fileRef = E5D00060 /* models-dev-api.json */; };
 		E5D00099 /* ProviderConfigDB.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D00199 /* ProviderConfigDB.swift */; };
+		E5D0A101 /* ModelReleaseIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D0A102 /* ModelReleaseIndex.swift */; };
+		E5DA0001 /* VisionGroupResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5DA0002 /* VisionGroupResolver.swift */; };
+		E5DRC0010 /* DebugRPCConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5DRC0020 /* DebugRPCConfig.swift */; };
 		E5DVO0001 /* DebugViewOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5DVO0011 /* DebugViewOverlay.swift */; };
 		E5E000001 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E000011 /* ShareViewController.swift */; };
 		E5E000003 /* ShareViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5E000013 /* ShareViewModel.swift */; };
@@ -218,6 +221,7 @@
 		E5F200006 /* ModelSelectionEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F200016 /* ModelSelectionEntity.swift */; };
 		E5F2000FA /* TextFadeAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F2000FB /* TextFadeAnimator.swift */; };
 		E5F2009A1 /* EquatableContextMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F2009B1 /* EquatableContextMenu.swift */; };
+		E5F200AA1 /* MemoryWriteRevoker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5F200AB1 /* MemoryWriteRevoker.swift */; };
 		E5FMI0001 /* FileMentionIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FMI0011 /* FileMentionIndex.swift */; };
 		E5FP00001 /* FileProviderExtension.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FP00011 /* FileProviderExtension.swift */; };
 		E5FP00002 /* FileProviderEnumerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FP00012 /* FileProviderEnumerator.swift */; };
@@ -342,8 +346,6 @@
 		E5QA0002 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5QA0102 /* AppDelegate.swift */; };
 		E5QA0003 /* QuickActionWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5QA0103 /* QuickActionWorkflow.swift */; };
 		E5QT00001 /* ModelQuickTestSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5QT00011 /* ModelQuickTestSheet.swift */; };
-		E5R000001 /* ICloudBackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5R000011 /* ICloudBackupManager.swift */; };
-		E5R000002 /* ICloudBackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5R000012 /* ICloudBackupView.swift */; };
 		E5S000001 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5S000011 /* DeviceIdentity.swift */; };
 		E5S000002 /* CloudSyncEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5S000012 /* CloudSyncEngine.swift */; };
 		E5S000003 /* SessionForkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5S000013 /* SessionForkManager.swift */; };
@@ -373,6 +375,13 @@
 		E5T00000B /* UserMessageEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T00001B /* UserMessageEntity.swift */; };
 		E5T0000A1 /* AskMinisIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5T0000A2 /* AskMinisIntent.swift */; };
 		E5TLC0001 /* ThinkingLevelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TLC0002 /* ThinkingLevelCatalog.swift */; };
+		E5TRC001 /* ThinkingRuleCoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TRC002 /* ThinkingRuleCoding.swift */; };
+		E5TRC0010 /* ThinkingRulesCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TRC0020 /* ThinkingRulesCollection.swift */; };
+		E5TRE001 /* ThinkingRuleEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TRE002 /* ThinkingRuleEditorView.swift */; };
+		E5TRS001 /* ThinkingRulesSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TRS002 /* ThinkingRulesSection.swift */; };
+		E5TWF001 /* ThinkingWireFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TWF002 /* ThinkingWireFormat.swift */; };
+		E5TWR001 /* ThinkingRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TWR002 /* ThinkingRule.swift */; };
+		E5TWS001 /* ThinkingRuleResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5TWS002 /* ThinkingRuleResolver.swift */; };
 		E5U000001 /* KaTeXRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5U000011 /* KaTeXRenderer.swift */; };
 		E5U000002 /* KaTeX in Resources */ = {isa = PBXBuildFile; fileRef = E5U000012 /* KaTeX */; };
 		E5UMP0001 /* UnifiedModelPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5UMP0011 /* UnifiedModelPicker.swift */; };
@@ -807,6 +816,9 @@
 		E5D00038 /* AgentLoopModelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentLoopModelsView.swift; sourceTree = "<group>"; };
 		E5D00060 /* models-dev-api.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = "models-dev-api.json"; path = "Resources/models-dev-api.json"; sourceTree = "<group>"; };
 		E5D00199 /* ProviderConfigDB.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderConfigDB.swift; sourceTree = "<group>"; };
+		E5D0A102 /* ModelReleaseIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelReleaseIndex.swift; sourceTree = "<group>"; };
+		E5DA0002 /* VisionGroupResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VisionGroupResolver.swift; sourceTree = "<group>"; };
+		E5DRC0020 /* DebugRPCConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugRPCConfig.swift; sourceTree = "<group>"; };
 		E5DVO0011 /* DebugViewOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugViewOverlay.swift; sourceTree = "<group>"; };
 		E5E000010 /* MinisShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MinisShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E5E000011 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -833,6 +845,7 @@
 		E5F200016 /* ModelSelectionEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelSelectionEntity.swift; sourceTree = "<group>"; };
 		E5F2000FB /* TextFadeAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextFadeAnimator.swift; sourceTree = "<group>"; };
 		E5F2009B1 /* EquatableContextMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquatableContextMenu.swift; sourceTree = "<group>"; };
+		E5F200AB1 /* MemoryWriteRevoker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryWriteRevoker.swift; sourceTree = "<group>"; };
 		E5FMI0011 /* FileMentionIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileMentionIndex.swift; sourceTree = "<group>"; };
 		E5FP00010 /* MinisFileProvider.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MinisFileProvider.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E5FP00011 /* FileProviderExtension.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileProviderExtension.swift; sourceTree = "<group>"; };
@@ -986,8 +999,6 @@
 		E5QA0102 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		E5QA0103 /* QuickActionWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActionWorkflow.swift; sourceTree = "<group>"; };
 		E5QT00011 /* ModelQuickTestSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelQuickTestSheet.swift; sourceTree = "<group>"; };
-		E5R000011 /* ICloudBackupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudBackupManager.swift; sourceTree = "<group>"; };
-		E5R000012 /* ICloudBackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ICloudBackupView.swift; sourceTree = "<group>"; };
 		E5S000011 /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 		E5S000012 /* CloudSyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CloudSyncEngine.swift; sourceTree = "<group>"; };
 		E5S000013 /* SessionForkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionForkManager.swift; sourceTree = "<group>"; };
@@ -1016,6 +1027,13 @@
 		E5T00001B /* UserMessageEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserMessageEntity.swift; sourceTree = "<group>"; };
 		E5T0000A2 /* AskMinisIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskMinisIntent.swift; sourceTree = "<group>"; };
 		E5TLC0002 /* ThinkingLevelCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingLevelCatalog.swift; sourceTree = "<group>"; };
+		E5TRC002 /* ThinkingRuleCoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ThinkingRuleCoding.swift; path = Thinking/ThinkingRuleCoding.swift; sourceTree = "<group>"; };
+		E5TRC0020 /* ThinkingRulesCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ThinkingRulesCollection.swift; path = Config/Collections/ThinkingRulesCollection.swift; sourceTree = "<group>"; };
+		E5TRE002 /* ThinkingRuleEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingRuleEditorView.swift; sourceTree = "<group>"; };
+		E5TRS002 /* ThinkingRulesSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThinkingRulesSection.swift; sourceTree = "<group>"; };
+		E5TWF002 /* ThinkingWireFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ThinkingWireFormat.swift; path = Thinking/ThinkingWireFormat.swift; sourceTree = "<group>"; };
+		E5TWR002 /* ThinkingRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ThinkingRule.swift; path = Thinking/ThinkingRule.swift; sourceTree = "<group>"; };
+		E5TWS002 /* ThinkingRuleResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ThinkingRuleResolver.swift; path = Thinking/ThinkingRuleResolver.swift; sourceTree = "<group>"; };
 		E5U000011 /* KaTeXRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KaTeXRenderer.swift; sourceTree = "<group>"; };
 		E5U000012 /* KaTeX */ = {isa = PBXFileReference; lastKnownFileType = folder; name = KaTeX; path = Resources/KaTeX; sourceTree = "<group>"; };
 		E5UMP0011 /* UnifiedModelPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedModelPicker.swift; sourceTree = "<group>"; };
@@ -1442,10 +1460,16 @@
 				E5D00013 /* ModelEntry.swift */,
 				E5D00014 /* ModelGroup.swift */,
 				E5TLC0002 /* ThinkingLevelCatalog.swift */,
+				E5TWF002 /* ThinkingWireFormat.swift */,
+				E5TRC002 /* ThinkingRuleCoding.swift */,
+				E5TWR002 /* ThinkingRule.swift */,
+				E5TWS002 /* ThinkingRuleResolver.swift */,
 				E5D00015 /* ProviderConfigStore.swift */,
 				E5D00199 /* ProviderConfigDB.swift */,
 				E5D00016 /* ModelGroupRouter.swift */,
+				E5DA0002 /* VisionGroupResolver.swift */,
 				E5D00017 /* ProviderMigration.swift */,
+				E5D0A102 /* ModelReleaseIndex.swift */,
 				E5D00018 /* ModelsDevAPI.swift */,
 				E5D00019 /* URLBuilding.swift */,
 				E52000031 /* Anthropic */,
@@ -1517,6 +1541,7 @@
 				E5MSC0011 /* MarkdownSnapshotCollector.swift */,
 				E5DVO0011 /* DebugViewOverlay.swift */,
 				E54000019 /* DebugRPCProviderChat.swift */,
+				E5DRC0020 /* DebugRPCConfig.swift */,
 				E5VC00014 /* VoiceCorrectionDebugRPC.swift */,
 				E5400009B /* DebugRPCMCP.swift */,
 				E54000014 /* AgentRequestTrace.swift */,
@@ -1701,6 +1726,7 @@
 				E5CFG001E /* ProvidersCollection.swift */,
 				E5CFG001F /* ModelsCollection.swift */,
 				E5CFG0030 /* GroupsCollection.swift */,
+				E5TRC0020 /* ThinkingRulesCollection.swift */,
 				E5CFG0031 /* EnvVarsCollection.swift */,
 				E5S000011 /* DeviceIdentity.swift */,
 				F1S00010 /* Environment */,
@@ -1989,7 +2015,6 @@
 			isa = PBXGroup;
 			children = (
 				E5S000012 /* CloudSyncEngine.swift */,
-				E5R000011 /* ICloudBackupManager.swift */,
 				E5S000016 /* SyncDirtyScanner.swift */,
 				F1A00099 /* V2 */,
 			);
@@ -2105,6 +2130,7 @@
 				E5F200013 /* AssistantBlockView.swift */,
 				E5F200014 /* ChatMessageViews.swift */,
 				E5F2009B1 /* EquatableContextMenu.swift */,
+				E5F200AB1 /* MemoryWriteRevoker.swift */,
 				E5F200015 /* ChatInputBar.swift */,
 				E5F2000FB /* TextFadeAnimator.swift */,
 				E5I000012 /* AudioWaveformView.swift */,
@@ -2163,6 +2189,8 @@
 				E5QT00011 /* ModelQuickTestSheet.swift */,
 				E5D00036 /* OnboardingModelSelectionView.swift */,
 				E5D00031 /* ProviderInstanceDetailView.swift */,
+				E5TRS002 /* ThinkingRulesSection.swift */,
+				E5TRE002 /* ThinkingRuleEditorView.swift */,
 				E5D00030 /* ProviderInstancesView.swift */,
 				E5SVP0031 /* ShadowVoiceProviderDetailView.swift */,
 				E5D00035 /* SessionModelPicker.swift */,
@@ -2197,7 +2225,6 @@
 		F1V00015 /* Backup */ = {
 			isa = PBXGroup;
 			children = (
-				E5R000012 /* ICloudBackupView.swift */,
 			);
 			path = Backup;
 			sourceTree = "<group>";
@@ -2278,6 +2305,7 @@
 				AA26BD2D2F2E659300AECF2D /* Copy Alpine Rootfs */,
 				AAF00F032F50A00000049557 /* Embed Frameworks */,
 				E5E000060 /* Embed Foundation Extensions */,
+				E54000AE0 /* Strip Third-Party VAD Framework Symbols */,
 			);
 			buildRules = (
 			);
@@ -2644,6 +2672,21 @@
 			shellPath = /bin/sh;
 			shellScript = "set -eu\nif [ \"${CONFIGURATION}\" = \"Debug\" ]; then\n  bash \"$SRCROOT/../../scripts/gen_debug_skill.sh\"\nelse\n  # Release: emit an empty stub so the source file always compiles.\n  OUT=\"$SRCROOT/Generated/DebugSkillGenerated.swift\"\n  mkdir -p \"$SRCROOT/Generated\"\n  printf '#if DEBUG\\nenum DebugSkillGenerated {\\n    static let skillMarkdownB64 = \"\"\\n    static let clientPythonB64 = \"\"\\n    static let clientNodeB64 = \"\"\\n    static let clientBashB64 = \"\"\\n}\\n#endif\\n' > \"$OUT\"\nfi\n";
 		};
+		E54000AE0 /* Strip Third-Party VAD Framework Symbols */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Strip Third-Party VAD Framework Symbols";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# [T-ios-strip-vad-symbols] Strip local symbols from the prebuilt\n# RealTimeCutVADCXXLibrary framework (RealTimeCutVADLibrary SPM package).\n#\n# WHY: the upstream xcframework ships unstripped. It statically links a full\n# ONNX Runtime + MLAS kernel set, so the arm64 binary is ~26MB of which ~9MB is\n# nothing but local symbols the app can never call. `strip -x` discards ONLY\n# local symbols; all 3610 global exports (_OrtGetApiBase, _MlasGemm*, the\n# Obj-C/C++ entry points) survive, so dynamic linking is unaffected.\n#\n# WHY THIS PHASE RUNS LAST (after Embed Frameworks):\n# This framework comes from an SPM binaryTarget, and Xcode embeds those by\n# copying STRAIGHT FROM THE PACKAGE ARTIFACT DIRECTORY\n# ($BUILD_DIR/../../SourcePackages/artifacts/...), not from $BUILT_PRODUCTS_DIR.\n# Verified empirically: stripping the $BUILT_PRODUCTS_DIR copy before the embed\n# left the .app copy untouched at the original 26.45MB, because that copy is\n# never the source. So the strip has to happen on the binary already inside\n# .app/Frameworks, which necessarily means after the embed phase.\n#\n# WHY WE RE-SIGN HERE (and why that is unavoidable):\n# Xcode signs an embedded framework as part of the copy. Modifying the Mach-O\n# afterwards invalidates that signature, and nothing downstream re-signs the\n# framework for us, so this script must do it. That is a deliberate deviation\n# from \"strip before the copy and let Xcode's codesign-on-copy handle it\" —\n# which is the tidier pattern but simply does not apply to SPM binaryTargets.\n# The re-sign is narrow: same ${EXPANDED_CODE_SIGN_IDENTITY} the app itself\n# uses, no entitlements (the framework has none — verified with\n# `codesign -d --entitlements`), and only this one framework is touched. The\n# app bundle's own signature is applied after all build phases, so re-signing a\n# nested framework here is seen by that final pass, and\n# `codesign --verify --deep --strict` passes on the result.\n#\n# Release only: Debug keeps full symbols so the framework stays debuggable.\n# The gate is $CONFIGURATION rather than runOnlyForDeploymentPostprocessing,\n# because that field means \"only during install/archive\" and would skip a plain\n# `xcodebuild -configuration Release` build.\nset -eu\nif [ \"${CONFIGURATION}\" != \"Release\" ]; then\n  echo \"note: skipping VAD strip (CONFIGURATION=${CONFIGURATION}, Release only)\"\n  exit 0\nfi\nFW=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/RealTimeCutVADCXXLibrary.framework\"\nBIN=\"$FW/RealTimeCutVADCXXLibrary\"\nif [ ! -f \"$BIN\" ]; then\n  echo \"note: $BIN not present — nothing to strip\"\n  exit 0\nfi\nif [ \"$(/usr/bin/nm \"$BIN\" 2>/dev/null | wc -l)\" -le \"$(/usr/bin/nm -g \"$BIN\" 2>/dev/null | wc -l)\" ]; then\n  echo \"note: $BIN already stripped — skipping\"\n  exit 0\nfi\nBEFORE=$(/usr/bin/stat -f%z \"$BIN\")\n/usr/bin/strip -x \"$BIN\"\nAFTER=$(/usr/bin/stat -f%z \"$BIN\")\n# Re-sign: stripping invalidated the signature Xcode applied during the copy.\nif [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ] && [ \"${CODE_SIGNING_REQUIRED:-YES}\" != \"NO\" ]; then\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" ${OTHER_CODE_SIGN_FLAGS:-} --preserve-metadata=identifier,flags --timestamp=none \"$FW\"\n  echo \"note: re-signed $FW with ${EXPANDED_CODE_SIGN_IDENTITY_NAME:-$EXPANDED_CODE_SIGN_IDENTITY}\"\nelse\n  echo \"note: code signing disabled — skipped re-sign\"\nfi\necho \"note: stripped VAD framework ($BEFORE -> $AFTER bytes)\"\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -2787,6 +2830,7 @@
 				E5F200003 /* AssistantBlockView.swift in Sources */,
 				E5F200004 /* ChatMessageViews.swift in Sources */,
 				E5F2009A1 /* EquatableContextMenu.swift in Sources */,
+				E5F200AA1 /* MemoryWriteRevoker.swift in Sources */,
 				E5F200005 /* ChatInputBar.swift in Sources */,
 				E5F2000FA /* TextFadeAnimator.swift in Sources */,
 				F1M00012 /* AudioPlayback.swift in Sources */,
@@ -2899,6 +2943,7 @@
 				E5DVO0001 /* DebugViewOverlay.swift in Sources */,
 				E54000007 /* DebugMethodRegistry.swift in Sources */,
 				E54000009 /* DebugRPCProviderChat.swift in Sources */,
+				E5DRC0010 /* DebugRPCConfig.swift in Sources */,
 				E5400009A /* DebugRPCMCP.swift in Sources */,
 				E54000004 /* AgentRequestTrace.swift in Sources */,
 				E5VIC0001 /* VoiceInputCapture.swift in Sources */,
@@ -2943,14 +2988,22 @@
 				E5D00003 /* ModelEntry.swift in Sources */,
 				E5D00004 /* ModelGroup.swift in Sources */,
 				E5TLC0001 /* ThinkingLevelCatalog.swift in Sources */,
+				E5TWF001 /* ThinkingWireFormat.swift in Sources */,
+				E5TRC001 /* ThinkingRuleCoding.swift in Sources */,
+				E5TWR001 /* ThinkingRule.swift in Sources */,
+				E5TWS001 /* ThinkingRuleResolver.swift in Sources */,
 				E5D00005 /* ProviderConfigStore.swift in Sources */,
 				E5D00099 /* ProviderConfigDB.swift in Sources */,
 				E5D00006 /* ModelGroupRouter.swift in Sources */,
+				E5DA0001 /* VisionGroupResolver.swift in Sources */,
 				E5D00007 /* ProviderMigration.swift in Sources */,
+				E5D0A101 /* ModelReleaseIndex.swift in Sources */,
 				E5D00008 /* ModelsDevAPI.swift in Sources */,
 				E5D00009 /* URLBuilding.swift in Sources */,
 				E5D00020 /* ProviderInstancesView.swift in Sources */,
 				E5D00021 /* ProviderInstanceDetailView.swift in Sources */,
+				E5TRS001 /* ThinkingRulesSection.swift in Sources */,
+				E5TRE001 /* ThinkingRuleEditorView.swift in Sources */,
 				E5SVP0021 /* ShadowVoiceProviderDetailView.swift in Sources */,
 				E5D00022 /* AddProviderView.swift in Sources */,
 				E5KIMIUI1 /* KimiDeviceLoginSheet.swift in Sources */,
@@ -3026,14 +3079,13 @@
 				E5CFG000E /* ProvidersCollection.swift in Sources */,
 				E5CFG000F /* ModelsCollection.swift in Sources */,
 				E5CFG0020 /* GroupsCollection.swift in Sources */,
+				E5TRC0010 /* ThinkingRulesCollection.swift in Sources */,
 				E5CFG0021 /* EnvVarsCollection.swift in Sources */,
 				E5Q000001 /* BPETokenizer.swift in Sources */,
 				E5MDS0003 /* MarkdownStripper.swift in Sources */,
 				E5Q000003 /* AppLogger.swift in Sources */,
 				F1S00012 /* ChatSessionIdEnvironment.swift in Sources */,
 				E5Q000004 /* FontSettings.swift in Sources */,
-				E5R000001 /* ICloudBackupManager.swift in Sources */,
-				E5R000002 /* ICloudBackupView.swift in Sources */,
 				E5S000001 /* DeviceIdentity.swift in Sources */,
 				E5S000002 /* CloudSyncEngine.swift in Sources */,
 				E5S000003 /* SessionForkManager.swift in Sources */,
@@ -3465,7 +3517,7 @@
 					"@executable_path/Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
-				MARKETING_VERSION = 1.11;
+				MARKETING_VERSION = 1.12;
 				OTHER_LDFLAGS = (
 					"-lish_emu",
 					"-lish",
@@ -3547,7 +3599,7 @@
 					"@executable_path/Frameworks",
 				);
 				LIBRARY_SEARCH_PATHS = "$(SRCROOT)/../../deps/libs";
-				MARKETING_VERSION = 1.11;
+				MARKETING_VERSION = 1.12;
 				OTHER_LDFLAGS = (
 					"-lish_emu",
 					"-lish",

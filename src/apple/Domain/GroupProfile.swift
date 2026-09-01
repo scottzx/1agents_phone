@@ -197,20 +197,19 @@ public struct GroupMessage: Equatable, Hashable, Sendable {
     }
 }
 
-/// The four caps that make a runaway room structurally impossible, plus the
-/// projection window. Values match grok-bot's (`GROUP_MAX_ROUNDS`,
-/// `GROUP_MAX_MEMBER_TURNS`, `GROUP_PROMPT_HISTORY_LIMIT`); the reasoning is
-/// theirs and it holds here: caps are cheaper and far more predictable than any
-/// heuristic for "the conversation has finished".
+/// One capacity definition shared by every user-message execution surface.
+/// Ordinary conversations, A2A deliveries and expanded group-member turns all
+/// acquire from the same FIFO session manager on iOS.
+public enum AgentSessionLimits {
+    public static let maxConcurrentRuns = 5
+}
+
+/// The bounded transcript projection shown to a member for one turn.
+///
+/// Group execution itself is intentionally not capped by rounds, member turns,
+/// or elapsed time. A freeform room keeps routing while members keep producing
+/// addressed messages, and stops when the room becomes quiet or is cancelled.
 public enum GroupChatLimits {
-    /// Rounds of speaking per user message.
-    public static let maxRounds = 3
-    /// Total member messages per user message, across all rounds.
-    public static let maxMemberTurns = 10
     /// Transcript lines shown to a member in one turn prompt.
     public static let promptHistoryLimit = 24
-    /// Ceiling on how long one member's turn may run before the room moves on.
-    /// Same value as SubagentTools.maxWaitSeconds, for the same reason: a group
-    /// turn is no more entitled to block than a dispatched task is.
-    public static let memberTurnTimeoutSeconds = 240
 }

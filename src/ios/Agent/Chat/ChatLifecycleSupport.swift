@@ -278,33 +278,62 @@ final class KeepScreenAwakeController {
 final class SessionConcurrencyManager: ObservableObject {
     static let shared = SessionConcurrencyManager()
 
-    let maxConcurrent: Int = 5
+    let maxConcurrent: Int
 
     @Published private(set) var runningSessions: Set<String> = []
     @Published private(set) var suspendedSessions: [String] = []
-    private var waiters: [(id: String, continuation: CheckedContinuation<Void, Never>)] = []
+    private var runningCounts: [String: Int] = [:]
+    private var waiters: [(id: String, continuation: CheckedContinuation<Bool, Never>)] = []
+
+    private var occupiedSlotCount: Int {
+        runningCounts.values.reduce(0, +)
+    }
+
+    var isAtCapacity: Bool {
+        occupiedSlotCount >= maxConcurrent
+    }
+
+    init(maxConcurrent: Int = AgentSessionLimits.maxConcurrentRuns) {
+        self.maxConcurrent = max(1, maxConcurrent)
+    }
 
     /// Acquire a processing slot. Returns immediately if under limit, otherwise suspends until a slot opens.
     func acquireSlot(sessionId: String) async throws {
-        if runningSessions.count < maxConcurrent {
-            runningSessions.insert(sessionId)
+        // A newcomer must not use a temporarily visible vacancy while an older
+        // waiter is being resumed. `fillAvailableSlots` reserves released slots
+        // in `runningSessions` before continuations are resumed, and this queue
+        // check makes FIFO explicit even if state is inspected mid-transition.
+        if waiters.isEmpty, occupiedSlotCount < maxConcurrent {
+            reserveSlot(sessionId: sessionId)
             return
         }
 
-        // Over limit — suspend and wait
+        // Over limit (or older work is already queued) — suspend in arrival order.
         suspendedSessions.append(sessionId)
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        let granted = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             waiters.append((id: sessionId, continuation: continuation))
         }
-        // After resuming, check if the task was cancelled while waiting
-        try Task.checkCancellation()
-        runningSessions.insert(sessionId)
+        guard granted else { throw CancellationError() }
+        do {
+            try Task.checkCancellation()
+        } catch {
+            // The slot was reserved before this continuation resumed. Hand it
+            // directly to the next FIFO waiter if cancellation won the race.
+            releaseSlot(sessionId: sessionId)
+            throw error
+        }
     }
 
     /// Release a processing slot and resume the next waiting session (FIFO).
     func releaseSlot(sessionId: String) {
-        runningSessions.remove(sessionId)
-        resumeNextWaiter()
+        guard let count = runningCounts[sessionId], count > 0 else { return }
+        if count == 1 {
+            runningCounts.removeValue(forKey: sessionId)
+            runningSessions.remove(sessionId)
+        } else {
+            runningCounts[sessionId] = count - 1
+        }
+        fillAvailableSlots()
     }
 
     /// Cancel a suspended session's wait so cancellation can propagate.
@@ -312,7 +341,7 @@ final class SessionConcurrencyManager: ObservableObject {
         suspendedSessions.removeAll { $0 == sessionId }
         if let idx = waiters.firstIndex(where: { $0.id == sessionId }) {
             let waiter = waiters.remove(at: idx)
-            waiter.continuation.resume()
+            waiter.continuation.resume(returning: false)
         }
     }
 
@@ -321,11 +350,21 @@ final class SessionConcurrencyManager: ObservableObject {
         suspendedSessions.contains(sessionId)
     }
 
-    private func resumeNextWaiter() {
-        guard !waiters.isEmpty else { return }
-        let next = waiters.removeFirst()
-        suspendedSessions.removeAll { $0 == next.id }
-        next.continuation.resume()
+    private func fillAvailableSlots() {
+        while occupiedSlotCount < maxConcurrent, !waiters.isEmpty {
+            let next = waiters.removeFirst()
+            suspendedSessions.removeAll { $0 == next.id }
+            // Reserve synchronously before waking the task. This closes the
+            // release/resume window where a newly arrived message could barge
+            // ahead of the FIFO head or temporarily exceed the global limit.
+            reserveSlot(sessionId: next.id)
+            next.continuation.resume(returning: true)
+        }
+    }
+
+    private func reserveSlot(sessionId: String) {
+        runningCounts[sessionId, default: 0] += 1
+        runningSessions.insert(sessionId)
     }
 }
 
@@ -559,4 +598,3 @@ final class ViewModelCache {
     /// Set by MoveToSessionSheet, consumed by AIChatView on appear.
     static var pendingTransfer: PendingTransfer?
 }
-

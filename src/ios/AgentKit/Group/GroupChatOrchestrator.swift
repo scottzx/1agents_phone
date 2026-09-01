@@ -2,21 +2,19 @@
 //  GroupChatOrchestrator.swift
 //  Minis
 //
-//  Runs a group turn: decide who speaks, let them speak one at a time, and
-//  write what they said back into the room.
+//  Routes group messages in FIFO order. Every selected member becomes an
+//  independent session task in the shared global FIFO; the next source
+//  message waits for all tasks produced by the current message to settle.
 //
-//  Modelled on grok-bot 0.18's group-chat-orchestrator.ts, including the parts
-//  that look like limitations and are not:
+//  Modelled on grok-bot 0.18's group-chat-orchestrator.ts, while allowing a
+//  room to keep collaborating for as long as members keep addressing peers:
 //
-//  - **Strictly serial.** One `await` per member, never a task group. Two
-//    agents talking at once would produce a transcript nobody can follow, and
-//    it would also blow through SessionConcurrencyManager's five slots the
-//    moment the user has another conversation open.
-//  - **Four caps** (rounds x total messages x one message per member per turn x
-//    "everyone passed"). Together they make a runaway room structurally
-//    impossible, which is a much stronger guarantee than the chain-based hop
-//    guard AgentDirectoryCoordinator uses for point-to-point relays — a group's
-//    natural shape is fan-out, and a chain guard does not bound fan-out.
+//  - **Per-member tasks.** @6 creates six global queue entries immediately;
+//    the shared five session slots, not the group message, control admission.
+//  - **FIFO barrier.** A queued reply cannot wake more members until all tasks
+//    caused by the current source message have settled.
+//  - **Quiescence ends the run.** The loop stops when nobody is addressed or
+//    every selected member passes, rather than after a fixed round count.
 //  - **A failed member turn is a pass, not a room-wide failure.**
 //
 
@@ -85,7 +83,7 @@ final class GroupChatOrchestrator {
     }
 
     /// Publish an A2A line which is already stored in the shared transcript,
-    /// then let the same engine epoch and serial loop route it. The explicit
+    /// then let the same engine FIFO queue route it. The explicit
     /// seed is essential because member rows normally form a new run cursor.
     func agentDidSend(
         group: GroupProfile,
@@ -99,8 +97,8 @@ final class GroupChatOrchestrator {
         Task { _ = await self.resume(group: group, members: members, seed: trigger) }
     }
 
-    /// Stop the shared room loop between member turns. Its epoch gate ensures
-    /// the currently executing member cannot publish another room message.
+    /// Stop the shared room loop and discard queued blocks. The epoch gate
+    /// rejects member results that return after cancellation is observed.
     func cancel(groupId: String) {
         Task { await sharedEngine.cancel(roomID: groupId) }
     }
@@ -243,7 +241,7 @@ private actor IOSGroupChatRepository: GroupChatRepository {
             source: "group",
             systemPromptBlock: system,
             thinkingLevel: ThinkingLevel.off.rawValue,
-            timeoutSeconds: TimeInterval(GroupChatLimits.memberTurnTimeoutSeconds)
+            timeoutSeconds: 0
         ))
         return GroupChatMemberTurnResult(text: result.text, accepted: result.accepted, timedOut: result.timedOut, cancelled: result.cancelled)
     }

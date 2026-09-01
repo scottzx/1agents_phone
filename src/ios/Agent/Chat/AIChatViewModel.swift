@@ -2583,7 +2583,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
             // Concurrency gate: wait for a processing slot
             let concurrency = SessionConcurrencyManager.shared
-            self.isSuspended = concurrency.runningSessions.count >= concurrency.maxConcurrent
+            self.isSuspended = concurrency.isAtCapacity
             do {
                 try await concurrency.acquireSlot(sessionId: sid)
                 self.isSuspended = false
@@ -2762,7 +2762,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // Concurrency gate: wait for a processing slot
             let retrySid = self.sessionId ?? "unknown"
             let concurrency = SessionConcurrencyManager.shared
-            self.isSuspended = concurrency.runningSessions.count >= concurrency.maxConcurrent
+            self.isSuspended = concurrency.isAtCapacity
             do {
                 try await concurrency.acquireSlot(sessionId: retrySid)
                 self.isSuspended = false
@@ -2894,7 +2894,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
             let resumeSid = self.sessionId ?? "unknown"
             let concurrency = SessionConcurrencyManager.shared
-            self.isSuspended = concurrency.runningSessions.count >= concurrency.maxConcurrent
+            self.isSuspended = concurrency.isAtCapacity
             do {
                 try await concurrency.acquireSlot(sessionId: resumeSid)
                 self.isSuspended = false
@@ -3205,7 +3205,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
             // Concurrency gate: wait for a processing slot
             let retryFromSid = self.sessionId ?? "unknown"
             let concurrency = SessionConcurrencyManager.shared
-            self.isSuspended = concurrency.runningSessions.count >= concurrency.maxConcurrent
+            self.isSuspended = concurrency.isAtCapacity
             do {
                 try await concurrency.acquireSlot(sessionId: retryFromSid)
                 self.isSuspended = false

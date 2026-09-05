@@ -35,6 +35,14 @@ final class SubagentApprovalStore: ObservableObject {
             .sorted { $0.createdAt < $1.createdAt }
     }
 
+    func cancel(taskId: String) {
+        requests.removeValue(forKey: taskId)
+    }
+
+    func clearAll() {
+        requests.removeAll()
+    }
+
     func approve(taskId: String, feedback: String? = nil) async {
         guard var req = requests[taskId] else { return }
         req.status = .approved

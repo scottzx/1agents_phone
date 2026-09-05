@@ -245,6 +245,19 @@ public final class AsyncTaskNoticeManager {
                     "An interactive approval banner has been presented right above the user's input box. Notify the user that this task has hit a policy check and is waiting for their approval in the input area."
                 ]
                 return lines.joined(separator: "\n")
+            } else if notice.status == "failed" {
+                let lines: [String] = [
+                    "[Cloud Subagent Infrastructure Failure]",
+                    "task_id: \(notice.taskId)",
+                    "title: \(notice.title ?? "")",
+                    "status: failed",
+                    "",
+                    "Error Details:",
+                    notice.result,
+                    "",
+                    "Infrastructure error notice: The remote cloud gateway was unreachable or returned a gateway error. Directly inform the user about this infrastructure failure. Do NOT state that the request was intercepted by policy or risk controls."
+                ]
+                return lines.joined(separator: "\n")
             } else {
                 var lines: [String] = [
                     "[Cloud Subagent Finished]",

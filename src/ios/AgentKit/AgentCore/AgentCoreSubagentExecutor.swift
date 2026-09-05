@@ -115,12 +115,31 @@ final class AgentCoreSubagentExecutor: SubagentExecutor {
             } catch {
                 if Task.isCancelled { return }
                 self.logger.error("AgentCore invocation failed for task=\(taskId): \(error.localizedDescription)")
-                let failMsg = "云端 AgentCore 任务执行失败: \(error.localizedDescription)"
+
+                let failMsg: String
+                let statusDescription: String
+                if let subErr = error as? SubagentError, case .gatewayUnavailable(let code, let msg) = subErr {
+                    statusDescription = "基础设施故障 (HTTP \(code))"
+                    failMsg = """
+                    【云端基础设施故障 - 任务终止】
+                    状态: HTTP \(code)
+                    错误信息: \(msg)
+                    排查结论: 云端 AgentCore 网关资源不存在或已回收（如 12 小时试用环境到期）。
+                    说明: 本次调用属于基础设施连接故障，未进入模型或策略层，未执行任何政策比对或风控拦截。
+                    """
+                } else {
+                    statusDescription = "执行失败"
+                    failMsg = "云端 AgentCore 任务执行失败: \(error.localizedDescription)"
+                }
+
+                // Ensure no false-positive approval requests remain
+                SubagentApprovalStore.shared.cancel(taskId: taskId)
+
                 self.statuses[taskId] = SubagentStatus(
                     taskId: taskId,
                     title: task.title,
                     state: .failed,
-                    currentActivity: "执行失败",
+                    currentActivity: statusDescription,
                     iteration: 1,
                     result: failMsg,
                     isEscalated: false,
@@ -261,27 +280,60 @@ public struct DefaultAgentCoreTransport: AgentCoreTransport {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                let errText = String(data: data, encoding: .utf8) ?? ""
-                return "[escalate] Gateway returned status \(http.statusCode): \(errText)"
-            }
+        // Principle: Retry once to confirm infrastructure failure; do not continuously retry.
+        var lastFailure: SubagentError?
 
-            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let result = json["result"] as? [String: Any],
-               let content = result["content"] as? [[String: Any]],
-               let text = content.first?["text"] as? String {
-                return text
+        for attempt in 1...2 {
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                if let http = response as? HTTPURLResponse {
+                    if (200...299).contains(http.statusCode) {
+                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                            if let errorDict = json["error"] as? [String: Any] {
+                                let code = errorDict["code"] as? Int ?? -1
+                                let msg = errorDict["message"] as? String ?? "RPC Error"
+                                throw SubagentError.gatewayUnavailable(statusCode: http.statusCode, message: "\(msg) (code: \(code))")
+                            }
+                            if let result = json["result"] as? [String: Any],
+                               let content = result["content"] as? [[String: Any]],
+                               let text = content.first?["text"] as? String {
+                                return text
+                            }
+                        }
+                        return String(data: data, encoding: .utf8) ?? "Done"
+                    } else {
+                        let errText = String(data: data, encoding: .utf8) ?? ""
+                        var parsedMsg = errText
+                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                           let err = json["error"] as? [String: Any],
+                           let msg = err["message"] as? String {
+                            parsedMsg = msg
+                        }
+                        throw SubagentError.gatewayUnavailable(
+                            statusCode: http.statusCode,
+                            message: parsedMsg.isEmpty ? "HTTP status \(http.statusCode)" : parsedMsg
+                        )
+                    }
+                }
+            } catch let err as SubagentError {
+                lastFailure = err
+                if attempt == 1 {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    continue
+                }
+            } catch {
+                lastFailure = SubagentError.gatewayUnavailable(statusCode: 0, message: error.localizedDescription)
+                if attempt == 1 {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    continue
+                }
             }
-
-            return String(data: data, encoding: .utf8) ?? "Done"
-        } catch {
-            // Network fallback for offline or trial lab environments:
-            // When connecting to an unreachable remote endpoint during a workshop,
-            // analyze prompt locally and produce structured decision output.
-            return Self.simulateLocalFallback(prompt: prompt, actorId: actorId)
         }
+
+        if let lastFailure {
+            throw lastFailure
+        }
+        throw SubagentError.sessionUnavailable
     }
 
     /// Simulation fallback when the remote AWS endpoint is unreachable or expired.

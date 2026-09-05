@@ -121,12 +121,15 @@ enum SubagentError: LocalizedError {
     case taskNotFound(String)
     case sessionUnavailable
     case notRunning(String)
+    case gatewayUnavailable(statusCode: Int, message: String)
 
     var errorDescription: String? {
         switch self {
         case .taskNotFound(let id): return "No task with id \(id)."
         case .sessionUnavailable: return "Could not create a session for the task."
         case .notRunning(let id): return "Task \(id) is not running any more."
+        case .gatewayUnavailable(let code, let msg):
+            return "云端网关基础设施异常 (HTTP \(code)): \(msg)"
         }
     }
 }

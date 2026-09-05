@@ -16,11 +16,18 @@ final class RoutingSubagentExecutor: SubagentExecutor {
     private var taskRouting: [String: SubagentTask.Target] = [:]
 
     init(
-        localExecutor: SubagentExecutor = LocalSubagentExecutor(),
-        cloudExecutor: SubagentExecutor = AgentCoreSubagentExecutor()
+        localExecutor: SubagentExecutor,
+        cloudExecutor: SubagentExecutor
     ) {
         self.localExecutor = localExecutor
         self.cloudExecutor = cloudExecutor
+    }
+
+    convenience init() {
+        self.init(
+            localExecutor: LocalSubagentExecutor(),
+            cloudExecutor: AgentCoreSubagentExecutor()
+        )
     }
 
     /// Resolve the target executor based on task intent and configuration.

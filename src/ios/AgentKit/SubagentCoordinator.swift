@@ -297,8 +297,12 @@ final class SubagentCoordinator {
 
     private let executor: SubagentExecutor
 
-    init(executor: SubagentExecutor = RoutingSubagentExecutor()) {
+    init(executor: SubagentExecutor) {
         self.executor = executor
+    }
+
+    convenience init() {
+        self.init(executor: RoutingSubagentExecutor())
     }
 
     /// Handle one dispatch tool call. Returns the text handed back to the

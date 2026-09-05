@@ -262,7 +262,9 @@ struct AIChatView: View {
     @ObservedObject private var groupStore = GroupStore.shared
     @ObservedObject private var fontSettings = FontSettings.shared
     @ObservedObject private var deepLink = DeepLinkCoordinator.shared
+    @ObservedObject private var approvalStore = SubagentApprovalStore.shared
     @Environment(\.dismiss) private var dismiss
+    @State private var showApprovalSheet: Bool = false
     @State private var inputFocused: Bool = false
     @State private var isKeyboardVisible: Bool = false
     @State private var inputHasSelection: Bool = false
@@ -617,10 +619,7 @@ struct AIChatView: View {
                                 }
                         }
                         VStack(spacing: 0) {
-                            // Temporarily hide the floating Bash/tool thumbnail and
-                            // tool list from the conversation composer.
-                            // floatingToolPreview
-                            //     .shadow(color: Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(white: 0, alpha: 0.25) : UIColor(white: 0, alpha: 0) }), radius: 6, x: 0, y: 4)
+                            FloatingApprovalBar(store: approvalStore, showSheet: $showApprovalSheet)
                             #if DEBUG
                             if isReadOnly {
                                 forkBanner
@@ -1082,6 +1081,9 @@ struct AIChatView: View {
         }
         .sheet(isPresented: $showSessionMemory) {
             SessionMemoryView(vm: cached.vm)
+        }
+        .sheet(isPresented: $showApprovalSheet) {
+            SubagentApprovalSheetView(store: approvalStore, isPresented: $showApprovalSheet)
         }
         .sheet(isPresented: $showMoveToSheet) {
             MoveToSessionSheet(currentSessionId: vm.sessionId) { targetId in

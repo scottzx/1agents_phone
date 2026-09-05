@@ -76,6 +76,15 @@ extension AIChatViewModel {
         // further executors would make task trees unbounded and untraceable.
         if policy == .orchestrator {
             tools.append(contentsOf: SubagentTools.definitions)
+        } else if agentRole != .executor {
+            // Allow standalone main sessions to also dispatch business tasks
+            // to remote Amazon Bedrock AgentCore cloud subagents.
+            if let cloudTool = SubagentTools.definitions.first(where: { $0.name == "spawn_cloud_subagent" }) {
+                tools.append(cloudTool)
+            }
+            if let checkTool = SubagentTools.definitions.first(where: { $0.name == "check_subagent" }) {
+                tools.append(checkTool)
+            }
         }
 
         // Roster tools — every agent's OWN conversation, both policies, and

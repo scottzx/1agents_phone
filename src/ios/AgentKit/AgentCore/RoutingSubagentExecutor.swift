@@ -64,14 +64,26 @@ final class RoutingSubagentExecutor: SubagentExecutor {
         if taskRouting[taskId] == .cloud {
             return await cloudExecutor.status(taskId: taskId)
         }
-        return await localExecutor.status(taskId: taskId)
+        let localStatus = await localExecutor.status(taskId: taskId)
+        if localStatus.state != .unknown {
+            return localStatus
+        }
+        let cloudStatus = await cloudExecutor.status(taskId: taskId)
+        if cloudStatus.state != .unknown {
+            return cloudStatus
+        }
+        return localStatus
     }
 
     func message(taskId: String, text: String) async throws {
         if taskRouting[taskId] == .cloud {
             try await cloudExecutor.message(taskId: taskId, text: text)
-        } else {
+            return
+        }
+        do {
             try await localExecutor.message(taskId: taskId, text: text)
+        } catch {
+            try await cloudExecutor.message(taskId: taskId, text: text)
         }
     }
 
@@ -80,6 +92,8 @@ final class RoutingSubagentExecutor: SubagentExecutor {
         if taskRouting[taskId] == .cloud {
             return await cloudExecutor.stop(taskId: taskId)
         }
-        return await localExecutor.stop(taskId: taskId)
+        let stopped = await localExecutor.stop(taskId: taskId)
+        if stopped { return true }
+        return await cloudExecutor.stop(taskId: taskId)
     }
 }

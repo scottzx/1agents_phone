@@ -71,12 +71,13 @@ final class AgentCoreSubagentExecutor: SubagentExecutor {
 
                 let decision = AgentCoreParser.parseDecision(from: rawOutput)
                 let isEscalated = (decision.tier == .escalate)
-                let finalState: SubagentStatus.State = (decision.tier == .refuse) ? .failed : .done
+                let finalState: SubagentStatus.State = isEscalated ? .running : ((decision.tier == .refuse) ? .failed : .done)
 
                 let resultText: String
                 if isEscalated {
                     resultText = """
                     [待创始人审批] \(decision.summary)
+                    触发策略: \(decision.policyRule ?? "forbid_policy")
                     原因: \(decision.reason ?? "触及云端策略或模型风控边界")
                     \(rawOutput)
                     """
@@ -97,7 +98,7 @@ final class AgentCoreSubagentExecutor: SubagentExecutor {
                     taskId: taskId,
                     title: task.title,
                     state: finalState,
-                    currentActivity: isEscalated ? "等待审批" : "执行完毕",
+                    currentActivity: isEscalated ? "等待创始人权限审批" : "执行完毕",
                     iteration: 2,
                     result: resultText,
                     isEscalated: isEscalated,
@@ -286,6 +287,24 @@ public struct DefaultAgentCoreTransport: AgentCoreTransport {
     /// Simulation fallback when the remote AWS endpoint is unreachable or expired.
     private static func simulateLocalFallback(prompt: String, actorId: String?) -> String {
         let lower = prompt.lowercased()
+
+        if lower.contains("已批准") || lower.contains("approved") || lower.contains("同意本次特批") {
+            return """
+            [auto] 创始人特批已生效，已执行并归档
+            【特批结果】: 创始人已特批批准对 \(actorId ?? "CLIENT-ABC") 的续约与报价方案。
+            【合规登记】: 已通过 record_decision 成功登记进企业合规台账，合同状态已更新为执行中。
+            [档位=auto]
+            """
+        }
+
+        if lower.contains("已拒绝") || lower.contains("rejected") || lower.contains("驳回") {
+            return """
+            [refuse] 创始人已驳回特批申请
+            【处理结果】: 创始人已拒绝本次特批申请，业务已终止并归档。
+            [档位=refuse]
+            """
+        }
+
         if lower.contains("20万") || lower.contains("21万") || lower.contains("超过") || lower.contains("七折") {
             return """
             [escalate] 必须升级给创始人确认

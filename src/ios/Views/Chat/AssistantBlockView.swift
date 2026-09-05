@@ -77,9 +77,34 @@ struct AssistantBlockView: View {
                                 toolSnapshots: toolSnapshots, detailBlock: $detailBlock)
 
                 if let taskId = extractSubagentTaskId(from: block.content),
-                   SubagentApprovalStore.shared.request(for: taskId) != nil {
-                    SubagentApprovalCardView(taskId: taskId)
-                        .padding(.top, 2)
+                   let req = SubagentApprovalStore.shared.request(for: taskId) {
+                    if req.status == .pending {
+                        HStack(spacing: 5) {
+                            Image(systemName: "exclamationmark.shield.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.orange)
+                            Text(String(localized: "触及策略拦截，请在输入框上方卡片审批"))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.orange)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.orange.opacity(0.1))
+                        .clipShape(Capsule())
+                    } else {
+                        HStack(spacing: 5) {
+                            Image(systemName: req.status == .approved ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(req.status == .approved ? .green : .secondary)
+                            Text(req.status == .approved ? String(localized: "创始人特批已批准") : String(localized: "特批申请已驳回"))
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(req.status == .approved ? .green : .secondary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background((req.status == .approved ? Color.green : Color.secondary).opacity(0.1))
+                        .clipShape(Capsule())
+                    }
                 }
             }
         case .info:

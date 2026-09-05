@@ -162,7 +162,7 @@ public final class AsyncTaskNoticeManager {
             let toolResult = ContentPart.toolResult(ToolResult(
                 toolUseId: toolUseId,
                 output: outputText,
-                success: notice.status == "done",
+                success: notice.status == "done" || notice.status == "escalate",
                 status: notice.status
             ))
             let offset = Double(index) * 0.002
@@ -229,6 +229,39 @@ public final class AsyncTaskNoticeManager {
             lines.append("")
             lines.append("This background subagent has finished. Review the result above. If you need to update the user with new information, answer them in your own voice. If no user update is required, respond with (pass).")
             return lines.joined(separator: "\n")
+
+        case "subagent_cloud":
+            if notice.status == "escalate" {
+                let lines: [String] = [
+                    "[Cloud Subagent Intercepted - Awaiting Approval]",
+                    "task_id: \(notice.taskId)",
+                    "title: \(notice.title ?? "")",
+                    "status: waiting_approval",
+                    "",
+                    "Decision / Reason:",
+                    notice.result,
+                    "",
+                    "The cloud subagent encountered a high-risk policy boundary and escalated this task for founder approval.",
+                    "An interactive approval banner has been presented right above the user's input box. Notify the user that this task has hit a policy check and is waiting for their approval in the input area."
+                ]
+                return lines.joined(separator: "\n")
+            } else {
+                var lines: [String] = [
+                    "[Cloud Subagent Finished]",
+                    "task_id: \(notice.taskId)",
+                    "title: \(notice.title ?? "")",
+                    "status: \(notice.status)"
+                ]
+                if let files = notice.filesPath, !files.isEmpty {
+                    lines.append("files: \(files)")
+                }
+                lines.append("")
+                lines.append("Result:")
+                lines.append(notice.result)
+                lines.append("")
+                lines.append("The remote Amazon Bedrock AgentCore cloud subagent has finished. Review the result above. Deliver the answer to the user in your own voice.")
+                return lines.joined(separator: "\n")
+            }
 
         case "shell", "command":
             let lines: [String] = [

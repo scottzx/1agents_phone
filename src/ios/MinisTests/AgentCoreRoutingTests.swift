@@ -189,9 +189,11 @@ final class AgentCoreRoutingTests: XCTestCase {
         store.register(req)
         XCTAssertTrue(store.hasPendingRequest(for: taskId))
         XCTAssertEqual(store.request(for: taskId)?.status, .pending)
+        XCTAssertTrue(store.pendingRequests.contains(where: { $0.taskId == taskId }))
 
         await store.approve(taskId: taskId, feedback: "同意按 25 万签约")
         XCTAssertFalse(store.hasPendingRequest(for: taskId))
+        XCTAssertFalse(store.pendingRequests.contains(where: { $0.taskId == taskId }))
         XCTAssertEqual(store.request(for: taskId)?.status, .approved)
         XCTAssertEqual(store.request(for: taskId)?.feedback, "同意按 25 万签约")
     }

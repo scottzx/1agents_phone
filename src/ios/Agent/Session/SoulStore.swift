@@ -460,13 +460,27 @@ enum SystemPromptBuilder {
     /// We never substitute a default body into the prompt — the identity
     /// sentence alone is the safe fallback when SOUL.md is missing or
     /// empty, matching pre-SOUL behavior.
+    /// The agent's own name as the model should refer to itself — SOUL.md's
+    /// `name` field, falling back to the shipped default. Split out of
+    /// `identitySection` so a prompt that wants ONLY the name (lite mode's,
+    /// which cannot afford the personality body and the SOUL edit hint) does
+    /// not have to re-derive the same fallback chain.
+    static func agentDisplayName(for agentId: String? = nil) -> String {
+        displayName(from: SoulStore.load(for: agentId))
+    }
+
+    /// Name resolution for a SOUL file already in hand — `identitySection`
+    /// loads the file for the personality body anyway, and SoulStore.load
+    /// hits disk on every call.
+    private static func displayName(from file: SoulFile?) -> String {
+        let n = (file?.metadata.name ?? SoulMetadata.default.name)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return n.isEmpty ? "Yima" : n
+    }
+
     static func identitySection(for agentId: String? = nil) -> String {
         let file = SoulStore.load(for: agentId)
-        let name: String = {
-            let n = (file?.metadata.name ?? SoulMetadata.default.name)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            return n.isEmpty ? "Yima" : n
-        }()
+        let name = displayName(from: file)
         let style: String = (file?.metadata.style ?? "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 

@@ -55,6 +55,8 @@ let package = Package(
             name: "MinisAppleDomain",
             path: "src/apple/Domain",
             sources: [
+                "Hooks/HookTypes.swift",
+                "Hooks/HookEngine.swift",
                 "AgentProfile.swift",
                 "AgentRunEngine.swift",
                 "ChatPersistence.swift",

@@ -81,7 +81,74 @@ extension AIChatViewModel {
     /// concurrent child tasks). The outcome carries the toolResult part,
     /// snapshot, and cancellation flag so the dispatcher can collect them
     /// in original tool_use order after every child task completes.
+    ///
+    /// [Hooks] This is the wrapper; `executeSingleToolUseInner` is the body.
+    /// The bracket sits out here on purpose: the body has a dozen early-return
+    /// refusal paths (cancelled, loop-detected, truncated write, preflight),
+    /// and a rule about "what did this turn actually call" must see those too,
+    /// not just the calls that reached a tool implementation.
     func executeSingleToolUse(
+        tu: StreamResult.ToolEntry,
+        msgIdx: Int,
+        tools: [AgentToolDefinition],
+        batchBudget: BatchImageBudget
+    ) async -> ToolExecOutcome {
+        let argsJSON: String? = {
+            guard let data = try? JSONSerialization.data(withJSONObject: tu.args),
+                  let string = String(data: data, encoding: .utf8) else { return nil }
+            return string
+        }()
+        let gate = hooks?.willRunTool(name: tu.name, argsJSON: argsJSON)
+        if let reason = gate?.blockReason {
+            return await hookBlockedOutcome(tu: tu, msgIdx: msgIdx, reason: reason)
+        }
+        let outcome = await executeSingleToolUseInner(
+            tu: tu, msgIdx: msgIdx, tools: tools, batchBudget: batchBudget
+        )
+        if let gate {
+            var succeeded = !outcome.cancelled
+            if case .toolResult(_, _, _, let isError, _, _, _, _) = outcome.resultPart {
+                succeeded = !isError && !outcome.cancelled
+            }
+            hooks?.didRunTool(name: tu.name, index: gate.index, succeeded: succeeded)
+        }
+        return outcome
+    }
+
+    /// A tool call a hook refused. Shaped exactly like the preflight rejection
+    /// below it — a failed block in the UI, an error tool_result carrying the
+    /// reason to the model — so a blocked call is a normal, recoverable turn
+    /// event rather than a hole in the history.
+    private func hookBlockedOutcome(
+        tu: StreamResult.ToolEntry,
+        msgIdx: Int,
+        reason: String
+    ) async -> ToolExecOutcome {
+        AppLogger(category: "Hooks").warning(
+            "[Hooks] BLOCKED tool=\(tu.name) id=\(tu.id) reason=\"\(reason)\""
+        )
+        let blockIdx = tu.blockIdx
+        let uiMessage = String(localized: "Blocked by a hook")
+        let modelMessage = "Error: This call was NOT executed. \(reason)"
+        if msgIdx < messages.count, blockIdx < messages[msgIdx].blocks.count {
+            messages[msgIdx].blocks[blockIdx].content = uiMessage
+            messages[msgIdx].blocks[blockIdx].toolStatus = .failed(message: uiMessage)
+        }
+        let snapshot = ToolSnapshot(type: .text, text: modelMessage, mediaRef: nil, duration: nil)
+        let item = ToolSnapshotItem(
+            id: tu.id, toolName: tu.name, snapshot: snapshot,
+            mediaResolver: await ChatStore.shared.mediaFileURLResolver()
+        )
+        return ToolExecOutcome(
+            toolId: tu.id, toolName: tu.name,
+            resultPart: .toolResult(id: tu.id, name: tu.name, content: modelMessage, isError: true),
+            snapshotEntry: (toolName: tu.name, snapshot: snapshot),
+            snapshotItem: item,
+            cancelled: false
+        )
+    }
+
+    private func executeSingleToolUseInner(
         tu: StreamResult.ToolEntry,
         msgIdx: Int,
         tools: [AgentToolDefinition],

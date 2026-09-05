@@ -172,6 +172,8 @@
 		E5AD0003 /* GroupMentionRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0013 /* GroupMentionRouter.swift */; };
 		E5AD0004 /* GroupChatPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0014 /* GroupChatPrompt.swift */; };
 		E5AD0007 /* GroupChatEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0017 /* GroupChatEngine.swift */; };
+		E5AD0111 /* HookTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0101 /* HookTypes.swift */; };
+		E5AD0112 /* HookEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0102 /* HookEngine.swift */; };
 		E5AD0005 /* AgentRunEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0015 /* AgentRunEngine.swift */; };
 		E5AD0006 /* ChatPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0016 /* ChatPersistence.swift */; };
 		E5AD0008 /* SyncV2Contracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5AD0018 /* SyncV2Contracts.swift */; };
@@ -802,6 +804,8 @@
 		E5AD0013 /* GroupMentionRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupMentionRouter.swift; sourceTree = "<group>"; };
 		E5AD0014 /* GroupChatPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatPrompt.swift; sourceTree = "<group>"; };
 		E5AD0017 /* GroupChatEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupChatEngine.swift; sourceTree = "<group>"; };
+		E5AD0101 /* HookTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hooks/HookTypes.swift; sourceTree = "<group>"; };
+		E5AD0102 /* HookEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Hooks/HookEngine.swift; sourceTree = "<group>"; };
 		E5AD0015 /* AgentRunEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentRunEngine.swift; sourceTree = "<group>"; };
 		E5AD0016 /* ChatPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPersistence.swift; sourceTree = "<group>"; };
 		E5AD0018 /* SyncV2Contracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncV2Contracts.swift; sourceTree = "<group>"; };
@@ -1422,6 +1426,8 @@
 				E5AD0013 /* GroupMentionRouter.swift */,
 				E5AD0014 /* GroupChatPrompt.swift */,
 				E5AD0017 /* GroupChatEngine.swift */,
+				E5AD0101 /* HookTypes.swift */,
+				E5AD0102 /* HookEngine.swift */,
 			);
 			name = AppleDomain;
 			path = "../apple/Domain";
@@ -2992,6 +2998,8 @@
 				E5AD0003 /* GroupMentionRouter.swift in Sources */,
 				E5AD0004 /* GroupChatPrompt.swift in Sources */,
 				E5AD0007 /* GroupChatEngine.swift in Sources */,
+				E5AD0111 /* HookTypes.swift in Sources */,
+				E5AD0112 /* HookEngine.swift in Sources */,
 				E5D00002 /* ProviderInstance.swift in Sources */,
 				E5D00003 /* ModelEntry.swift in Sources */,
 				E5D00004 /* ModelGroup.swift in Sources */,

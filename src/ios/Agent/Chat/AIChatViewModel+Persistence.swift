@@ -199,6 +199,12 @@ extension AIChatViewModel {
         // vm.memoryEnabled from the DB/global default, and which session.
         AppLogger(category: "MemDiag").info("[MemDiag] loadSession sid=\(sessionId.prefix(8)) → vm.memoryEnabled=\(self.memoryEnabled)")
 
+        // [T-lite-mode-small-local-models] Per-session chat mode. Stored on
+        // the row (seeded from the global default at creation), so opening an
+        // old conversation restores the mode it was held in rather than the
+        // one the composer happens to be showing.
+        chatMode = await ChatStore.shared.getChatMode(sessionId: sessionId)
+
         // Resolve which Agent owns this session, and in what role. Both feed
         // prompt assembly and tool-set construction, so they must be settled
         // before the first runAgentLoop. A row with no agent_id predates the
@@ -1044,6 +1050,10 @@ extension AIChatViewModel {
         // the flag.
         memoryEnabled = await ChatStore.shared.getMemoryEnabled(sessionId: session.id)
         AppLogger(category: "MemDiag").info("[MemDiag] ensureSession sid=\(session.id.prefix(8)) → vm.memoryEnabled=\(self.memoryEnabled)")
+        // [T-lite-mode-small-local-models] Same read-back for the chat mode:
+        // createSession wrote the global default into the new row, and a
+        // draft VM never runs loadSession.
+        chatMode = await ChatStore.shared.getChatMode(sessionId: session.id)
         // Tracker migration: if this vm was marked active under its draftId,
         // swap that entry to the real session id. draftId is kept on the vm
         // itself (sidebar UX still references it until the proxy row is

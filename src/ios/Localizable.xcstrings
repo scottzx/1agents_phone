@@ -11581,6 +11581,59 @@
         }
       }
     },
+    "Chat Mode": {
+      "comment": "Composer chat-mode picker title",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat-Modus"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chat Mode"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode de conversation"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "チャットモード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "채팅 모드"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Режим чата"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "对话模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "對話模式"
+          }
+        }
+      }
+    },
     "Chat Sessions": {
       "localizations": {
         "de": {
@@ -28305,6 +28358,59 @@
         }
       }
     },
+    "Full toolset and instructions. Best for cloud models.": {
+      "comment": "Chat mode explanation: standard",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vollständiger Werkzeugsatz und Anweisungen. Am besten für Cloud-Modelle."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full toolset and instructions. Best for cloud models."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ensemble complet d'outils et d'instructions. Idéal pour les modèles cloud."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのツールと指示。クラウドモデル向け。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "전체 도구와 지침. 클라우드 모델에 적합합니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Полный набор инструментов и инструкций. Лучше всего для облачных моделей."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整工具集与提示词，适合云端模型。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整工具集與提示詞，適合雲端模型。"
+          }
+        }
+      }
+    },
     "Fullscreen": {
       "localizations": {
         "de": {
@@ -34860,6 +34966,59 @@
           "stringUnit": {
             "state": "translated",
             "value": "列出所有 一伴 聊天會話及其標題和 ID。"
+          }
+        }
+      }
+    },
+    "Lite Mode": {
+      "comment": "Chat mode: shell-only, minimal prompt",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leichter Modus"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lite Mode"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode léger"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "軽量モード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "라이트 모드"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Облегчённый режим"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精简模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "精簡模式"
           }
         }
       }
@@ -61200,6 +61359,59 @@
         }
       }
     },
+    "Shell tool only, short prompt, skills still load. For small on-device models that ignore tool calls.": {
+      "comment": "Chat mode explanation: lite",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nur das Shell-Werkzeug, kurzer Prompt, Skills bleiben verfügbar. Für kleine Modelle auf dem Gerät, die Werkzeugaufrufe ignorieren."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shell tool only, short prompt, skills still load. For small on-device models that ignore tool calls."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Uniquement l'outil shell, prompt court, les compétences restent disponibles. Pour les petits modèles locaux qui ignorent les appels d'outils."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "シェルツールのみ、短いプロンプト、スキルは利用可能。ツール呼び出しを行わない小型のローカルモデル向け。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "셸 도구만 사용하고 프롬프트가 짧으며 스킬은 그대로 불러옵니다. 도구 호출을 하지 않는 소형 온디바이스 모델용입니다."
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Только инструмент shell, короткий промпт, навыки по-прежнему загружаются. Для небольших локальных моделей, которые игнорируют вызовы инструментов."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅保留 shell 工具，提示词极简，技能照常加载。适合不会调用工具的端侧小模型。"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "僅保留 shell 工具，提示詞極簡，技能照常載入。適合不會呼叫工具的端側小模型。"
+          }
+        }
+      }
+    },
     "Short-Lived (~30s)": {
       "localizations": {
         "de": {
@@ -63948,6 +64160,59 @@
           "stringUnit": {
             "state": "translated",
             "value": "標準 /v1/chat/completions 格式。相容大多數 OpenAI 相容服務。"
+          }
+        }
+      }
+    },
+    "Standard Mode": {
+      "comment": "Chat mode: full tools and prompt",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standardmodus"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Standard Mode"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode standard"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標準モード"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "표준 모드"
+          }
+        },
+        "ru": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Стандартный режим"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标准模式"
+          }
+        },
+        "zh-Hant": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標準模式"
           }
         }
       }

@@ -42,6 +42,14 @@ extension AIChatViewModel {
     /// `.standalone` is the historical full toolset and stays the default for
     /// any session that predates the Agent migration.
     func makeAgentTools() -> [AgentToolDefinition] {
+        // [T-lite-mode-small-local-models] Lite mode registers exactly one
+        // tool. This returns BEFORE the policy split on purpose: even the
+        // orchestrator branch below would hand out four dispatch/roster tools
+        // whose schemas alone are larger than the entire lite prompt, and the
+        // whole point of the mode is that the model has one obvious thing to
+        // call. Skills survive because loading one is `cat SKILL.md`.
+        if liteModeActive { return LiteModePrompt.toolDefinitions }
+
         let policy = effectiveToolPolicy
 
         // [T-memory-toggle-gates-injection-and-tools-ios] memory_get and

@@ -218,6 +218,10 @@ actor ChatStore {
         addColumnIfMissing(table: "messages", column: "reasoning_content", definition: "TEXT")
         addColumnIfMissing(table: "messages", column: "stream_interrupt_count", definition: "INTEGER NOT NULL DEFAULT 0")
         addColumnIfMissing(table: "sessions", column: "memory_enabled", definition: "INTEGER NOT NULL DEFAULT 1")
+        // [T-lite-mode-small-local-models] Per-session ChatMode. NOT NULL
+        // DEFAULT 'normal' so every pre-existing row keeps the full toolset;
+        // only rows written by createSession pick up the global default.
+        addColumnIfMissing(table: "sessions", column: "chat_mode", definition: "TEXT NOT NULL DEFAULT 'normal'")
         addColumnIfMissing(table: "sessions", column: "last_synced_at", definition: "REAL")
         addColumnIfMissing(table: "sessions", column: "remote_origin_device_id", definition: "TEXT")
         addColumnIfMissing(table: "sync_devices", column: "upload_types", definition: "TEXT NOT NULL DEFAULT ''")
@@ -734,7 +738,12 @@ actor ChatStore {
         let rawObj = UserDefaults.standard.object(forKey: "memory.global.enabled")
         memDiagLogger.info("[MemDiag] createSession sid=\(session.id.prefix(8)) rawDefaults=\(String(describing: rawObj)) resolved=\(globalMemoryEnabled) → bind memory_enabled=\(globalMemoryEnabled ? 1 : 0)")
 
-        let sql = "INSERT INTO sessions (id, title, model_id, created_at, updated_at, source, memory_enabled) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        // [T-lite-mode-small-local-models] Same story as memory_enabled: the
+        // mode the user last picked in the composer seeds new sessions, so
+        // "I'm on the local model today" survives starting a new chat.
+        let globalChatMode = ChatModePreferences.globalDefault
+
+        let sql = "INSERT INTO sessions (id, title, model_id, created_at, updated_at, source, memory_enabled, chat_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_text(stmt, 1, (session.id as NSString).utf8String, -1, nil)
@@ -744,6 +753,7 @@ actor ChatStore {
             sqlite3_bind_double(stmt, 5, now.timeIntervalSince1970)
             bindOptionalText(stmt, index: 6, value: source)
             sqlite3_bind_int(stmt, 7, globalMemoryEnabled ? 1 : 0)
+            sqlite3_bind_text(stmt, 8, (globalChatMode.rawValue as NSString).utf8String, -1, nil)
             let rc = sqlite3_step(stmt)
             memDiagLogger.info("[MemDiag] createSession INSERT step rc=\(rc) (101=DONE) sid=\(session.id.prefix(8))")
         } else {
@@ -2690,6 +2700,37 @@ actor ChatStore {
         var stmt: OpaquePointer?
         if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
             sqlite3_bind_int(stmt, 1, enabled ? 1 : 0)
+            sqlite3_bind_text(stmt, 2, (sessionId as NSString).utf8String, -1, nil)
+            sqlite3_step(stmt)
+        }
+        sqlite3_finalize(stmt)
+    }
+
+    /// [T-lite-mode-small-local-models] The session's ChatMode. Unlike
+    /// `getMemoryEnabled` there is no global fallback for a missing row: the
+    /// column is NOT NULL, so every real row answers for itself, and a lookup
+    /// that finds nothing is a draft whose VM already holds the global
+    /// default. Falling back to the global here would instead re-read it for
+    /// sessions that had deliberately been set the other way.
+    func getChatMode(sessionId: String) -> ChatMode {
+        let sql = "SELECT chat_mode FROM sessions WHERE id = ?"
+        var stmt: OpaquePointer?
+        var mode: ChatMode?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (sessionId as NSString).utf8String, -1, nil)
+            if sqlite3_step(stmt) == SQLITE_ROW, let raw = sqlite3_column_text(stmt, 0) {
+                mode = ChatMode(rawValue: String(cString: raw))
+            }
+        }
+        sqlite3_finalize(stmt)
+        return mode ?? .normal
+    }
+
+    func setChatMode(sessionId: String, mode: ChatMode) {
+        let sql = "UPDATE sessions SET chat_mode = ? WHERE id = ?"
+        var stmt: OpaquePointer?
+        if sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK {
+            sqlite3_bind_text(stmt, 1, (mode.rawValue as NSString).utf8String, -1, nil)
             sqlite3_bind_text(stmt, 2, (sessionId as NSString).utf8String, -1, nil)
             sqlite3_step(stmt)
         }

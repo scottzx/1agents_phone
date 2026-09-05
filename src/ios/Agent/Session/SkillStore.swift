@@ -1254,7 +1254,14 @@ Do not create extraneous files: README.md, INSTALLATION_GUIDE.md, CHANGELOG.md, 
     /// 1. Bundled skills (always included)
     /// 2. Recently modified/created skills within last 7 days (up to 10)
     /// 3. Frequently used skills by normalized use count (fill remaining slots)
-    func skillPromptFragment(for sessionId: String) -> String? {
+    /// [T-lite-mode-small-local-models] `liteMode` swaps `<path>` for the
+    /// literal shell command that loads the skill. Measured on
+    /// qwen3-1.7b (2026-09-02): given `<path>/var/minis/skills/x/SKILL.md`
+    /// plus prose telling it to "read the file", the model passed the bare
+    /// PATH as the command in 3 of 4 runs — the path field reads as the thing
+    /// to execute. Handing it `cat …` verbatim leaves nothing to infer. Lite
+    /// mode has no file_read, so `cat` is also the only correct answer there.
+    func skillPromptFragment(for sessionId: String, liteMode: Bool = false) -> String? {
         let logger = AppLogger(category: "SkillDisclosure")
         let enabled = skills.filter { isEnabledForSession($0.id, sessionId: sessionId) }
         guard !enabled.isEmpty else { return nil }
@@ -1340,13 +1347,17 @@ Do not create extraneous files: README.md, INSTALLATION_GUIDE.md, CHANGELOG.md, 
             xml += "  <skill>\n"
             xml += "    <name>\(escapedName)</name>\n"
             xml += "    <description>\(escapedDesc)</description>\n"
-            xml += "    <path>/var/minis/skills/\(skill.id)/SKILL.md</path>\n"
+            xml += liteMode
+                ? "    <load>cat /var/minis/skills/\(skill.id)/SKILL.md</load>\n"
+                : "    <path>/var/minis/skills/\(skill.id)/SKILL.md</path>\n"
             xml += "  </skill>\n"
         }
         xml += "</available_skills>"
 
         var fragment = "Skills:\n"
-        fragment += "Reusable instruction sets stored at /var/minis/skills/<name>/SKILL.md. Read the SKILL.md file to load full instructions before using a skill.\n\n"
+        fragment += liteMode
+            ? "Reusable instruction sets. When one fits the task, load it FIRST by running its <load> line verbatim as a shell_execute command, then follow the instructions it prints.\n\n"
+            : "Reusable instruction sets stored at /var/minis/skills/<name>/SKILL.md. Read the SKILL.md file to load full instructions before using a skill.\n\n"
         fragment += xml
 
         if hasMore {

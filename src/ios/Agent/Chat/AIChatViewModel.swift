@@ -129,6 +129,12 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// have changed.
     var groupPromptBlock: String?
 
+    /// Whether GLOBAL.md and the recent daily logs get injected into this
+    /// turn's system prompt. Lite mode drops them for the same reason it drops
+    /// the memory tools: the injection is unbounded user prose, and the point
+    /// of the mode is a context a 2B model can still hold.
+    var injectsMemoryFragments: Bool { memoryEnabled && !liteModeActive }
+
     /// Effective tool ceiling for this VM. Executors always get the full
     /// toolset regardless of what their parent agent is allowed — they are the
     /// ones actually doing the work.
@@ -921,6 +927,29 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     var skipCompactCheck = false
     /// When false, memory_write tool calls are skipped (returns "Memory disabled") in this session.
     @Published var memoryEnabled = true
+
+    // MARK: Chat mode
+    //
+    /// [T-lite-mode-small-local-models] How much scaffolding this session
+    /// hands the model. Seeded from the global default so a draft VM (which
+    /// never runs `loadSession`) already reflects the last pick; `loadSession`
+    /// / `ensureSession` then replace it with the session's stored value.
+    @Published var chatMode: ChatMode = ChatModePreferences.globalDefault
+
+    /// Whether the lite prompt + shell-only toolset actually apply this turn.
+    ///
+    /// The mode is a property of the conversation the USER is having, so it is
+    /// deliberately confined to that conversation. A dispatched executor, a
+    /// group member's turn and a hardware voice session all run their own
+    /// sessions created by code the user never sees; each of those would
+    /// otherwise inherit the global default and be silently stripped of the
+    /// tools its caller expects it to have.
+    var liteModeActive: Bool {
+        chatMode == .lite
+            && agentRole == .main
+            && groupId == nil
+            && sessionSource != "hardware"
+    }
 
     // MARK: - Session Stats
     /// Accumulated streaming duration (seconds) for output token speed calculation.
@@ -1829,6 +1858,14 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// orchestrator/executor split lands everywhere (including the provider-
     /// fallback re-assembly) without touching those sites.
     private var baseSystemPrompt: String {
+        // [T-lite-mode-small-local-models] Lite mode replaces the whole
+        // prompt rather than trimming it: the operator prompt's value is that
+        // its parts reinforce each other, and half of it is instructions for
+        // tools a lite turn does not register. `liteModeActive` has already
+        // excluded executors, group turns and hardware sessions.
+        if liteModeActive {
+            return LiteModePrompt.render(agentId: agentId, timeString: approximateTimeString)
+        }
         // In a group the room's rules come first, before the agent's own
         // persona and tool instructions: "you are one of several voices here"
         // has to frame everything below it, not read as an afterthought.
@@ -2056,6 +2093,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// model knows the tools won't be registered, the memory files won't
     /// be injected, and what to tell the user if they ask about memory.
     private var memoryStatusFragment: String {
+        // [T-lite-mode-small-local-models] Nothing to override in lite mode —
+        // its prompt never mentions memory_get / memory_write, so a paragraph
+        // explaining which of them are registered is pure noise in a context
+        // deliberately kept short.
+        if liteModeActive { return "" }
         if memoryEnabled {
             // [T-agent-subagent-memory-readonly] This footer is authoritative —
             // it overrides anything said earlier in the prompt — so it must not
@@ -2087,6 +2129,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
     /// Source tag written to the session record on creation (e.g. "shortcut").
     var sessionSource: String?
+
+    /// Turn-lifecycle hooks in force for this session. Resolved once per turn
+    /// in `runAgentLoop`; nil until the first turn runs. With no bindings
+    /// configured — the default — every entry point on it is a no-op.
+    var hooks: HookRunner?
 
     /// [T-shortcut-duplicate-completion-notification] Suppresses the *generic*
     /// background-completion notification for this run, because a Shortcuts
@@ -4659,6 +4706,22 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         // [T-ios-empty-after-toolresult-reminder] Fresh turn → allow one reminder retry.
         didInjectEmptyToolReminderThisRun = false
 
+        // [Hooks] Resolve this turn's bindings and open the turn ledger. Done
+        // here rather than in send() so every entry into the loop — send,
+        // retry, resume, the notice-driven revival — gets a fresh ledger and
+        // the wake source that actually applies to it.
+        let hooks = HookRunner.resolve(sessionID: sessionId ?? "", agentID: agentId)
+        hooks.beginTurn(
+            sessionSource: sessionSource,
+            isNoticeDriven: isNoticeDriven,
+            isExecutor: agentRole == .executor
+        )
+        hooks.onSystemRow = { [weak self] text, icon in
+            self?.appendSystemInfo(text, icon: icon)
+        }
+        self.hooks = hooks
+        hooks.absorb(hooks.turnWillStart())
+
         // Resolve provider from ProviderConfigStore
         guard let entry = resolveCurrentEntry() else {
             let errMsg = ChatMessage(role: .assistant, content: "", blocks: [])
@@ -4721,12 +4784,12 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
 
         // Inject enabled skill metadata into system prompt
         if let sid = sessionId,
-           let skillFragment = SkillStore.shared.skillPromptFragment(for: sid) {
+           let skillFragment = SkillStore.shared.skillPromptFragment(for: sid, liteMode: liteModeActive) {
             userSystemPrompt += "\n\n" + skillFragment
         }
 
         // [T-mcp-integration-ios] Inject Top-20 enabled MCP server metadata.
-        if let sid = sessionId,
+        if !liteModeActive, let sid = sessionId,
            let mcpFragment = MCPStore.shared.systemPromptSnippet(for: sid) {
             userSystemPrompt += "\n\n" + mcpFragment
         }
@@ -4741,7 +4804,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
         // session so a repro shows whether loadSession seeded it from the
         // global default.
         AppLogger(category: "MemDiag").info("[MemDiag] inject-decision sid=\(self.sessionId?.prefix(8) ?? "nil") vm.memoryEnabled=\(self.memoryEnabled)")
-        if memoryEnabled {
+        if injectsMemoryFragments {
             if let memoryFragment = Self.loadGlobalMemoryFragment(agentId: agentId) {
                 userSystemPrompt += "\n\n" + memoryFragment
             }
@@ -5021,6 +5084,25 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 break loopLabel
             }
 
+            hooks.beginRound(turnCount)
+
+            // [Hooks] Deliver any reminder a turnWillStart hook asked for. It
+            // rides as a user-role text part, which mergeConsecutiveSameRole
+            // folds into the prompt it annotates — the same shape the loop's
+            // own empty-response reminder uses.
+            for reminder in hooks.drainReminders() {
+                agentHistory.append(AgentMessage(role: .user, parts: [.text(reminder)]))
+            }
+
+            // [Hooks] The tool surface for THIS round. `tools` is the session's
+            // full toolset, computed once above; a toolsWillBeSent hook may
+            // narrow what the model is shown for one round (e.g. "open with a
+            // reply, not a tool call") without the loop knowing the rule. Only
+            // the request sites below use `roundTools` — tool EXECUTION and
+            // preflight keep the full `tools`, because those validate arguments
+            // against a schema and must not be affected by visibility.
+            let roundTools = hooks.tools(tools)
+
             CrashReporter.shared.setLastAPI(provider: provider.name, model: activeModelForOffload.id)
             logger.info("Calling \(provider.name) API (streaming) with \(self.agentHistory.count) messages")
             // [StreamDiag] (#181) Monotonic request sequence, so a
@@ -5101,7 +5183,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 messages: contextHistory,
                 baseSystemPrompt: baseSystemPrompt,
                 systemPrompt: userSystemPrompt,
-                tools: tools,
+                tools: roundTools,
                 model: activeModel,
                 lastContextTokens: turnUsage.latestContextTokens,
                 chatMessage: messages[msgIdx],
@@ -5134,11 +5216,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                     userSystemPrompt += "\n\n" + behaviorFragment
                 }
                 if let sid = sessionId,
-                   let skillFragment = SkillStore.shared.skillPromptFragment(for: sid) {
+                   let skillFragment = SkillStore.shared.skillPromptFragment(for: sid, liteMode: liteModeActive) {
                     userSystemPrompt += "\n\n" + skillFragment
                 }
                 // [T-mcp-integration-ios] Inject Top-20 enabled MCP metadata.
-                if let sid = sessionId,
+                if !liteModeActive, let sid = sessionId,
                    let mcpFragment = MCPStore.shared.systemPromptSnippet(for: sid) {
                     userSystemPrompt += "\n\n" + mcpFragment
                 }
@@ -5146,7 +5228,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                 // the gate from the first injection site — fallback to a
                 // new provider must respect the per-session memoryEnabled
                 // toggle the same way the initial system prompt did.
-                if memoryEnabled {
+                if injectsMemoryFragments {
                     if let memoryFragment = Self.loadGlobalMemoryFragment(agentId: agentId) {
                         userSystemPrompt += "\n\n" + memoryFragment
                     }
@@ -5243,7 +5325,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                         provider: provider,
                         messages: applyRequestImageBudget(historyWithEmptyToolResultReminder()),
                         systemPrompt: userSystemPrompt,
-                        tools: tools,
+                        tools: roundTools,
                         maxTokens: dynamicMaxTokens(provider: provider, model: activeModel, lastContextTokens: turnUsage.latestContextTokens),
                         chatMessage: messages[msgIdx]
                     )
@@ -5315,7 +5397,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                         messages: applyRequestImageBudget(effectiveAgentHistory()),
                         baseSystemPrompt: baseSystemPrompt,
                         systemPrompt: userSystemPrompt,
-                        tools: tools,
+                        tools: roundTools,
                         model: activeModel,
                         lastContextTokens: turnUsage.latestContextTokens,
                         chatMessage: messages[msgIdx],
@@ -5337,7 +5419,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                             provider: provider,
                             messages: applyRequestImageBudget(effectiveAgentHistory()),
                             systemPrompt: userSystemPrompt,
-                            tools: tools,
+                            tools: roundTools,
                             maxTokens: dynamicMaxTokens(provider: provider, model: activeModel, lastContextTokens: turnUsage.latestContextTokens),
                             chatMessage: messages[msgIdx]
                         )
@@ -5389,7 +5471,7 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                             messages: applyRequestImageBudget(effectiveAgentHistory()),
                             baseSystemPrompt: baseSystemPrompt,
                             systemPrompt: userSystemPrompt,
-                            tools: tools,
+                            tools: roundTools,
                             model: activeModel,
                             lastContextTokens: turnUsage.latestContextTokens,
                             chatMessage: messages[msgIdx],
@@ -5982,6 +6064,33 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
                     }
                     canResume = true
                 }
+
+                // [Hooks] Last chance to refuse the turn end. A turnWillEnd hook
+                // that returns a reminder gets ONE more round: the reminder is
+                // appended as a user turn (the loop's own resume shape) and the
+                // loop continues instead of breaking. The per-binding continue
+                // budget lives in HookRunner, so a rule the model keeps not
+                // satisfying stops forcing rounds rather than pinning the loop
+                // against maxAgentTurns.
+                //
+                // Deliberately AFTER the error/canResume handling above: a turn
+                // that ended because the stream dropped or ran out of tokens is
+                // already broken, and asking the model for one more round would
+                // stack a hook's reminder on top of a failure the user needs to
+                // see. Hooks only get to argue with a clean end_turn.
+                if stopReason == .endTurn,
+                   let reminder = hooks.turnWillEnd(assistantText: assistantText) {
+                    // Mark this round's blocks committed before continuing, the
+                    // same boundary the queue-interrupt path sets: a mid-stream
+                    // retry in the extra round must clear only the new tail, not
+                    // the text the model already produced and the user can see.
+                    prevCommittedBlockCount = committedBlockCount
+                    committedBlockCount = messages[msgIdx].blocks.count
+                    self.committedBlockCount = committedBlockCount
+                    agentHistory.append(AgentMessage(role: .user, parts: [.text(reminder)]))
+                    continue
+                }
+
                 hitTurnLimit = false
                 break
             }
@@ -6249,6 +6358,11 @@ final class AIChatViewModel: ObservableObject, SpeechControlling {
     /// "Clear Chat?" confirmation alert. The view mirrors this into its
     /// local @State and resets the flag back to false on observation.
     @Published var clearChatConfirmRequested = false
+
+    /// Set by `/hooks` to ask the view to present the hook list. Same
+    /// request-flag pattern as `clearChatConfirmRequested` above: the view
+    /// mirrors it into local @State and resets it.
+    @Published var hookSettingsRequested = false
 
     /// Text saved before showing slash menu over existing input.
     /// When non-nil, the menu was opened via the "/" button while text existed —

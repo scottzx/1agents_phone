@@ -37,6 +37,7 @@ extension AIChatViewModel {
         SlashCommand(id: "compact", icon: "arrow.down.right.and.arrow.up.left", title: "Compact", subtitle: "Compress conversation history into summary"),
         SlashCommand(id: "memory", icon: "brain.head.profile", title: "Memory", subtitle: "Toggle memory writes on/off (reads unaffected)"),
         SlashCommand(id: "thinking", icon: "lightbulb", title: "Thinking", subtitle: "Toggle deep thinking mode on/off"),
+        SlashCommand(id: "hooks", icon: "point.3.connected.trianglepath.dotted", title: "Hooks", subtitle: "See and toggle the turn rules running on this chat"),
     ]
 
     /// Show slash menu without replacing existing input text.
@@ -409,6 +410,8 @@ extension AIChatViewModel {
             appendSystemInfo("Memory writes \(status). Reads are unaffected.", icon: "brain.head.profile")
         case "clear":
             clearChatConfirmRequested = true
+        case "hooks":
+            hookSettingsRequested = true
         default:
             break
         }

@@ -367,6 +367,7 @@ struct AIChatView: View {
     @State private var showDocumentPicker = false
     @State private var showMoveToSheet = false
     @State private var showClearChatConfirm = false
+    @State private var showHookSettings = false
     /// [T-new-chat-menu-entry] Confirmation gate for "New Chat" from the "…"
     /// menu while the current session is still streaming: stopping the task is
     /// destructive enough to warrant an explicit confirm.
@@ -408,6 +409,8 @@ struct AIChatView: View {
     /// True while unsent share-extension content is in the input bar.
     @State private var hasInjectedShareContent = false
     @State private var showModelPicker = false
+    /// iOS 16 fallback for the chat-mode menu (Menu misaligns in this row on 16).
+    @State private var showChatModeDialog = false
     @State private var showSessionSkills = false
     @State private var showSessionMCPs = false
     @State private var showSessionMemory = false
@@ -865,6 +868,16 @@ struct AIChatView: View {
                 showClearChatConfirm = true
                 vm.clearChatConfirmRequested = false
             }
+        }
+        // Same bridge for "/hooks".
+        .onChange(of: vm.hookSettingsRequested) { requested in
+            if requested {
+                showHookSettings = true
+                vm.hookSettingsRequested = false
+            }
+        }
+        .sheet(isPresented: $showHookSettings) {
+            HookSettingsView(sessionId: vm.sessionId, agentId: vm.agentId)
         }
         .alert(String(localized: "Compact Above"), isPresented: Binding(
             get: { compactConfirmMessageId != nil },
@@ -2823,6 +2836,12 @@ struct AIChatView: View {
             attachmentMenuButton
             slashMenuButton
             modelPickerButton
+            // Yields its 46pt to the exit capsule while editing, for the same
+            // reason the read-aloud toggle does below: this row overflows on a
+            // small phone once a capsule joins the icons. The mode is per
+            // session and unchanged by the edit, so nothing is lost by hiding
+            // the control until the edit is committed or cancelled.
+            if vm.editingMessageIndex == nil { chatModePickerButton }
             if vm.editingMessageIndex != nil { editExitButton }
             Spacer()
             // Mutually exclusive with editExitButton: while editing a past
@@ -2923,6 +2942,62 @@ struct AIChatView: View {
                 .overlay(Circle().stroke(ChatColors.inputIconBorder, lineWidth: 0.5))
         }
         .accessibilityLabel(String(localized: "Choose Model"))
+    }
+
+    /// [T-lite-mode-small-local-models] Chat-mode switcher, deliberately
+    /// sitting next to the model picker: the mode only ever gets changed
+    /// because of which model is answering, so the two controls belong in the
+    /// same glance. Tinted accent while lite is active — the mode silently
+    /// removes tools, so it must never be ambiguous which one is on.
+    @ViewBuilder
+    private var chatModePickerButton: some View {
+        let isLite = vm.chatMode == .lite
+        let icon = Image(systemName: vm.chatMode.iconName)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(isLite ? Color.accentColor : ChatColors.secondaryText)
+            .frame(width: 34, height: 34)
+            .background(isLite ? Color.accentColor.opacity(0.15) : ChatColors.inputIconBg)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(ChatColors.inputIconBorder, lineWidth: 0.5))
+
+        if #available(iOS 17, *) {
+            Menu {
+                chatModeMenuItems
+            } label: {
+                icon
+            }
+            .accessibilityLabel(String(localized: "Chat Mode"))
+        } else {
+            Button { showChatModeDialog = true } label: { icon }
+                .accessibilityLabel(String(localized: "Chat Mode"))
+                .confirmationDialog(Text("Chat Mode", comment: "Composer chat-mode picker title"),
+                                    isPresented: $showChatModeDialog,
+                                    titleVisibility: .visible) {
+                    ForEach(ChatMode.allCases) { mode in
+                        Button(mode.displayName) { vm.applyChatMode(mode) }
+                    }
+                } message: {
+                    Text(vm.chatMode.explanation)
+                }
+        }
+    }
+
+    /// Menu rows. A Button label of Text + Text + Image renders as
+    /// title / subtitle / icon in a UIMenu, which is how each mode gets to
+    /// explain itself without a settings screen.
+    @ViewBuilder
+    private var chatModeMenuItems: some View {
+        Section(String(localized: "Chat Mode", comment: "Composer chat-mode picker title")) {
+            ForEach(ChatMode.allCases) { mode in
+                Button {
+                    vm.applyChatMode(mode)
+                } label: {
+                    Text(mode.displayName)
+                    Text(mode.explanation)
+                    Image(systemName: mode == vm.chatMode ? "checkmark" : mode.iconName)
+                }
+            }
+        }
     }
 
     /// "Exit Edit Mode" capsule shown while editing a past message.

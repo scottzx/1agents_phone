@@ -7,6 +7,26 @@ private let logger = AppLogger(category: "AIChatVM")
 
 extension AIChatViewModel {
 
+    // MARK: - Chat Mode
+
+    /// [T-lite-mode-small-local-models] Apply a mode picked in the composer.
+    ///
+    /// Writes three places on purpose: the @Published property so the current
+    /// turn uses it, the session row so reopening this conversation restores
+    /// it, and the global default so the NEXT new chat starts in the same mode
+    /// (a user who has switched to a local model is not done after one chat).
+    /// A draft with no session id yet is covered by the last of those —
+    /// `createSession` seeds the new row from it.
+    func applyChatMode(_ mode: ChatMode) {
+        guard mode != chatMode else { return }
+        chatMode = mode
+        ChatModePreferences.globalDefault = mode
+        if let sid = sessionId {
+            Task { await ChatStore.shared.setChatMode(sessionId: sid, mode: mode) }
+        }
+        logger.info("[ChatMode] session=\(self.sessionId?.prefix(8) ?? "draft") → \(mode.rawValue)")
+    }
+
     // MARK: - Kernel Boot
 
     func ensureKernelBooted() {

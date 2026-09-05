@@ -881,7 +881,7 @@ extension AIChatViewModel {
             toolOutput = memResult.output
             toolSuccess = memResult.success
 
-        case "spawn_subagent", "check_subagent", "message_subagent", "stop_subagent":
+        case "spawn_subagent", "spawn_cloud_subagent", "check_subagent", "message_subagent", "stop_subagent":
             // Dispatch tools. Only an orchestrator is ever handed these (see
             // makeAgentTools), and the work itself happens in a separate
             // scratch session — so all that lands in THIS transcript is the

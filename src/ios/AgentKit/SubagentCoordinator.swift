@@ -295,9 +295,11 @@ final class LocalSubagentExecutor: SubagentExecutor {
 final class SubagentCoordinator {
     static let shared = SubagentCoordinator()
 
-    private let executor: SubagentExecutor = LocalSubagentExecutor()
+    private let executor: SubagentExecutor
 
-    private init() {}
+    init(executor: SubagentExecutor = RoutingSubagentExecutor()) {
+        self.executor = executor
+    }
 
     /// Handle one dispatch tool call. Returns the text handed back to the
     /// model as the tool result.
@@ -309,7 +311,9 @@ final class SubagentCoordinator {
     ) async -> String {
         switch toolName {
         case "spawn_subagent":
-            return await handleSpawn(input: input, parentSessionId: parentSessionId, agentId: agentId)
+            return await handleSpawn(input: input, parentSessionId: parentSessionId, agentId: agentId, forceTarget: .local)
+        case "spawn_cloud_subagent":
+            return await handleSpawn(input: input, parentSessionId: parentSessionId, agentId: agentId, forceTarget: .cloud)
         case "check_subagent":
             return await handleCheck(input: input)
         case "message_subagent":
@@ -321,12 +325,26 @@ final class SubagentCoordinator {
         }
     }
 
-    private func handleSpawn(input: [String: Any], parentSessionId: String, agentId: String?) async -> String {
+    private func handleSpawn(
+        input: [String: Any],
+        parentSessionId: String,
+        agentId: String?,
+        forceTarget: SubagentTask.Target? = nil
+    ) async -> String {
         let title = (input["task_title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let prompt = (input["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard !prompt.isEmpty else {
             return "Error: `prompt` is required and must describe the task in full. The subagent starts with no context."
         }
+
+        let target: SubagentTask.Target
+        if let forceTarget {
+            target = forceTarget
+        } else {
+            let targetRaw = (input["target"] as? String)?.lowercased() ?? "auto"
+            target = SubagentTask.Target(rawValue: targetRaw) ?? .auto
+        }
+        let actorId = (input["actor_id"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let task = SubagentTask(
             id: "",
@@ -334,7 +352,9 @@ final class SubagentCoordinator {
             agentId: agentId ?? AgentProfile.defaultAgentId,
             title: title.isEmpty ? String(localized: "后台任务") : title,
             prompt: prompt,
-            createdAt: Date()
+            createdAt: Date(),
+            target: target,
+            actorId: (actorId?.isEmpty == false) ? actorId : nil
         )
 
         let taskId: String
@@ -349,6 +369,7 @@ final class SubagentCoordinator {
             task_id: \(taskId)
             agent_id: \(task.agentId)
             title: \(task.title)
+            target: \(task.target.rawValue)
             status: running
             files: \(OrchestratorPrompt.taskDeliveryDir(taskId: taskId))/
 

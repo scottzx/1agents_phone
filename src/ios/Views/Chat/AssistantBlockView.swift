@@ -66,13 +66,22 @@ struct AssistantBlockView: View {
             ToolCapsuleView(block: block, icon: "brain.head.profile", accentColor: .pink,
                             commandStartTime: commandStartTime, onStop: onStop,
                             toolSnapshots: toolSnapshots, detailBlock: $detailBlock)
-        case .subagentTool:
-            // Reuses the tool capsule rather than a bespoke card: the capsule
-            // already carries title + status + tap-through, and the status text
-            // the coordinator returns is written to be read as-is.
-            ToolCapsuleView(block: block, icon: "person.2.badge.gearshape", accentColor: .teal,
-                            commandStartTime: commandStartTime, onStop: onStop,
-                            toolSnapshots: toolSnapshots, detailBlock: $detailBlock)
+        case .subagentTool(let action, _):
+            let isCloud = (action == "spawn_cloud_subagent" || block.content.contains("target: cloud"))
+            let icon = isCloud ? "cloud.fill" : "person.2.badge.gearshape"
+            let tint: Color = isCloud ? .indigo : .teal
+
+            VStack(alignment: .leading, spacing: 6) {
+                ToolCapsuleView(block: block, icon: icon, accentColor: tint,
+                                commandStartTime: commandStartTime, onStop: onStop,
+                                toolSnapshots: toolSnapshots, detailBlock: $detailBlock)
+
+                if let taskId = extractSubagentTaskId(from: block.content),
+                   SubagentApprovalStore.shared.request(for: taskId) != nil {
+                    SubagentApprovalCardView(taskId: taskId)
+                        .padding(.top, 2)
+                }
+            }
         case .info:
             let allLines = block.content.components(separatedBy: "\n").filter { !$0.isEmpty }
             // Separate reason lines (⚠️) from the final switched line (✅)
@@ -133,6 +142,17 @@ struct AssistantBlockView: View {
         )
         .fixedSize(horizontal: false, vertical: true)
         .modifier(MinisOpenURLHandler())
+    }
+
+    private func extractSubagentTaskId(from text: String) -> String? {
+        for line in text.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("task_id:") {
+                let id = trimmed.dropFirst("task_id:".count).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !id.isEmpty { return id }
+            }
+        }
+        return nil
     }
 }
 

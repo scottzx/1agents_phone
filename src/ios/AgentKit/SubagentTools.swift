@@ -15,7 +15,7 @@ import Foundation
 enum SubagentTools {
 
     static let names: Set<String> = [
-        "spawn_subagent", "check_subagent", "message_subagent", "stop_subagent",
+        "spawn_subagent", "spawn_cloud_subagent", "check_subagent", "message_subagent", "stop_subagent",
     ]
 
     /// Upper bound on how long the dispatcher keeps waiting for one subagent
@@ -30,7 +30,7 @@ enum SubagentTools {
         [
             AgentToolDefinition(
                 name: "spawn_subagent",
-                description: "Hand one self-contained chunk of work to a background subagent, and get back a task_id immediately. The subagent has the full execution toolset (shell, file write/edit, browser) that you do not have — this is how anything beyond conversation actually gets done. It starts with NO context from this conversation, so the prompt you write must carry everything it needs. It can read your memory but cannot write to it, and it has no way to talk to the user: it reports its result back to you, and you deliver it (and save anything durable it found). Files it produces go in /var/minis/shared/tasks/<task_id>/, which you can file_read once it is done — its own workspace is private to it. It runs on the same model as this conversation. It always runs asynchronously and notifies you via async_task_notice when complete.",
+                description: "Hand one self-contained chunk of work to an on-device background subagent (iPhone local iSH), and get back a task_id immediately. The subagent has the local execution toolset (shell, file write/edit, browser) that you do not have — this is how anything beyond conversation actually gets done. It starts with NO context from this conversation, so the prompt you write must carry everything it needs. It can read your memory but cannot write to it, and it has no way to talk to the user: it reports its result back to you, and you deliver it. Files it produces go in /var/minis/shared/tasks/<task_id>/, which you can file_read once it is done. It always runs asynchronously and notifies you via async_task_notice when complete.",
                 parameters: [
                     "tool_title": AgentToolParam(type: .string, description: "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Start market research task', 'Kick off log analysis'). Use the same language as the user."),
                     "task_title": AgentToolParam(type: .string, description: "Short label for this task, shown to the user on the task card (e.g. '查上证指数收盘' / 'Analyze crash logs'). Use the same language as the user."),
@@ -38,6 +38,19 @@ enum SubagentTools {
                 ],
                 required: ["tool_title", "task_title", "prompt"],
                 propertyOrdering: ["tool_title", "task_title", "prompt"]
+            ),
+            AgentToolDefinition(
+                name: "spawn_cloud_subagent",
+                description: "Hand a specialized business operations, pricing/quoting, supplier contract, reconciliation, or policy check task to the remote Amazon Bedrock AgentCore cloud subagent. Powered by Bedrock Knowledge Bases (product specs, pricing policy, renewal rules), multi-tenant actor memory, and Cedar Policy Engine. If a high-risk operation exceeds policy thresholds (e.g. amount > 200k, new counterparty, overdue accounts), the cloud gateway intercepts it and returns an escalation request for founder approval. Always runs asynchronously and notifies you via async_task_notice when complete.",
+                parameters: [
+                    "tool_title": AgentToolParam(type: .string, description: "A concise 5-10 word summary of what this tool call does, shown to the user (e.g. 'Review supplier quote on AgentCore', 'Verify customer renewal contract'). Use the same language as the user."),
+                    "task_title": AgentToolParam(type: .string, description: "Short label for this task, shown to the user on the task card (e.g. '审核供应商报价' / '核对续约合同'). Use the same language as the user."),
+                    "prompt": AgentToolParam(type: .string, description: "The full instruction for the cloud subagent. MUST be self-contained: the business scenario, counterparties, contract numbers, pricing details, and success criteria."),
+                    "actor_id": AgentToolParam(type: .string, description: "Optional counterparty/actor identifier for cloud memory isolation (e.g. 'CLIENT-ABC', 'SUPPLIER-XYZ', 'founder-general')."),
+                    "skill": AgentToolParam(type: .string, description: "Optional AgentCore skill to load (e.g. 'quote-review', 'reconciliation', 'renewal-and-tax')."),
+                ],
+                required: ["tool_title", "task_title", "prompt"],
+                propertyOrdering: ["tool_title", "task_title", "prompt", "actor_id", "skill"]
             ),
             AgentToolDefinition(
                 name: "check_subagent",

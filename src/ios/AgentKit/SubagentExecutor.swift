@@ -19,12 +19,40 @@ import Foundation
 /// and its transcript are the same object, so a task card can push straight
 /// into the session with no separate mapping table.
 struct SubagentTask: Identifiable, Hashable {
+    enum Target: String, Codable, Sendable {
+        case auto
+        case local
+        case cloud
+    }
+
     let id: String
     let parentSessionId: String
     let agentId: String
     let title: String
     let prompt: String
     let createdAt: Date
+    let target: Target
+    let actorId: String?
+
+    init(
+        id: String,
+        parentSessionId: String,
+        agentId: String,
+        title: String,
+        prompt: String,
+        createdAt: Date = Date(),
+        target: Target = .auto,
+        actorId: String? = nil
+    ) {
+        self.id = id
+        self.parentSessionId = parentSessionId
+        self.agentId = agentId
+        self.title = title
+        self.prompt = prompt
+        self.createdAt = createdAt
+        self.target = target
+        self.actorId = actorId
+    }
 }
 
 /// A snapshot of a task, as the orchestrator sees it.
@@ -43,8 +71,33 @@ struct SubagentStatus {
     let iteration: Int
     /// The final answer, once the task reached a terminal state.
     let result: String?
+    /// Whether the task was halted by a Cedar policy or model escalation rule
+    /// requiring human-in-the-loop review.
+    let isEscalated: Bool
+    /// Structured decision outcome if executed by an AgentCore cloud subagent.
+    let decision: AgentCoreDecision?
 
     var isTerminal: Bool { state != .running }
+
+    init(
+        taskId: String,
+        title: String,
+        state: State,
+        currentActivity: String,
+        iteration: Int,
+        result: String?,
+        isEscalated: Bool = false,
+        decision: AgentCoreDecision? = nil
+    ) {
+        self.taskId = taskId
+        self.title = title
+        self.state = state
+        self.currentActivity = currentActivity
+        self.iteration = iteration
+        self.result = result
+        self.isEscalated = isEscalated
+        self.decision = decision
+    }
 }
 
 @MainActor

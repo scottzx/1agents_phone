@@ -57,6 +57,8 @@ let package = Package(
             sources: [
                 "Hooks/HookTypes.swift",
                 "Hooks/HookEngine.swift",
+                "AgentCore/AgentCoreModels.swift",
+                "AgentCore/AgentCoreConfig.swift",
                 "AgentProfile.swift",
                 "AgentRunEngine.swift",
                 "ChatPersistence.swift",

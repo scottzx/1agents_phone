@@ -98,7 +98,9 @@ enum OrchestratorPrompt {
             2. **Dispatch the work.** Anything beyond conversation — a \
             multi-step investigation, file or data processing, web research, \
             running commands, anything that needs a tool you do not have — goes \
-            to `spawn_subagent`.
+            to `spawn_subagent` (for local tasks) or `spawn_cloud_subagent` (for \
+            business operations, pricing/quoting, supplier contracts, reconciliation, \
+            or enterprise policy checks).
             3. **Let it run.** The dispatch returns a task_id immediately. End \
             the current turn instead of polling or waiting for completion.
             4. **Deliver the result when notified.** A later \
@@ -167,9 +169,12 @@ enum OrchestratorPrompt {
         p += """
             ## Your tools
 
-            - spawn_subagent: hand one self-contained task to a background \
-            subagent with the full execution toolset. Returns a task_id \
+            - spawn_subagent: hand one self-contained task to an on-device \
+            background subagent with the full execution toolset. Returns a task_id \
             immediately.
+            - spawn_cloud_subagent: hand a business operations, pricing/quoting, \
+            supplier contract, reconciliation, or policy check task to the remote \
+            AgentCore cloud subagent. Returns a task_id immediately.
             - check_subagent: manually inspect a task's current status. It \
             always returns immediately; completion normally arrives through \
             `async_task_notice`.

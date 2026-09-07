@@ -77,54 +77,47 @@ final class ToolLoopDetector {
 
         let argsHash = argsHashFor(toolName, params)
 
+        // Every threshold below counts the call that is ABOUT TO FIRE, not the
+        // ones already in history: `check` runs before execution, so a
+        // threshold of N means "the Nth identical call is the one we block".
+        // Both streak helpers return raw history counts and every comparison
+        // here adds the upcoming call — previously `countUnknownStreakFromTail`
+        // baked the +1 in while `getNoProgressStreak` did not, so the same
+        // configured number meant "block the 10th" for one strategy and "block
+        // the 21st" for another.
+
         // Strategy 1: unknown_tool_repeat — highest priority.
-        let unknownStreak = countUnknownStreakFromTail(toolName: toolName)
-        if unknownStreak >= config.unknownToolThreshold {
-            let msg = "[LOOP BLOCKED] CRITICAL: attempted unavailable tool '\(toolName)' \(unknownStreak) times. Stop retrying that missing tool and answer without it."
-            logger.error("loop-detector: unknown_tool_repeat critical tool=\(toolName) streak=\(unknownStreak)")
+        let upcomingUnknown = countUnknownStreakFromTail(toolName: toolName) + 1
+        if upcomingUnknown >= config.unknownToolThreshold {
+            let msg = "[LOOP BLOCKED] CRITICAL: attempted unavailable tool '\(toolName)' \(upcomingUnknown) times. Stop retrying that missing tool and answer without it."
+            logger.error("loop-detector: unknown_tool_repeat critical tool=\(toolName) streak=\(upcomingUnknown)")
             return LoopCheckResult(level: .critical, message: msg, warningKey: nil)
         }
 
         // Strategy 2: global_circuit_breaker — backstop, runs before poll-specific check.
-        let noProgressStreak = getNoProgressStreak(toolName: toolName, argsHash: argsHash)
-        if noProgressStreak >= config.globalCircuitBreakerThreshold {
-            let msg = "[LOOP BLOCKED] CRITICAL: \(toolName) has repeated identical no-progress outcomes \(noProgressStreak) times. Session execution blocked by global circuit breaker."
-            logger.error("loop-detector: global_circuit_breaker critical tool=\(toolName) streak=\(noProgressStreak)")
+        let upcomingNoProgress = getNoProgressStreak(toolName: toolName, argsHash: argsHash) + 1
+        if upcomingNoProgress >= config.globalCircuitBreakerThreshold {
+            let msg = "[LOOP BLOCKED] CRITICAL: \(toolName) has repeated identical no-progress outcomes \(upcomingNoProgress) times. Session execution blocked by global circuit breaker."
+            logger.error("loop-detector: global_circuit_breaker critical tool=\(toolName) streak=\(upcomingNoProgress)")
             return LoopCheckResult(level: .critical, message: msg, warningKey: nil)
         }
 
-        // Strategy 3: known_poll_no_progress — dual threshold for known polling tools.
-        if isPollTool(toolName, params) {
-            if noProgressStreak >= config.criticalThreshold {
-                let msg = "[LOOP BLOCKED] CRITICAL: Called \(toolName) \(noProgressStreak) times with identical no-progress results. Session execution blocked."
-                logger.error("loop-detector: poll_no_progress critical tool=\(toolName) streak=\(noProgressStreak)")
-                return LoopCheckResult(level: .critical, message: msg, warningKey: nil)
-            }
-            if noProgressStreak >= config.warningThreshold {
-                let key = "poll:\(toolName):\(argsHash)"
-                if shouldEmitWarning(warningKey: key, currentCount: noProgressStreak) {
-                    let msg = "[LOOP WARNING] You have called \(toolName) \(noProgressStreak) times with no progress. Stop polling and either (1) increase wait time, or (2) report the task as failed."
-                    logger.warning("loop-detector: poll_no_progress warning tool=\(toolName) streak=\(noProgressStreak)")
-                    return LoopCheckResult(level: .warning, message: msg, warningKey: key)
-                }
-            }
+        // Strategy 3: known_poll_no_progress.
+        if isPollTool(toolName, params), upcomingNoProgress >= config.criticalThreshold {
+            let msg = "[LOOP BLOCKED] CRITICAL: Called \(toolName) \(upcomingNoProgress) times with identical no-progress results. Session execution blocked."
+            logger.error("loop-detector: poll_no_progress critical tool=\(toolName) streak=\(upcomingNoProgress)")
+            return LoopCheckResult(level: .critical, message: msg, warningKey: nil)
         }
 
-        // Strategy 4: generic_repeat — non-poll tools, total occurrences (not necessarily contiguous).
-        if !isPollTool(toolName, params) {
-            let totalCount = history.reduce(0) { acc, r in
-                (r.toolName == toolName && r.argsHash == argsHash) ? acc + 1 : acc
-            }
-            if totalCount >= config.warningThreshold {
-                let key = "repeat:\(toolName):\(argsHash)"
-                if shouldEmitWarning(warningKey: key, currentCount: totalCount) {
-                    let msg = "[LOOP WARNING] You have called \(toolName) \(totalCount) times with identical arguments. If this is not making progress, stop retrying and report the task as failed."
-                    logger.warning("loop-detector: generic_repeat warning tool=\(toolName) count=\(totalCount)")
-                    return LoopCheckResult(level: .warning, message: msg, warningKey: key)
-                }
-            }
-        }
-
+        // No warning is raised here, by design. `check` decides whether to BLOCK;
+        // warnings are advisory text that has to reach the model, and the only
+        // way it does that is `record`, which appends the message to the tool
+        // result. A warning returned from here was dead — the sole caller acts
+        // on `.critical` alone — and worse, it consumed that warning's throttle
+        // bucket (`shouldEmitWarning` fires once per bucket of
+        // `warningThreshold`), silencing the `record` call that would actually
+        // have shown it. That is why a model could loop past the threshold and
+        // never see a single warning.
         return .pass
     }
 
@@ -349,14 +342,19 @@ final class ToolLoopDetector {
             }
             streak += 1
         }
-        // Predict the upcoming call: callers invoke `check(...)` before recording.
-        // Returning `streak` is the count of *prior* identical no-progress outcomes.
+        // Raw history count: how many identical no-progress outcomes are ALREADY
+        // recorded. `record` wants exactly this (it counts what has happened);
+        // `check` adds one for the call it is about to admit.
         return streak
     }
 
     /// Walk history backwards; count contiguous unknown-tool errors for `toolName`.
     /// We rely on the historical record's `unknownToolName` matching `toolName`.
-    /// Returns the streak +1 to model "this is the (n+1)-th attempt about to fire".
+    ///
+    /// Raw history count, like `getNoProgressStreak` — the "+1 for the call about
+    /// to fire" belongs to `check`, which is the only thing that models an
+    /// upcoming call. It used to be added here instead, which is what made the
+    /// two counters disagree about what a configured threshold meant.
     private func countUnknownStreakFromTail(toolName: String) -> Int {
         var streak = 0
         for rec in history.reversed() {
@@ -364,7 +362,6 @@ final class ToolLoopDetector {
                   rec.toolName == toolName else { break }
             streak += 1
         }
-        // The check() call models "if we let this fire, that would be the (streak+1)-th".
-        return streak + 1
+        return streak
     }
 }

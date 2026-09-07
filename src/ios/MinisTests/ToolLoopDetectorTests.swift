@@ -169,6 +169,12 @@ final class ToolLoopDetectorTests: XCTestCase {
 
     // MARK: - Stable hashing
 
+    // These assert the hash directly, via the recorded history, rather than
+    // through a warning. Warnings are throttled to one per bucket of
+    // `warningThreshold`, so an earlier call in the same test consumes the
+    // bucket and the later assertion reads `.none` — which says nothing about
+    // whether the hashing collapsed. The history is the actual subject.
+
     func testArgsHash_ignoresToolTitle() {
         // The model is required by tool schema to provide `tool_title` (a UI label).
         // Models often suffix it with a counter ("#1", "#2", ...), which must NOT
@@ -181,11 +187,9 @@ final class ToolLoopDetectorTests: XCTestCase {
             ]
             _ = detector.record(toolName: "file_read", params: params, result: "localhost")
         }
-        let pre = detector.check(
-            toolName: "file_read",
-            params: ["path": "/etc/hostname", "tool_title": "Read /etc/hostname #11"]
-        )
-        XCTAssertNotEqual(pre.level, .none, "tool_title variation must NOT defeat repeat detection")
+
+        let hashes = Set(detector._historySnapshot().map(\.argsHash))
+        XCTAssertEqual(hashes.count, 1, "tool_title variation must NOT defeat repeat detection")
     }
 
     func testArgsHash_keyOrderInvariant() {
@@ -200,8 +204,52 @@ final class ToolLoopDetectorTests: XCTestCase {
         for _ in 0..<5 {
             _ = detector.record(toolName: "file_read", params: p2, result: "ok")
         }
-        // 10 total (with stable hashing) → next pre-check sees count=10 → warning.
-        let post = detector.record(toolName: "file_read", params: p2, result: "ok")
-        XCTAssertEqual(post.level, .warning, "key-order-invariant hashing must collapse to a single bucket")
+
+        let hashes = Set(detector._historySnapshot().map(\.argsHash))
+        XCTAssertEqual(hashes.count, 1, "key-order-invariant hashing must collapse to a single bucket")
+    }
+
+    // MARK: - Warning delivery
+
+    /// The warning a looping model actually sees comes from `record`, which
+    /// appends it to the tool result. `check` must not consume that throttle
+    /// bucket first — it used to, which silenced the only warning that reaches
+    /// the model.
+    func testCheckDoesNotSwallowTheWarningRecordOwes() {
+        let detector = ToolLoopDetector()
+        let params: [String: Any] = ["path": "/tmp/foo"]
+
+        for _ in 0..<9 {
+            _ = detector.record(toolName: "file_read", params: params, result: "same")
+            XCTAssertEqual(detector.check(toolName: "file_read", params: params).level, .none)
+        }
+
+        let post10 = detector.record(toolName: "file_read", params: params, result: "same")
+        XCTAssertEqual(post10.level, .warning,
+                       "the 10th identical call must still warn even though check() ran before each one")
+        XCTAssertTrue(post10.message?.contains("[LOOP WARNING]") == true)
+    }
+
+    /// Thresholds count the call about to fire, uniformly across strategies:
+    /// `unknownToolThreshold: 10` and `criticalThreshold: 20` must both mean
+    /// "the Nth call is the blocked one".
+    func testThresholdsCountTheUpcomingCallConsistently() {
+        let unknown = ToolLoopDetector()
+        for _ in 0..<8 {
+            _ = unknown.record(toolName: "nope", params: [:], result: nil, errorMessage: "unknown tool: nope")
+        }
+        XCTAssertEqual(unknown.check(toolName: "nope", params: [:]).level, .none, "9th attempt still allowed")
+        _ = unknown.record(toolName: "nope", params: [:], result: nil, errorMessage: "unknown tool: nope")
+        XCTAssertEqual(unknown.check(toolName: "nope", params: [:]).level, .critical, "10th attempt blocked")
+
+        let poll = ToolLoopDetector()
+        let params: [String: Any] = ["pid": 1234]
+        let stable = "{\"status\":\"running\"}"
+        for _ in 0..<18 {
+            _ = poll.record(toolName: "command_status", params: params, result: stable)
+        }
+        XCTAssertEqual(poll.check(toolName: "command_status", params: params).level, .none, "19th poll still allowed")
+        _ = poll.record(toolName: "command_status", params: params, result: stable)
+        XCTAssertEqual(poll.check(toolName: "command_status", params: params).level, .critical, "20th poll blocked")
     }
 }

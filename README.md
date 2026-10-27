@@ -1,4 +1,4 @@
-# Yima / 一伴
+# Yima / 一芥伙伴
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20Android%20%7C%20macOS-lightgrey.svg)](#beta-programme)
@@ -11,7 +11,7 @@
 
 ---
 
-Yima / 一伴 将领先的大模型（Claude、GPT、Gemini、DeepSeek 等）带入原生移动与桌面体验，并为它们提供真实的计算环境：运行在设备本地的完整 Linux 环境、浏览器自动化、可扩展技能（Skills）、持久化记忆（Memory）以及多智能体协同运行环境。
+Yima / 一芥伙伴 将领先的大模型（Claude、GPT、Gemini、DeepSeek 等）带入原生移动与桌面体验，并为它们提供真实的计算环境：运行在设备本地的完整 Linux 环境、浏览器自动化、可扩展技能（Skills）、持久化记忆（Memory）以及多智能体协同运行环境。
 
 It is free, and fully open source.
 
@@ -48,7 +48,7 @@ Official upstream: **[openminis.app](https://openminis.app)**
 
 ---
 
-## What you can do with Yima / 一伴
+## What you can do with Yima / 一芥伙伴
 
 A few things people actually use it for:
 

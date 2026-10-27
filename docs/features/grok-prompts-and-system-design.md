@@ -1,6 +1,6 @@
 # Grok 系列提示词与系统设计深度解析（Prompt Engineering & Mental Models）
 
-> 本文深入剖析 `../1agents_app/reference_repo/` 中两个 Grok 核心项目（**`grok-bot-0.18-reconstructed`** 与 **`grok-build`**）的系统提示词（System Prompt）、Prompt 结构、多智能体交互协议及合成唤醒（Synthetic Revival）设计，为 `1agents_phone`（一伴）的 Prompt 与 A2A 协议改造提供权威技术参考。
+> 本文深入剖析 `../1agents_app/reference_repo/` 中两个 Grok 核心项目（**`grok-bot-0.18-reconstructed`** 与 **`grok-build`**）的系统提示词（System Prompt）、Prompt 结构、多智能体交互协议及合成唤醒（Synthetic Revival）设计，为 `1agents_phone`（一芥伙伴）的 Prompt 与 A2A 协议改造提供权威技术参考。
 
 ---
 

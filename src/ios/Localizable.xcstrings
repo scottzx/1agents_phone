@@ -3106,13 +3106,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送给 一伴 的快捷指令可能尚未完成。请打开会话查看。"
+            "value": "发送给 一芥伙伴 的快捷指令可能尚未完成。请打开会话查看。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "傳送給 一伴 的捷徑可能尚未完成。請開啟工作階段查看。"
+            "value": "傳送給 一芥伙伴 的捷徑可能尚未完成。請開啟工作階段查看。"
           }
         }
       }
@@ -3939,13 +3939,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关于一伴"
+            "value": "关于一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "關於一伴"
+            "value": "關於一芥伙伴"
           }
         }
       }
@@ -4043,13 +4043,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关于一伴"
+            "value": "关于一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "關於一伴"
+            "value": "關於一芥伙伴"
           }
         }
       }
@@ -5890,13 +5890,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有 一伴数据已从 iCloud 中移除。本设备正在将其本地内容重新上传到新的 iCloud 区域。"
+            "value": "所有 一芥伙伴数据已从 iCloud 中移除。本设备正在将其本地内容重新上传到新的 iCloud 区域。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "所有 一伴 數據已從 iCloud 中移除。本設備正在將其本地內容重新上傳到新的 iCloud 區域。"
+            "value": "所有 一芥伙伴 數據已從 iCloud 中移除。本設備正在將其本地內容重新上傳到新的 iCloud 區域。"
           }
         }
       }
@@ -7617,13 +7617,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "询问一伴"
+            "value": "询问一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "詢問 一伴"
+            "value": "詢問 一芥伙伴"
           }
         }
       }
@@ -13447,13 +13447,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "清除 Cookie 将退出 一伴 浏览器中所有网站的登录。"
+            "value": "清除 Cookie 将退出 一芥伙伴 浏览器中所有网站的登录。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "清除 Cookie 將退出 一伴 瀏覽器中所有網站的登錄。"
+            "value": "清除 Cookie 將退出 一芥伙伴 瀏覽器中所有網站的登錄。"
           }
         }
       }
@@ -13660,13 +13660,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "CloudKit 内置区域。一伴 未使用。"
+            "value": "CloudKit 内置区域。一芥伙伴 未使用。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "CloudKit 內建區域。一伴 未使用。"
+            "value": "CloudKit 內建區域。一芥伙伴 未使用。"
           }
         }
       }
@@ -24826,13 +24826,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 在你的 iCloud 私有数据库中创建的所有区域。**V2** 保存当前同步引擎的数据；**V1** 保存旧版本按设备的遗留备份。删除区域是永久操作，会移除其中的所有内容（记录 + 资源）。可在迁移完成后用它来释放空间。"
+            "value": "一芥伙伴 在你的 iCloud 私有数据库中创建的所有区域。**V2** 保存当前同步引擎的数据；**V1** 保存旧版本按设备的遗留备份。删除区域是永久操作，会移除其中的所有内容（记录 + 资源）。可在迁移完成后用它来释放空间。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 在你的 iCloud 私人資料庫中建立的所有區域。**V2** 保存目前同步引擎的資料；**V1** 保存舊版本按裝置的舊備份。刪除區域是永久操作，會移除其中的所有內容（記錄 + 資源）。可在遷移完成後用它來釋放空間。"
+            "value": "一芥伙伴 在你的 iCloud 私人資料庫中建立的所有區域。**V2** 保存目前同步引擎的資料；**V1** 保存舊版本按裝置的舊備份。刪除區域是永久操作，會移除其中的所有內容（記錄 + 資源）。可在遷移完成後用它來釋放空間。"
           }
         }
       }
@@ -28247,7 +28247,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在你其他 一伴 设备上显示的友好名称。"
+            "value": "在你其他 一芥伙伴 设备上显示的友好名称。"
           }
         }
       }
@@ -28715,13 +28715,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "获取 一伴 会话的当前状态，包括代理是否仍在运行、最新消息和最后的工具调用。"
+            "value": "获取 一芥伙伴 会话的当前状态，包括代理是否仍在运行、最新消息和最后的工具调用。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "獲取 一伴 會話的當前狀態，包括代理是否仍在運行、最新消息和最後的工具調用。"
+            "value": "獲取 一芥伙伴 會話的當前狀態，包括代理是否仍在運行、最新消息和最後的工具調用。"
           }
         }
       }
@@ -30395,13 +30395,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待该服务器首次 initialize 的时长。启动较慢的服务器（如 uvx）可调大。留空则用默认值（60 秒）。这是 一伴 配置，并非 MCP 协议的一部分。"
+            "value": "等待该服务器首次 initialize 的时长。启动较慢的服务器（如 uvx）可调大。留空则用默认值（60 秒）。这是 一芥伙伴 配置，并非 MCP 协议的一部分。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "等待此伺服器首次 initialize 的時間。啟動較慢的伺服器（如 uvx）可調大。留空則用預設值（60 秒）。這是 一伴 設定，並非 MCP 協定的一部分。"
+            "value": "等待此伺服器首次 initialize 的時間。啟動較慢的伺服器（如 uvx）可調大。留空則用預設值（60 秒）。這是 一芥伙伴 設定，並非 MCP 協定的一部分。"
           }
         }
       }
@@ -34959,13 +34959,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "列出所有 一伴 聊天会话及其标题和 ID。"
+            "value": "列出所有 一芥伙伴 聊天会话及其标题和 ID。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "列出所有 一伴 聊天會話及其標題和 ID。"
+            "value": "列出所有 一芥伙伴 聊天會話及其標題和 ID。"
           }
         }
       }
@@ -37989,13 +37989,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 一伴 发消息"
+            "value": "向 一芥伙伴 发消息"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 一伴 發消息"
+            "value": "向 一芥伙伴 發消息"
           }
         }
       }
@@ -38352,13 +38352,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴"
+            "value": "一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴"
+            "value": "一芥伙伴"
           }
         }
       }
@@ -38404,13 +38404,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 电脑"
+            "value": "一芥伙伴 电脑"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 電腦"
+            "value": "一芥伙伴 電腦"
           }
         }
       }
@@ -38456,13 +38456,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴文件"
+            "value": "一芥伙伴文件"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴文件"
+            "value": "一芥伙伴文件"
           }
         }
       }
@@ -38508,13 +38508,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 Shell"
+            "value": "一芥伙伴 Shell"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 Shell"
+            "value": "一芥伙伴 Shell"
           }
         }
       }
@@ -38560,13 +38560,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 技能"
+            "value": "一芥伙伴 技能"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 技能"
+            "value": "一芥伙伴 技能"
           }
         }
       }
@@ -38717,13 +38717,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 可以将你对语音转录的修改(原文 → 修正对)以及被采纳的 AI 纠错保存到设备本地数据库,用于让后续语音纠错更聪明。数据不会上传。你可以随时在 设置 → 权限 中更改或清除这些数据。"
+            "value": "一芥伙伴 可以将你对语音转录的修改(原文 → 修正对)以及被采纳的 AI 纠错保存到设备本地数据库,用于让后续语音纠错更聪明。数据不会上传。你可以随时在 设置 → 权限 中更改或清除这些数据。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 可以將你對語音轉錄的修改(原文 → 修正對)以及被採納的 AI 糾錯儲存到裝置本機資料庫,用於讓後續語音糾錯更聰明。資料不會上傳。你可以隨時在 設定 → 權限 中更改或清除這些資料。"
+            "value": "一芥伙伴 可以將你對語音轉錄的修改(原文 → 修正對)以及被採納的 AI 糾錯儲存到裝置本機資料庫,用於讓後續語音糾錯更聰明。資料不會上傳。你可以隨時在 設定 → 權限 中更改或清除這些資料。"
           }
         }
       }
@@ -38769,13 +38769,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 无法打开该页面，因为无法连接到服务器。"
+            "value": "一芥伙伴 无法打开该页面，因为无法连接到服务器。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 無法開啟該頁面，因為無法連線到伺服器。"
+            "value": "一芥伙伴 無法開啟該頁面，因為無法連線到伺服器。"
           }
         }
       }
@@ -38821,13 +38821,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 无法打开该页面，因为找不到服务器“%@”。"
+            "value": "一芥伙伴 无法打开该页面，因为找不到服务器“%@”。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 無法開啟該頁面，因為找不到伺服器「%@」。"
+            "value": "一芥伙伴 無法開啟該頁面，因為找不到伺服器「%@」。"
           }
         }
       }
@@ -38873,13 +38873,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 无法打开该页面，因为找不到服务器。"
+            "value": "一芥伙伴 无法打开该页面，因为找不到服务器。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 無法開啟該頁面，因為找不到伺服器。"
+            "value": "一芥伙伴 無法開啟該頁面，因為找不到伺服器。"
           }
         }
       }
@@ -38925,13 +38925,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 无法验证服务器“%@”的身份。"
+            "value": "一芥伙伴 无法验证服务器“%@”的身份。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 無法驗證伺服器「%@」的身分。"
+            "value": "一芥伙伴 無法驗證伺服器「%@」的身分。"
           }
         }
       }
@@ -38977,13 +38977,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 无法验证服务器的身份。"
+            "value": "一芥伙伴 无法验证服务器的身份。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 無法驗證伺服器的身分。"
+            "value": "一芥伙伴 無法驗證伺服器的身分。"
           }
         }
       }
@@ -39029,13 +39029,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 不运营任何服务器，不会收集、存储或处理您的任何个人数据。所有数据都保存在您的设备上。"
+            "value": "一芥伙伴 不运营任何服务器，不会收集、存储或处理您的任何个人数据。所有数据都保存在您的设备上。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 不運營任何服務器，不會收集、存儲或處理您的任何個人數據。所有數據都保存在您的設備上。"
+            "value": "一芥伙伴 不運營任何服務器，不會收集、存儲或處理您的任何個人數據。所有數據都保存在您的設備上。"
           }
         }
       }
@@ -39081,13 +39081,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴已锁定"
+            "value": "一芥伙伴已锁定"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴已鎖定"
+            "value": "一芥伙伴已鎖定"
           }
         }
       }
@@ -39133,13 +39133,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 是您完全本地、完全私密的设备端代理。"
+            "value": "一芥伙伴 是您完全本地、完全私密的设备端代理。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 是您完全本機、完全私密的裝置端代理。"
+            "value": "一芥伙伴 是您完全本機、完全私密的裝置端代理。"
           }
         }
       }
@@ -39238,13 +39238,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 构建于这些开源项目之上。感谢所有贡献者。"
+            "value": "一芥伙伴 构建于这些开源项目之上。感谢所有贡献者。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 構建於這些開源項目之上。感謝所有貢獻者。"
+            "value": "一芥伙伴 構建於這些開源項目之上。感謝所有貢獻者。"
           }
         }
       }
@@ -39344,13 +39344,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 会为本次会话创建以下目录"
+            "value": "一芥伙伴 会为本次会话创建以下目录"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 會為本次會話建立以下目錄"
+            "value": "一芥伙伴 會為本次會話建立以下目錄"
           }
         }
       }
@@ -39397,13 +39397,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 会在所有会话间共享使用以下目录"
+            "value": "一芥伙伴 会在所有会话间共享使用以下目录"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 會在所有會話間共用以下目錄"
+            "value": "一芥伙伴 會在所有會話間共用以下目錄"
           }
         }
       }
@@ -43362,13 +43362,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "除您选择的 AI 服务商外，数据不会与 一伴 或任何其他方共享"
+            "value": "除您选择的 AI 服务商外，数据不会与 一芥伙伴 或任何其他方共享"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "除您選擇的 AI 服務商外，數據不會與 一伴 或任何其他方共享"
+            "value": "除您選擇的 AI 服務商外，數據不會與 一芥伙伴 或任何其他方共享"
           }
         }
       }
@@ -43730,13 +43730,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无 一伴文件"
+            "value": "无 一芥伙伴文件"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "無 一伴文件"
+            "value": "無 一芥伙伴文件"
           }
         }
       }
@@ -46110,13 +46110,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "好的 — 正在打开一伴。"
+            "value": "好的 — 正在打开一芥伙伴。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "好的 — 正在開啟 一伴。"
+            "value": "好的 — 正在開啟 一芥伙伴。"
           }
         }
       }
@@ -46808,13 +46808,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开一伴，发送你的提示词并显示对话。开始新会话，或在你选择某个会话时继续该会话。"
+            "value": "打开一芥伙伴，发送你的提示词并显示对话。开始新会话，或在你选择某个会话时继续该会话。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "開啟 一伴，傳送你的提示詞並顯示對話。開始新工作階段，或在你選擇某個工作階段時繼續該工作階段。"
+            "value": "開啟 一芥伙伴，傳送你的提示詞並顯示對話。開始新工作階段，或在你選擇某個工作階段時繼續該工作階段。"
           }
         }
       }
@@ -46860,13 +46860,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在应用中打开一个 一伴 聊天会话。"
+            "value": "在应用中打开一个 一芥伙伴 聊天会话。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "在應用中打開一個 一伴 聊天會話。"
+            "value": "在應用中打開一個 一芥伙伴 聊天會話。"
           }
         }
       }
@@ -47609,13 +47609,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "覆盖发送到此接口的 User-Agent 头。留空则使用 一伴 默认值。适用于仅接受特定客户端的中继（例如“claude-cli/1.0”）。"
+            "value": "覆盖发送到此接口的 User-Agent 头。留空则使用 一芥伙伴 默认值。适用于仅接受特定客户端的中继（例如“claude-cli/1.0”）。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "覆寫傳送到此端點的 User-Agent 標頭。留空則使用 一伴 預設值。適用於僅接受特定用戶端的中繼（例如「claude-cli/1.0」）。"
+            "value": "覆寫傳送到此端點的 User-Agent 標頭。留空則使用 一芥伙伴 預設值。適用於僅接受特定用戶端的中繼（例如「claude-cli/1.0」）。"
           }
         }
       }
@@ -48930,13 +48930,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "永久从 iCloud 中删除所有 一伴数据。本设备上的本地数据不受影响。"
+            "value": "永久从 iCloud 中删除所有 一芥伙伴数据。本设备上的本地数据不受影响。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "永久從 iCloud 中刪除所有 一伴 數據。本設備上的本地數據不受影響。"
+            "value": "永久從 iCloud 中刪除所有 一芥伙伴 數據。本設備上的本地數據不受影響。"
           }
         }
       }
@@ -49411,13 +49411,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所选文件夹将以 bind 方式挂载到 /var/minis/mounts/<name>。您可以在“浏览文件”中查看，也可以直接在 一伴 Shell 中读写，就像 /var/minis/shared 一样。最多可同时挂载 10 个文件夹。"
+            "value": "所选文件夹将以 bind 方式挂载到 /var/minis/mounts/<name>。您可以在“浏览文件”中查看，也可以直接在 一芥伙伴 Shell 中读写，就像 /var/minis/shared 一样。最多可同时挂载 10 个文件夹。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "所選文件夾將以 bind 方式掛載到 /var/minis/mounts/<name>。您可以在“瀏覽文件”中查看，也可以直接在 一伴 Shell 中讀寫，就像 /var/minis/shared 一樣。最多可同時掛載 10 個文件夾。"
+            "value": "所選文件夾將以 bind 方式掛載到 /var/minis/mounts/<name>。您可以在“瀏覽文件”中查看，也可以直接在 一芥伙伴 Shell 中讀寫，就像 /var/minis/shared 一樣。最多可同時掛載 10 個文件夾。"
           }
         }
       }
@@ -54738,13 +54738,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开一伴 需要 %@。"
+            "value": "打开一芥伙伴 需要 %@。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "開啟 一伴 需要 %@。"
+            "value": "開啟 一芥伙伴 需要 %@。"
           }
         }
       }
@@ -57940,13 +57940,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "运行预定义的 一伴 任务，如睡眠分析、天气查看或早间简报。"
+            "value": "运行预定义的 一芥伙伴 任务，如睡眠分析、天气查看或早间简报。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "運行預定義的 一伴 任務，如睡眠分析、天氣查看或早間簡報。"
+            "value": "運行預定義的 一芥伙伴 任務，如睡眠分析、天氣查看或早間簡報。"
           }
         }
       }
@@ -59767,13 +59767,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向现有 一伴 会话发送跟进提示，继续与 AI 代理的对话。"
+            "value": "向现有 一芥伙伴 会话发送跟进提示，继续与 AI 代理的对话。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "向現有 一伴 會話發送跟進提示，繼續與 AI 代理的對話。"
+            "value": "向現有 一芥伙伴 會話發送跟進提示，繼續與 AI 代理的對話。"
           }
         }
       }
@@ -59819,13 +59819,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 一伴 AI 代理发送提示。任务在后台运行时立即返回会话信息。"
+            "value": "向 一芥伙伴 AI 代理发送提示。任务在后台运行时立即返回会话信息。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "向 一伴 AI 代理發送提示。任務在後臺運行時立即返回會話信息。"
+            "value": "向 一芥伙伴 AI 代理發送提示。任務在後臺運行時立即返回會話信息。"
           }
         }
       }
@@ -67904,13 +67904,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "发送给 一伴 的快捷指令可能未在后台运行完成。请在“设置”中开启“后台保活”，以便自动化能够可靠地完成。"
+            "value": "发送给 一芥伙伴 的快捷指令可能未在后台运行完成。请在“设置”中开启“后台保活”，以便自动化能够可靠地完成。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "傳送給 一伴 的捷徑可能未在背景執行完成。請在「設定」中開啟「背景保活」，以便自動化能夠可靠地完成。"
+            "value": "傳送給 一芥伙伴 的捷徑可能未在背景執行完成。請在「設定」中開啟「背景保活」，以便自動化能夠可靠地完成。"
           }
         }
       }
@@ -68979,13 +68979,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这些目录会显示在 iOS“文件”App 的“我的 iPhone → 一伴”下。轻点某一行可查看详情、浏览内容或切换可见性。"
+            "value": "这些目录会显示在 iOS“文件”App 的“我的 iPhone → 一芥伙伴”下。轻点某一行可查看详情、浏览内容或切换可见性。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "這些目錄會顯示在 iOS“文件”App 的“我的 iPhone → 一伴”下。輕點某一行可查看詳情、瀏覽內容或切換可見性。"
+            "value": "這些目錄會顯示在 iOS“文件”App 的“我的 iPhone → 一芥伙伴”下。輕點某一行可查看詳情、瀏覽內容或切換可見性。"
           }
         }
       }
@@ -69414,13 +69414,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此操作无法撤销。iCloud 中存储的所有 一伴数据将立即被删除。登录同一 iCloud 账户的其他设备将在下次同步时失去已同步的副本。\n\n本设备上的本地数据是安全的。"
+            "value": "此操作无法撤销。iCloud 中存储的所有 一芥伙伴数据将立即被删除。登录同一 iCloud 账户的其他设备将在下次同步时失去已同步的副本。\n\n本设备上的本地数据是安全的。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "此操作無法撤銷。iCloud 中存儲的所有 一伴 數據將立即被刪除。登錄同一 iCloud 賬戶的其他設備將在下次同步時失去已同步的副本。\n\n本設備上的本地數據是安全的。"
+            "value": "此操作無法撤銷。iCloud 中存儲的所有 一芥伙伴 數據將立即被刪除。登錄同一 iCloud 賬戶的其他設備將在下次同步時失去已同步的副本。\n\n本設備上的本地數據是安全的。"
           }
         }
       }
@@ -69587,13 +69587,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此文件夹会显示在“文件”→“我的 iPhone”→ 一伴 中。"
+            "value": "此文件夹会显示在“文件”→“我的 iPhone”→ 一芥伙伴 中。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "此文件夾會顯示在“文件”→“我的 iPhone”→ 一伴 中。"
+            "value": "此文件夾會顯示在“文件”→“我的 iPhone”→ 一芥伙伴 中。"
           }
         }
       }
@@ -70989,13 +70989,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此操作将永久删除 一伴 上传到您 iCloud 账户中的所有内容，跨您所有的设备：\n\n• 聊天会话和消息\n• 会话文件和附件\n• 技能\n• 服务商配置\n• 环境变量\n\n本设备上的本地数据不会被删除 —— 仅删除云端副本。删除后，本设备将把其本地内容重新上传到新的 iCloud 区域。"
+            "value": "此操作将永久删除 一芥伙伴 上传到您 iCloud 账户中的所有内容，跨您所有的设备：\n\n• 聊天会话和消息\n• 会话文件和附件\n• 技能\n• 服务商配置\n• 环境变量\n\n本设备上的本地数据不会被删除 —— 仅删除云端副本。删除后，本设备将把其本地内容重新上传到新的 iCloud 区域。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "此操作將永久刪除 一伴 上傳到您 iCloud 賬戶中的所有內容，跨您所有的設備：\n\n• 聊天會話和消息\n• 會話文件和附件\n• 技能\n• 服務商配置\n• 環境變量\n\n本設備上的本地數據不會被刪除 —— 僅刪除雲端副本。刪除後，本設備將把其本地內容重新上傳到新的 iCloud 區域。"
+            "value": "此操作將永久刪除 一芥伙伴 上傳到您 iCloud 賬戶中的所有內容，跨您所有的設備：\n\n• 聊天會話和消息\n• 會話文件和附件\n• 技能\n• 服務商配置\n• 環境變量\n\n本設備上的本地數據不會被刪除 —— 僅刪除雲端副本。刪除後，本設備將把其本地內容重新上傳到新的 iCloud 區域。"
           }
         }
       }
@@ -71145,13 +71145,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这将从 一伴 浏览器中删除所有 Cookie 和网站数据。"
+            "value": "这将从 一芥伙伴 浏览器中删除所有 Cookie 和网站数据。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "這將從 一伴 瀏覽器中刪除所有 Cookie 和網站數據。"
+            "value": "這將從 一芥伙伴 瀏覽器中刪除所有 Cookie 和網站數據。"
           }
         }
       }
@@ -71906,13 +71906,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "从实时活动切换 一伴 音频朗读的播放/暂停。"
+            "value": "从实时活动切换 一芥伙伴 音频朗读的播放/暂停。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "從即時動態切換 一伴 音訊朗讀的播放/暫停。"
+            "value": "從即時動態切換 一芥伙伴 音訊朗讀的播放/暫停。"
           }
         }
       }
@@ -73426,13 +73426,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "解锁一伴"
+            "value": "解锁一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "解鎖 一伴"
+            "value": "解鎖 一芥伙伴"
           }
         }
       }
@@ -76907,13 +76907,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "欢迎使用一伴"
+            "value": "欢迎使用一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "歡迎使用 一伴"
+            "value": "歡迎使用 一芥伙伴"
           }
         }
       }
@@ -77028,13 +77028,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "您想问 一伴 什么？"
+            "value": "您想问 一芥伙伴 什么？"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "您想問 一伴 什麼？"
+            "value": "您想問 一芥伙伴 什麼？"
           }
         }
       }
@@ -77653,13 +77653,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭后，一伴 Shell 和 AI 工具将无法在此挂载中创建、编辑或删除文件。"
+            "value": "关闭后，一芥伙伴 Shell 和 AI 工具将无法在此挂载中创建、编辑或删除文件。"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "關閉後，一伴 Shell 和 AI 工具將無法在此掛載中創建、編輯或刪除文件。"
+            "value": "關閉後，一芥伙伴 Shell 和 AI 工具將無法在此掛載中創建、編輯或刪除文件。"
           }
         }
       }
@@ -78175,13 +78175,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 工作目录结构"
+            "value": "一芥伙伴 工作目录结构"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴 工作目錄結構"
+            "value": "一芥伙伴 工作目錄結構"
           }
         }
       }
@@ -78439,13 +78439,13 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴"
+            "value": "一芥伙伴"
           }
         },
         "zh-Hant": {
           "stringUnit": {
             "state": "translated",
-            "value": "一伴"
+            "value": "一芥伙伴"
           }
         }
       }

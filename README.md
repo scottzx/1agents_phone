@@ -1,5 +1,12 @@
 # Yima / 一芥伙伴
 
+> [!IMPORTANT]
+> **本仓库已不再作为主开发仓库 / This repository is no longer the primary development repo.**
+>
+> 「一芥伙伴」（Yima）的后续开发在 **[VoiceContext](https://github.com/scottzx/VoiceContext)** 进行。请到新仓库获取最新代码、构建说明和贡献入口。
+>
+> Ongoing development of 一芥伙伴 (Yima) continues in **[VoiceContext](https://github.com/scottzx/VoiceContext)**. Use that repository for the latest code, build instructions, and contributions.
+
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20Android%20%7C%20macOS-lightgrey.svg)](#beta-programme)
 
@@ -121,6 +128,10 @@ always carries the latest APK.
 
 ## Building from source
 
+**现行开发与构建请前往 [VoiceContext](https://github.com/scottzx/VoiceContext)。** 下面的步骤只说明本仓库里这份历史代码如何编译，不再是「一芥伙伴」的现行工程入口。
+
+**Current development and builds are in [VoiceContext](https://github.com/scottzx/VoiceContext).** The steps below only describe how to compile the historical tree in this repository.
+
 Minis ships a Linux sandbox inside the app, so the native dependencies (iSH on
 iOS, PRoot on Android, FFmpeg, LAME) and the Alpine rootfs are **built from
 source** rather than committed as binaries.
@@ -211,12 +222,13 @@ work is distributed under GPLv3. Bundled third-party licenses are listed in
 
 ## Community
 
-- **Telegram**: [Join the group](https://t.me/+2NzhOJuzRyI1YmM1)
-- **Issues**: Bug reports, feature requests and discussion via
-  [GitHub Issues](https://github.com/OpenMinis/OpenMinis/issues)
+「一芥伙伴」（Yima）的开发、问题反馈与代码贡献请前往 **[VoiceContext](https://github.com/scottzx/VoiceContext)**。本仓库只保留历史代码，新的开发讨论和改动请提交到那里。
 
-This repository is a mirror of a private development tree, so it **does not
-accept pull requests** — there is nowhere for them to land. Issues are the way
-to shape the product, and [AwesomeMinis](https://github.com/OpenMinis/AwesomeMinis)
-and [MinisSkills](https://github.com/OpenMinis/MinisSkills) both do take
-contributions. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Development, bug reports, and code contributions for 一芥伙伴 (Yima) belong in **[VoiceContext](https://github.com/scottzx/VoiceContext)**. This repository keeps the historical tree; send new development discussion and changes there.
+
+上游 OpenMinis 的社区渠道仍然是：
+
+- **Telegram**: [Join the group](https://t.me/+2NzhOJuzRyI1YmM1)
+- **Issues**: [OpenMinis Issues](https://github.com/OpenMinis/OpenMinis/issues)
+- **Use cases**: [AwesomeMinis](https://github.com/OpenMinis/AwesomeMinis)
+- **Skills**: [MinisSkills](https://github.com/OpenMinis/MinisSkills)

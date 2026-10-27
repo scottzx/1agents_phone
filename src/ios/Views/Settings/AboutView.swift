@@ -23,7 +23,7 @@ struct AboutView: View {
                                     .stroke(Color(UIColor.separator), lineWidth: 0.5)
                             )
                     }
-                    Text("Yima / 一伴")
+                    Text("Yima / 一芥伙伴")
                         .font(.title2.bold())
                     Text("Version \(appVersion)")
                         .font(.subheadline)

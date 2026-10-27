@@ -74,7 +74,7 @@ fun AboutScreen(onBack: () -> Unit) {
                 )
             }
             Text(
-                "Yima / 一伴",
+                "Yima / 一芥伙伴",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
             )

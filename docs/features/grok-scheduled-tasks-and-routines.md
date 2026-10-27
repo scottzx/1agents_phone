@@ -1,6 +1,6 @@
 # Grok 系列定时任务与例行自动化深度解析（Scheduled Tasks & Routines）
 
-> 本文系统梳理 `../1agents_app/reference_repo/` 中两个 Grok 项目（**`grok-bot-0.18-reconstructed`** 与 **`grok-build`**）在**定时任务（Scheduler）、例行流程（Routine）、多事件源监听（Event Triggers）与安静唤醒（Quiet Wake）**等方面的架构实现，为 `1agents_phone`（一伴）的例行自动化体系升级提供完整参考。
+> 本文系统梳理 `../1agents_app/reference_repo/` 中两个 Grok 项目（**`grok-bot-0.18-reconstructed`** 与 **`grok-build`**）在**定时任务（Scheduler）、例行流程（Routine）、多事件源监听（Event Triggers）与安静唤醒（Quiet Wake）**等方面的架构实现，为 `1agents_phone`（一芥伙伴）的例行自动化体系升级提供完整参考。
 
 ---
 
